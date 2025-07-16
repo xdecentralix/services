@@ -189,6 +189,7 @@ async fn init_liquidity(
             web3.clone(),
             &contracts,
             config.pool_deny_list.clone(),
+            config.graph_api_key.clone(),
         )
         .await
         .context("failed to create balancer pool fetcher")?,

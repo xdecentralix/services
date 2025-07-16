@@ -15,6 +15,7 @@ const MAX_NUMBER_OF_RETRIES: usize = 10;
 pub struct SubgraphClient {
     client: Client,
     subgraph_url: Url,
+    api_key: Option<String>,
 }
 
 pub trait ContainsId {
@@ -29,10 +30,11 @@ pub struct Data<T> {
 
 impl SubgraphClient {
     /// Creates a new subgraph client from the specified organization and name.
-    pub fn try_new(subgraph_url: Url, client: Client) -> Result<Self> {
+    pub fn try_new(subgraph_url: Url, client: Client, api_key: Option<String>) -> Result<Self> {
         Ok(Self {
             client,
             subgraph_url,
+            api_key,
         })
     }
 
@@ -45,13 +47,20 @@ impl SubgraphClient {
         // introduced retry mechanism that should efficiently help since failures are
         // quick and we need 1 or 2 retries to succeed.
         for _ in 0..MAX_NUMBER_OF_RETRIES {
-            match self
+            let mut request_builder = self
                 .client
                 .post(self.subgraph_url.clone())
                 .json(&Query {
                     query,
                     variables: variables.clone(),
-                })
+                });
+            
+            // Add Authorization header if API key is provided
+            if let Some(api_key) = &self.api_key {
+                request_builder = request_builder.header("Authorization", format!("Bearer {}", api_key));
+            }
+            
+            match request_builder
                 .send()
                 .await?
                 .json::<QueryResponse<T>>()

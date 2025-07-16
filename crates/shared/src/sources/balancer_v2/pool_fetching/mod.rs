@@ -303,8 +303,9 @@ impl BalancerPoolFetcher {
         web3: Web3,
         contracts: &BalancerContracts,
         deny_listed_pool_ids: Vec<H256>,
+        api_key: Option<String>,
     ) -> Result<Self> {
-        let pool_initializer = BalancerSubgraphClient::from_subgraph_url(subgraph_url, client)?;
+        let pool_initializer = BalancerSubgraphClient::from_subgraph_url(subgraph_url, client, api_key)?;
         let web3 = ethrpc::instrumented::instrument_with_label(&web3, "balancerV2".into());
         let fetcher = Arc::new(Cache::new(
             create_aggregate_pool_fetcher(

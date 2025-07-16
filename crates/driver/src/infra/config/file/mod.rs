@@ -554,6 +554,10 @@ enum UniswapV3Config {
         /// access to new pools.
         #[serde(with = "humantime_serde", default = "default_reinit_interval")]
         reinit_interval: Option<Duration>,
+
+        /// Graph API key for subgraph queries
+        #[serde(rename = "graph-api-key")]
+        graph_api_key: Option<String>,
     },
 
     #[serde(rename_all = "kebab-case")]
@@ -572,6 +576,10 @@ enum UniswapV3Config {
         /// access to new pools.
         #[serde(with = "humantime_serde", default = "default_reinit_interval")]
         reinit_interval: Option<Duration>,
+
+        /// Graph API key for subgraph queries
+        #[serde(rename = "graph-api-key")]
+        graph_api_key: Option<String>,
     },
 }
 
@@ -605,6 +613,10 @@ enum BalancerV2Config {
         /// access to new pools.
         #[serde(with = "humantime_serde", default = "default_reinit_interval")]
         reinit_interval: Option<Duration>,
+
+        /// Graph API key for subgraph queries
+        #[serde(rename = "graph-api-key")]
+        graph_api_key: Option<String>,
     },
 
     #[serde(rename_all = "kebab-case")]
@@ -646,6 +658,10 @@ enum BalancerV2Config {
         /// access to new pools.
         #[serde(with = "humantime_serde", default = "default_reinit_interval")]
         reinit_interval: Option<Duration>,
+
+        /// Graph API key for subgraph queries
+        #[serde(rename = "graph-api-key")]
+        graph_api_key: Option<String>,
     },
 }
 

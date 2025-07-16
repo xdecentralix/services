@@ -138,6 +138,7 @@ async fn init_liquidity(
             boundary::liquidity::http_client(),
             block_retriever,
             config.max_pools_to_initialize,
+            config.graph_api_key.clone(),
         )
         .await
         .context("failed to initialise UniswapV3 liquidity")?,

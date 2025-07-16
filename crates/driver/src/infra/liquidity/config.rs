@@ -152,17 +152,21 @@ pub struct UniswapV3 {
     /// How often the liquidity source should be reinitialized to
     /// become aware of new pools.
     pub reinit_interval: Option<Duration>,
+
+    /// Graph API key for subgraph queries
+    pub graph_api_key: Option<String>,
 }
 
 impl UniswapV3 {
     /// Returns the liquidity configuration for Uniswap V3.
     #[allow(clippy::self_named_constructors)]
-    pub fn uniswap_v3(graph_url: &Url, chain: Chain) -> Option<Self> {
+    pub fn uniswap_v3(graph_url: &Url, chain: Chain, graph_api_key: Option<String>) -> Option<Self> {
         Some(Self {
             router: deployment_address(contracts::UniswapV3SwapRouter::raw_contract(), chain)?,
             max_pools_to_initialize: 100,
             graph_url: graph_url.clone(),
             reinit_interval: None,
+            graph_api_key,
         })
     }
 }
@@ -201,12 +205,15 @@ pub struct BalancerV2 {
     /// How often the liquidty source should be re-initialized to become
     /// aware of new pools.
     pub reinit_interval: Option<Duration>,
+
+    /// Graph API key for subgraph queries
+    pub graph_api_key: Option<String>,
 }
 
 impl BalancerV2 {
     /// Returns the liquidity configuration for Balancer V2.
     #[allow(clippy::self_named_constructors)]
-    pub fn balancer_v2(graph_url: &Url, chain: Chain) -> Option<Self> {
+    pub fn balancer_v2(graph_url: &Url, chain: Chain, graph_api_key: Option<String>) -> Option<Self> {
         let factory_addresses =
             |contracts: &[&ethcontract::Contract]| -> Vec<eth::ContractAddress> {
                 contracts
@@ -241,6 +248,7 @@ impl BalancerV2 {
             pool_deny_list: Vec::new(),
             graph_url: graph_url.clone(),
             reinit_interval: None,
+            graph_api_key,
         })
     }
 }

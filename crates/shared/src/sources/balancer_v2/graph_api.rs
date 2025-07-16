@@ -34,8 +34,8 @@ pub struct BalancerSubgraphClient(SubgraphClient);
 
 impl BalancerSubgraphClient {
     /// Creates a new Balancer subgraph client with full subgraph URL.
-    pub fn from_subgraph_url(subgraph_url: &Url, client: Client) -> Result<Self> {
-        Ok(Self(SubgraphClient::try_new(subgraph_url.clone(), client)?))
+    pub fn from_subgraph_url(subgraph_url: &Url, client: Client, api_key: Option<String>) -> Result<Self> {
+        Ok(Self(SubgraphClient::try_new(subgraph_url.clone(), client, api_key)?))
     }
 
     /// Retrieves the list of registered pools from the subgraph.

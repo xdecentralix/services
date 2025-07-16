@@ -107,8 +107,8 @@ pub struct UniV3SubgraphClient(SubgraphClient);
 
 impl UniV3SubgraphClient {
     /// Creates a new Uniswap V3 subgraph client from the specified URL.
-    pub fn from_subgraph_url(subgraph_url: &Url, client: Client) -> Result<Self> {
-        Ok(Self(SubgraphClient::try_new(subgraph_url.clone(), client)?))
+    pub fn from_subgraph_url(subgraph_url: &Url, client: Client, api_key: Option<String>) -> Result<Self> {
+        Ok(Self(SubgraphClient::try_new(subgraph_url.clone(), client, api_key)?))
     }
 
     async fn get_pools(&self, query: &str, variables: Map<String, Value>) -> Result<Vec<PoolData>> {
