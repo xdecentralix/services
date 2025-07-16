@@ -466,6 +466,10 @@ struct LiquidityConfig {
     #[serde(default)]
     balancer_v2: Vec<BalancerV2Config>,
 
+    /// Liquidity provided by a Balancer V3 compatible contract.
+    #[serde(default)]
+    balancer_v3: Vec<BalancerV3Config>,
+
     /// Liquidity provided by 0x API.
     #[serde(default)]
     zeroex: Option<ZeroExConfig>,
@@ -669,6 +673,63 @@ enum BalancerV2Config {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 enum BalancerV2Preset {
     BalancerV2,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged, deny_unknown_fields)]
+enum BalancerV3Config {
+    #[serde(rename_all = "kebab-case")]
+    Preset {
+        preset: BalancerV3Preset,
+
+        /// Deny listed Balancer V3 pools.
+        #[serde(default)]
+        pool_deny_list: Vec<eth::H256>,
+
+        /// The URL used to connect to balancer v3 subgraph client.
+        graph_url: Url,
+
+        /// How often the liquidity source should be reinitialized to get
+        /// access to new pools.
+        #[serde(with = "humantime_serde", default = "default_reinit_interval")]
+        reinit_interval: Option<Duration>,
+
+        /// Graph API key for subgraph queries
+        #[serde(rename = "graph-api-key")]
+        graph_api_key: Option<String>,
+    },
+
+    #[serde(rename_all = "kebab-case")]
+    Manual {
+        /// Addresses of Balancer V3 compatible vault contract.
+        vault: eth::H160,
+
+        /// The weighted pool factory contract addresses.
+        #[serde(default)]
+        weighted: Vec<eth::H160>,
+
+        /// Deny listed Balancer V3 pools.
+        #[serde(default)]
+        pool_deny_list: Vec<eth::H256>,
+
+        /// The URL used to connect to balancer v3 subgraph client.
+        graph_url: Url,
+
+        /// How often the liquidity source should be reinitialized to get
+        /// access to new pools.
+        #[serde(with = "humantime_serde", default = "default_reinit_interval")]
+        reinit_interval: Option<Duration>,
+
+        /// Graph API key for subgraph queries
+        #[serde(rename = "graph-api-key")]
+        graph_api_key: Option<String>,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+enum BalancerV3Preset {
+    BalancerV3,
 }
 
 fn default_reinit_interval() -> Option<Duration> {

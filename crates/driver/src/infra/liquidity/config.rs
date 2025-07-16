@@ -30,6 +30,10 @@ pub struct Config {
     /// for.
     pub balancer_v2: Vec<BalancerV2>,
 
+    /// The collection of Balancer V3 compatible exchanges to fetch liquidity
+    /// for.
+    pub balancer_v3: Vec<BalancerV3>,
+
     /// 0x liquidity fetcher.
     pub zeroex: Option<ZeroEx>,
 }
@@ -244,6 +248,59 @@ impl BalancerV2 {
                 contracts::BalancerV2ComposableStablePoolFactoryV4::raw_contract(),
                 contracts::BalancerV2ComposableStablePoolFactoryV5::raw_contract(),
                 contracts::BalancerV2ComposableStablePoolFactoryV6::raw_contract(),
+            ]),
+            pool_deny_list: Vec::new(),
+            graph_url: graph_url.clone(),
+            reinit_interval: None,
+            graph_api_key,
+        })
+    }
+}
+
+/// Balancer V3 liquidity fetching options.
+#[derive(Clone, Debug)]
+pub struct BalancerV3 {
+    /// The address of the Balancer V3 compatible vault contract.
+    pub vault: eth::ContractAddress,
+
+    /// Weighted pool factory addresses.
+    pub weighted: Vec<eth::ContractAddress>,
+
+    /// Deny listed Balancer V3 pools.
+    ///
+    /// Since pools allow for custom controllers and logic, it is possible for
+    /// pools to get "bricked". This configuration allows those pools to be
+    /// ignored.
+    pub pool_deny_list: Vec<eth::H256>,
+
+    /// The base URL used to connect to balancer v3 subgraph client.
+    pub graph_url: Url,
+
+    /// How often the liquidty source should be re-initialized to become
+    /// aware of new pools.
+    pub reinit_interval: Option<Duration>,
+
+    /// Graph API key for subgraph queries
+    pub graph_api_key: Option<String>,
+}
+
+impl BalancerV3 {
+    /// Returns the liquidity configuration for Balancer V3.
+    #[allow(clippy::self_named_constructors)]
+    pub fn balancer_v3(graph_url: &Url, chain: Chain, graph_api_key: Option<String>) -> Option<Self> {
+        let factory_addresses =
+            |contracts: &[&ethcontract::Contract]| -> Vec<eth::ContractAddress> {
+                contracts
+                    .iter()
+                    .copied()
+                    .filter_map(|c| deployment_address(c, chain))
+                    .collect()
+            };
+
+        Some(Self {
+            vault: deployment_address(contracts::BalancerV3Vault::raw_contract(), chain)?,
+            weighted: factory_addresses(&[
+                contracts::BalancerV3WeightedPoolFactory::raw_contract(),
             ]),
             pool_deny_list: Vec::new(),
             graph_url: graph_url.clone(),

@@ -313,6 +313,51 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                     },
                 })
                 .collect(),
+            balancer_v3: config
+                .liquidity
+                .balancer_v3
+                .iter()
+                .cloned()
+                .map(|config| match config {
+                    file::BalancerV3Config::Preset {
+                        preset,
+                        pool_deny_list,
+                        graph_url,
+                        reinit_interval,
+                        graph_api_key,
+                        ..
+                    } => liquidity::config::BalancerV3 {
+                        pool_deny_list: pool_deny_list.clone(),
+                        reinit_interval,
+                        graph_api_key: graph_api_key.clone(),
+                        ..match preset {
+                            file::BalancerV3Preset::BalancerV3 => {
+                                liquidity::config::BalancerV3::balancer_v3(&graph_url, chain, graph_api_key)
+                            }
+                        }
+                        .expect("no Balancer V3 preset for current network")
+                    },
+                    file::BalancerV3Config::Manual {
+                        vault,
+                        weighted,
+                        pool_deny_list,
+                        graph_url,
+                        reinit_interval,
+                        graph_api_key,
+                        ..
+                    } => liquidity::config::BalancerV3 {
+                        vault: vault.into(),
+                        weighted: weighted
+                            .into_iter()
+                            .map(eth::ContractAddress::from)
+                            .collect(),
+                        pool_deny_list: pool_deny_list.clone(),
+                        graph_url,
+                        reinit_interval,
+                        graph_api_key,
+                    },
+                })
+                .collect(),
             zeroex: config
                 .liquidity
                 .zeroex
