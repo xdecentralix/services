@@ -71,6 +71,9 @@ include_contracts! {
     BalancerV2WeightedPoolFactoryV3;
     BalancerV2WeightedPoolFactoryV4;
     BalancerV3BatchRouter;
+    BalancerV3Vault;
+    BalancerV3WeightedPool;
+    BalancerV3WeightedPoolFactory;
     BaoswapRouter;
     CowAmm;
     CowAmmConstantProductFactory;

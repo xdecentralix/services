@@ -5014,6 +5014,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-opentelemetry",
+ "url",
  "web3",
 ]
 

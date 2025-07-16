@@ -991,6 +991,115 @@ fn main() {
     });
     generate_contract("BalancerV2LiquidityBootstrappingPool");
     generate_contract("BalancerV2ComposableStablePool");
+    // Balancer V3 contracts
+    generate_contract_with_config("BalancerV3Vault", |builder| {
+        builder
+            .add_network(
+                MAINNET,
+                Network {
+                    address: addr("0xbA1333333333a1BA1108E8412f11850A5C319bA9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(21332121)),
+                },
+            )
+            .add_network(
+                GNOSIS,
+                Network {
+                    address: addr("0xbA1333333333a1BA1108E8412f11850A5C319bA9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(37360338)),
+                },
+            )
+            .add_network(
+                SEPOLIA,
+                Network {
+                    address: addr("0xbA1333333333a1BA1108E8412f11850A5C319bA9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(7212247)),
+                },
+            )
+            .add_network(
+                ARBITRUM_ONE,
+                Network {
+                    address: addr("0xbA1333333333a1BA1108E8412f11850A5C319bA9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(297810187)),
+                },
+            )
+            .add_network(
+                BASE,
+                Network {
+                    address: addr("0xbA1333333333a1BA1108E8412f11850A5C319bA9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(25343854)),
+                },
+            )
+            .add_network(
+                AVALANCHE,
+                Network {
+                    address: addr("0xbA1333333333a1BA1108E8412f11850A5C319bA9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(59955604)),
+                },
+            )
+            .add_network(
+                OPTIMISM,
+                Network {
+                    address: addr("0xbA1333333333a1BA1108E8412f11850A5C319bA9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(133969439)),
+                },
+            )
+    });
+    
+    generate_contract_with_config("BalancerV3WeightedPoolFactory", |builder| {
+        builder
+            .add_network(
+                ARBITRUM_ONE,
+                Network {
+                    address: addr("0xD961E30156C2E0D0d925A0De45f931CB7815e970"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(297830075)),
+                },
+            )
+            .add_network(
+                AVALANCHE,
+                Network {
+                    address: addr("0xD961E30156C2E0D0d925A0De45f931CB7815e970"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(59965815)),
+                },
+            )
+            .add_network(
+                BASE,
+                Network {
+                    address: addr("0x5cF4928a3205728bd12830E1840F7DB85c62a4B9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(25347415)),
+                },
+            )
+            .add_network(
+                GNOSIS,
+                Network {
+                    address: addr("0xEB1eeaBF0126d813589C3D2CfeFFE410D9aE3863"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(37371691)),
+                },
+            )
+            .add_network(
+                MAINNET,
+                Network {
+                    address: addr("0x201efd508c8DfE9DE1a13c2452863A78CB2a86Cc"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(21336937)),
+                },
+            )
+            .add_network(
+                OPTIMISM,
+                Network {
+                    address: addr("0x0f08eEf2C785AA5e7539684aF04755dEC1347b7c"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(133969639)),
+                },
+            )
+            
+            .add_network(
+                SEPOLIA,
+                Network {
+                    address: addr("0x7532d5a3bE916e4a4D900240F49F0BABd4FD855C"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(7216947)),
+                },
+            )
+    });
+    
+    generate_contract("BalancerV3WeightedPool");
     generate_contract_with_config("BalancerV3BatchRouter", |builder| {
         builder
             .add_network(

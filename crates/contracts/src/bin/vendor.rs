@@ -206,6 +206,26 @@ fn run() -> Result<()> {
             "ChainalysisOracle",
             "Chainalysis does not publish its code",
         );
+        
+    // Balancer V3 contracts - Vault and Factory under full (like V2)
+    vendor
+        .full()
+        .github(
+            "BalancerV3Vault",
+            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241204-v3-vault/artifact/Vault.json",
+        )?
+        .github(
+            "BalancerV3WeightedPoolFactory",
+            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-weighted-pool/artifact/WeightedPoolFactory.json",
+        )?;
+
+    // Balancer V3 contracts - Individual pools under ABI only (like V2)
+    vendor
+        .abi_only()
+        .github(
+            "BalancerV3WeightedPool",
+            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-weighted-pool/artifact/WeightedPool.json",
+        )?;
 
     Ok(())
 }
