@@ -72,7 +72,8 @@ impl BalancerApiClient {
                         "orderDirection" => "desc",
                         "where" => json!({
                             "chainIn": [self.chain],
-                            "poolTypeIn": ["WEIGHTED", "STABLE", "LIQUIDITY_BOOTSTRAPPING", "COMPOSABLE_STABLE"]
+                            "poolTypeIn": ["WEIGHTED", "STABLE", "LIQUIDITY_BOOTSTRAPPING", "COMPOSABLE_STABLE"],
+                            "protocolVersionIn": [2]
                         }),
                     }),
                 )
@@ -80,10 +81,7 @@ impl BalancerApiClient {
                 .pool_get_pools;
 
             let no_more_pages = page.len() != QUERY_PAGE_SIZE;
-            
-            // Filter for V2 pools only (protocol version 2)
-            let v2_pools: Vec<_> = page.into_iter().filter(|pool| pool.is_v2_pool()).collect();
-            pools.extend(v2_pools);
+            pools.extend(page);
 
             if no_more_pages {
                 break;
