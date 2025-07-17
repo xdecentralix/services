@@ -8,6 +8,7 @@ use {
         infra::{self, blockchain::Ethereum},
     },
     anyhow::{Context, Result},
+    chain::Chain,
     contracts::{
         BalancerV2ComposableStablePoolFactory,
         BalancerV2LiquidityBootstrappingPoolFactory,
@@ -24,6 +25,7 @@ use {
             BalancerFactoryKind,
             BalancerPoolFetcher,
             pool_fetching::BalancerContracts,
+            GqlChain,
         },
         token_info::{CachedTokenInfoFetcher, TokenInfoFetcher},
     },
@@ -37,6 +39,23 @@ use {
 
 pub mod stable;
 pub mod weighted;
+
+/// Maps a Chain to the corresponding GqlChain for Balancer API v3.
+fn chain_to_gql_chain(chain: &Chain) -> GqlChain {
+    match chain {
+        Chain::Mainnet => GqlChain::MAINNET,
+        Chain::Goerli => GqlChain::SEPOLIA, // Goerli is deprecated, use Sepolia
+        Chain::Sepolia => GqlChain::SEPOLIA,
+        Chain::Gnosis => GqlChain::GNOSIS,
+        Chain::Polygon => GqlChain::POLYGON,
+        Chain::ArbitrumOne => GqlChain::ARBITRUM,
+        Chain::Optimism => GqlChain::OPTIMISM,
+        Chain::Base => GqlChain::BASE,
+        Chain::Bnb => GqlChain::BSC,
+        Chain::Avalanche => GqlChain::AVALANCHE,
+        Chain::Hardhat => GqlChain::MAINNET, // Hardhat is a local testnet, default to mainnet
+    }
+}
 
 struct Pool {
     vault: eth::ContractAddress,
@@ -189,7 +208,7 @@ async fn init_liquidity(
             web3.clone(),
             &contracts,
             config.pool_deny_list.clone(),
-            config.graph_api_key.clone(),
+            chain_to_gql_chain(&eth.chain()),
         )
         .await
         .context("failed to create balancer pool fetcher")?,

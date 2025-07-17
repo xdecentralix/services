@@ -209,15 +209,12 @@ pub struct BalancerV2 {
     /// How often the liquidty source should be re-initialized to become
     /// aware of new pools.
     pub reinit_interval: Option<Duration>,
-
-    /// Graph API key for subgraph queries
-    pub graph_api_key: Option<String>,
 }
 
 impl BalancerV2 {
     /// Returns the liquidity configuration for Balancer V2.
     #[allow(clippy::self_named_constructors)]
-    pub fn balancer_v2(graph_url: &Url, chain: Chain, graph_api_key: Option<String>) -> Option<Self> {
+    pub fn balancer_v2(graph_url: &Url, chain: Chain, _graph_api_key: Option<String>) -> Option<Self> {
         let factory_addresses =
             |contracts: &[&ethcontract::Contract]| -> Vec<eth::ContractAddress> {
                 contracts
@@ -252,7 +249,6 @@ impl BalancerV2 {
             pool_deny_list: Vec::new(),
             graph_url: graph_url.clone(),
             reinit_interval: None,
-            graph_api_key,
         })
     }
 }
@@ -279,15 +275,12 @@ pub struct BalancerV3 {
     /// How often the liquidty source should be re-initialized to become
     /// aware of new pools.
     pub reinit_interval: Option<Duration>,
-
-    /// Graph API key for subgraph queries
-    pub graph_api_key: Option<String>,
 }
 
 impl BalancerV3 {
     /// Returns the liquidity configuration for Balancer V3.
     #[allow(clippy::self_named_constructors)]
-    pub fn balancer_v3(graph_url: &Url, chain: Chain, graph_api_key: Option<String>) -> Option<Self> {
+    pub fn balancer_v3(graph_url: &Url, chain: Chain, _graph_api_key: Option<String>) -> Option<Self> {
         let factory_addresses =
             |contracts: &[&ethcontract::Contract]| -> Vec<eth::ContractAddress> {
                 contracts
@@ -305,7 +298,6 @@ impl BalancerV3 {
             pool_deny_list: Vec::new(),
             graph_url: graph_url.clone(),
             reinit_interval: None,
-            graph_api_key,
         })
     }
 }

@@ -2,13 +2,13 @@
 
 use {
     super::{FactoryIndexing, Pool, PoolIndexing as _, PoolStatus},
-    crate::{
-        sources::balancer_v2::{
-            graph_api::{PoolData, PoolType},
-            swap::fixed_point::Bfp,
+                    crate::{
+            sources::balancer_v2::{
+                graph_api::{PoolData, PoolType},
+                swap::fixed_point::Bfp,
+            },
+            token_info::TokenInfoFetching,
         },
-        token_info::TokenInfoFetching,
-    },
     anyhow::{Context, Result, anyhow, ensure},
     contracts::{BalancerV2BasePool, BalancerV2Vault},
     ethcontract::{BlockId, Bytes, H160, H256, U256},
@@ -217,14 +217,14 @@ pub struct PoolInfo {
 impl PoolInfo {
     /// Loads a pool info from Graph pool data.
     pub fn from_graph_data(pool: &PoolData, block_created: u64) -> Result<Self> {
-        ensure!(pool.tokens.len() > 1, "insufficient tokens in pool");
+        ensure!(pool.tokens().len() > 1, "insufficient tokens in pool");
 
         Ok(PoolInfo {
-            id: pool.id,
+            id: pool.id_as_h256()?,
             address: pool.address,
-            tokens: pool.tokens.iter().map(|token| token.address).collect(),
+            tokens: pool.tokens().iter().map(|token| token.address).collect(),
             scaling_factors: pool
-                .tokens
+                .tokens()
                 .iter()
                 .map(|token| scaling_factor_from_decimals(token.decimals))
                 .collect::<Result<_>>()?,
@@ -236,9 +236,9 @@ impl PoolInfo {
     /// to be the specified value.
     pub fn for_type(pool_type: PoolType, pool: &PoolData, block_created: u64) -> Result<Self> {
         ensure!(
-            pool.pool_type == pool_type,
+            pool.pool_type_enum() == pool_type,
             "cannot convert {:?} pool to {:?} pool",
-            pool.pool_type,
+            pool.pool_type_enum(),
             pool_type,
         );
         Self::from_graph_data(pool, block_created)
@@ -338,7 +338,7 @@ mod tests {
         super::*,
         crate::{
             sources::balancer_v2::{
-                graph_api::{PoolType, Token},
+                graph_api::{Token, GqlChain, DynamicData, PoolData},
                 pools::{MockFactoryIndexing, PoolKind, weighted},
             },
             token_info::{MockTokenInfoFetching, TokenInfo},
@@ -779,12 +779,13 @@ mod tests {
     #[test]
     fn convert_graph_pool_to_common_pool_info() {
         let pool = PoolData {
-            pool_type: PoolType::Stable,
             id: H256([4; 32]),
             address: H160([3; 20]),
+            pool_type: "STABLE".to_string(),
+            protocol_version: 2,
             factory: H160([0xfb; 20]),
-            swap_enabled: true,
-            tokens: vec![
+            chain: GqlChain::MAINNET,
+            pool_tokens: vec![
                 Token {
                     address: H160([0x33; 20]),
                     decimals: 3,
@@ -796,6 +797,8 @@ mod tests {
                     weight: None,
                 },
             ],
+            dynamic_data: DynamicData { swap_enabled: true },
+            create_time: 0,
         };
 
         assert_eq!(
@@ -813,16 +816,19 @@ mod tests {
     #[test]
     fn pool_conversion_insufficient_tokens() {
         let pool = PoolData {
-            pool_type: PoolType::Weighted,
             id: H256([2; 32]),
             address: H160([1; 20]),
+            pool_type: "WEIGHTED".to_string(),
+            protocol_version: 2,
             factory: H160([0; 20]),
-            swap_enabled: true,
-            tokens: vec![Token {
+            chain: GqlChain::MAINNET,
+            pool_tokens: vec![Token {
                 address: H160([2; 20]),
                 decimals: 18,
                 weight: Some("1.337".parse().unwrap()),
             }],
+            dynamic_data: DynamicData { swap_enabled: true },
+            create_time: 0,
         };
         assert!(PoolInfo::from_graph_data(&pool, 42).is_err());
     }
@@ -830,12 +836,13 @@ mod tests {
     #[test]
     fn pool_conversion_invalid_decimals() {
         let pool = PoolData {
-            pool_type: PoolType::Weighted,
             id: H256([2; 32]),
             address: H160([1; 20]),
+            pool_type: "WEIGHTED".to_string(),
+            protocol_version: 2,
             factory: H160([0; 20]),
-            swap_enabled: true,
-            tokens: vec![
+            chain: GqlChain::MAINNET,
+            pool_tokens: vec![
                 Token {
                     address: H160([2; 20]),
                     decimals: 19,
@@ -847,6 +854,8 @@ mod tests {
                     weight: Some("1.337".parse().unwrap()),
                 },
             ],
+            dynamic_data: DynamicData { swap_enabled: true },
+            create_time: 0,
         };
         assert!(PoolInfo::from_graph_data(&pool, 42).is_err());
     }

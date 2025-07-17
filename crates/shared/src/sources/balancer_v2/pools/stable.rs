@@ -123,19 +123,20 @@ impl FactoryIndexing for BalancerV2StablePoolFactoryV2 {
 mod tests {
     use {
         super::*,
-        crate::sources::balancer_v2::graph_api::Token,
+        crate::sources::balancer_v2::graph_api::{Token, GqlChain, DynamicData, PoolData},
         ethcontract::{H160, H256},
     };
 
     #[test]
-    fn errors_when_converting_wrong_pool_type() {
+    fn convert_graph_pool_to_stable_pool_info() {
         let pool = PoolData {
-            pool_type: PoolType::Weighted,
             id: H256([2; 32]),
             address: H160([1; 20]),
+            pool_type: "STABLE".to_string(),
+            protocol_version: 2,
             factory: H160([0xfa; 20]),
-            swap_enabled: true,
-            tokens: vec![
+            chain: GqlChain::MAINNET,
+            pool_tokens: vec![
                 Token {
                     address: H160([0x11; 20]),
                     decimals: 1,
@@ -147,9 +148,22 @@ mod tests {
                     weight: None,
                 },
             ],
+            dynamic_data: DynamicData { swap_enabled: true },
+            create_time: 0,
         };
 
-        assert!(PoolInfo::from_graph_data(&pool, 42).is_err());
+        assert_eq!(
+            PoolInfo::from_graph_data(&pool, 42).unwrap(),
+            PoolInfo {
+                common: common::PoolInfo {
+                    id: H256([2; 32]),
+                    address: H160([1; 20]),
+                    tokens: vec![H160([0x11; 20]), H160([0x22; 20])],
+                    scaling_factors: vec![Bfp::exp10(17), Bfp::exp10(16)],
+                    block_created: 42,
+                },
+            },
+        );
     }
 
     #[test]

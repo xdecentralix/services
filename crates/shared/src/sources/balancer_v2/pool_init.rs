@@ -4,7 +4,7 @@
 //! with existing data in order to reduce the "cold start" time of the service.
 
 use {
-    super::graph_api::{BalancerSubgraphClient, RegisteredPools},
+    super::graph_api::{BalancerApiClient, RegisteredPools},
     anyhow::Result,
 };
 
@@ -14,14 +14,14 @@ pub trait PoolInitializing: Send + Sync {
 }
 
 #[async_trait::async_trait]
-impl PoolInitializing for BalancerSubgraphClient {
+impl PoolInitializing for BalancerApiClient {
     async fn initialize_pools(&self) -> Result<RegisteredPools> {
         let registered_pools = self.get_registered_pools().await?;
         tracing::debug!(
             block = %registered_pools.fetched_block_number, pools = %registered_pools.pools.len(),
-            "initialized registered pools",
+            "initialized {} pools from Balancer API v3",
+            registered_pools.pools.len()
         );
-
         Ok(registered_pools)
     }
 }

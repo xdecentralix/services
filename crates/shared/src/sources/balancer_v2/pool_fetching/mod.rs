@@ -12,7 +12,7 @@ use {
         registry::Registry,
     },
     super::{
-        graph_api::{BalancerSubgraphClient, RegisteredPools},
+        graph_api::{BalancerApiClient, GqlChain, RegisteredPools},
         pool_init::PoolInitializing,
         pools::{
             FactoryIndexing,
@@ -303,9 +303,9 @@ impl BalancerPoolFetcher {
         web3: Web3,
         contracts: &BalancerContracts,
         deny_listed_pool_ids: Vec<H256>,
-        api_key: Option<String>,
+        chain: GqlChain,
     ) -> Result<Self> {
-        let pool_initializer = BalancerSubgraphClient::from_subgraph_url(subgraph_url, client, api_key)?;
+        let pool_initializer = BalancerApiClient::from_subgraph_url(subgraph_url, client, chain)?;
         let web3 = ethrpc::instrumented::instrument_with_label(&web3, "balancerV2".into());
         let fetcher = Arc::new(Cache::new(
             create_aggregate_pool_fetcher(
