@@ -1,6 +1,6 @@
-//! Balancer pool registry initialization.
+//! Balancer V3 pool registry initialization.
 //!
-//! This module contains a component used to initialize Balancer pool registries
+//! This module contains a component used to initialize Balancer V3 pool registries
 //! with existing data in order to reduce the "cold start" time of the service.
 
 use {
@@ -19,9 +19,9 @@ impl PoolInitializing for BalancerApiClient {
         let registered_pools = self.get_registered_pools().await?;
         tracing::debug!(
             block = %registered_pools.fetched_block_number, pools = %registered_pools.pools.len(),
-            "initialized {} V2 pools from Balancer API v3",
+            "initialized {} V3 pools from Balancer API v3",
             registered_pools.pools.len()
         );
         Ok(registered_pools)
     }
-}
+} 
