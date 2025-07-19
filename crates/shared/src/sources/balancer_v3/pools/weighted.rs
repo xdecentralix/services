@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn convert_graph_pool_to_weighted_pool_info() {
         let pool = PoolData {
-            id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+            id: "0x1111111111111111111111111111111111111111".to_string(),
             address: H160([1; 20]),
             pool_type: "WEIGHTED".to_string(),
             protocol_version: 3,
@@ -159,7 +159,7 @@ mod tests {
             PoolInfo::from_graph_data(&pool, 42).unwrap(),
             PoolInfo {
                 common: common::PoolInfo {
-                    id: H256([0x11; 32]),
+                    id: H160([0x11; 20]),
                     address: H160([1; 20]),
                     tokens: vec![H160([0x11; 20]), H160([0x22; 20])],
                     scaling_factors: vec![Bfp::exp10(17), Bfp::exp10(16)],
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn errors_when_converting_wrong_pool_type() {
         let pool = PoolData {
-            id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+            id: "0x1111111111111111111111111111111111111111".to_string(),
             address: H160([1; 20]),
             pool_type: "STABLE".to_string(),
             protocol_version: 3,
@@ -215,7 +215,7 @@ mod tests {
         let factory = BalancerV3WeightedPoolFactory::at(&web3, H160([0xfa; 20]));
         let pool = factory
             .specialize_pool_info(common::PoolInfo {
-                id: H256([1; 32]),
+                id: H160([1; 20]),
                 address: pool.address(),
                 tokens: vec![H160([0x11; 20]), H160([0x22; 20]), H160([0x33; 20])],
                 scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0), Bfp::exp10(0)],
@@ -234,7 +234,7 @@ mod tests {
 
         let pool_info = PoolInfo {
             common: common::PoolInfo {
-                id: H256([1; 32]),
+                id: H160([1; 20]),
                 address: H160([1; 20]),
                 tokens: vec![H160([0x11; 20]), H160([0x22; 20])],
                 scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0)],

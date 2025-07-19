@@ -258,6 +258,7 @@ impl BalancerV2 {
 pub struct BalancerV3 {
     /// The address of the Balancer V3 compatible vault contract.
     pub vault: eth::ContractAddress,
+    pub vault_extension: eth::ContractAddress,
 
     /// Weighted pool factory addresses.
     pub weighted: Vec<eth::ContractAddress>,
@@ -292,6 +293,7 @@ impl BalancerV3 {
 
         Some(Self {
             vault: deployment_address(contracts::BalancerV3Vault::raw_contract(), chain)?,
+            vault_extension: deployment_address(contracts::BalancerV3VaultExtension::raw_contract(), chain)?,
             weighted: factory_addresses(&[
                 contracts::BalancerV3WeightedPoolFactory::raw_contract(),
             ]),

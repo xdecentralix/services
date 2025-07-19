@@ -1045,6 +1045,59 @@ fn main() {
             )
     });
     
+    generate_contract_with_config("BalancerV3VaultExtension", |builder| {
+        builder
+            .add_network(
+                MAINNET,
+                Network {
+                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(21332121)),
+                },
+            )
+            .add_network(
+                GNOSIS,
+                Network {
+                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(37360338)),
+                },
+            )
+            .add_network(
+                SEPOLIA,
+                Network {
+                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(7212247)),
+                },
+            )
+            .add_network(
+                ARBITRUM_ONE,
+                Network {
+                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(297810187)),
+                },
+            )
+            .add_network(
+                BASE,
+                Network {
+                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(25343854)),
+                },
+            )
+            .add_network(
+                AVALANCHE,
+                Network {
+                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(59955604)),
+                },
+            )
+            .add_network(
+                OPTIMISM,
+                Network {
+                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(133969439)),
+                },
+            )
+    });
+    
     generate_contract_with_config("BalancerV3WeightedPoolFactory", |builder| {
         builder
             .add_network(

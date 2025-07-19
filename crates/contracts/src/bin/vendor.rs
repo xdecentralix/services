@@ -215,6 +215,10 @@ fn run() -> Result<()> {
             "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241204-v3-vault/artifact/Vault.json",
         )?
         .github(
+            "BalancerV3VaultExtension",
+            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241204-v3-vault/artifact/VaultExtension.json",
+        )?
+        .github(
             "BalancerV3WeightedPoolFactory",
             "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-weighted-pool/artifact/WeightedPoolFactory.json",
         )?;

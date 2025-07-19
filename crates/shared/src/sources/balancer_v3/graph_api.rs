@@ -7,11 +7,11 @@
 //! - ensure that we are using the latest up-to-date pool data by using events
 //!   from the node
 
+const QUERY_PAGE_SIZE: usize = 100;
+
 use {
-    crate::{
-        subgraph_client::{SubgraphClient, QUERY_PAGE_SIZE},
-        token_info::TokenInfoFetching,
-    },
+    super::swap::fixed_point::Bfp,
+    crate::subgraph::SubgraphClient,
     anyhow::{Context, Result},
     ethcontract::{H160, H256},
     reqwest::{Client, Url},
@@ -168,7 +168,7 @@ pub struct Token {
     pub decimals: u8,
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[serde(default)]
-    pub weight: Option<crate::swap::fixed_point::Bfp>,
+    pub weight: Option<Bfp>,
 }
 
 /// Supported pool kinds for V3.

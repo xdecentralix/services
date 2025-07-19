@@ -32,12 +32,6 @@ pub enum PoolKind {
     Weighted(weighted::PoolState),
 }
 
-impl From<weighted::PoolState> for PoolKind {
-    fn from(state: weighted::PoolState) -> Self {
-        Self::Weighted(state)
-    }
-}
-
 macro_rules! impl_from_state {
     ($from:ty, $variant:ident) => {
         impl From<$from> for PoolKind {

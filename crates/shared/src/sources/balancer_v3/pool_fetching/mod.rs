@@ -34,6 +34,7 @@ use {
     contracts::{
         BalancerV3WeightedPoolFactory,
         BalancerV3Vault,
+        BalancerV3VaultExtension,
     },
     ethcontract::{BlockId, H160, Instance, dyns::DynInstance},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
@@ -45,6 +46,7 @@ use {
     },
 };
 pub use {
+    common::TokenState,
     weighted::{TokenState as WeightedTokenState, Version as WeightedPoolVersion},
 };
 
@@ -145,6 +147,7 @@ impl BalancerFactoryKind {
 /// All balancer V3 related contracts that we expect to exist.
 pub struct BalancerContracts {
     pub vault: BalancerV3Vault,
+    pub vault_extension: BalancerV3VaultExtension,
     pub factories: Vec<(BalancerFactoryKind, DynInstance)>,
 }
 
@@ -154,6 +157,9 @@ impl BalancerContracts {
         let vault = BalancerV3Vault::deployed(&web3)
             .await
             .context("Cannot retrieve balancer V3 vault")?;
+        let vault_extension = BalancerV3VaultExtension::deployed(&web3)
+            .await
+            .context("Cannot retrieve balancer V3 vault extension")?;
 
         macro_rules! instance {
             ($factory:ident) => {{
@@ -176,7 +182,7 @@ impl BalancerContracts {
             factories.push((factory_kind, factory_instance));
         }
 
-        Ok(BalancerContracts { vault, factories })
+        Ok(BalancerContracts { vault, vault_extension, factories })
     }
 }
 
@@ -256,29 +262,63 @@ async fn create_aggregate_pool_fetcher(
     token_infos: Arc<dyn TokenInfoFetching>,
     contracts: &BalancerContracts,
 ) -> Result<Aggregate> {
+    let registered_pools = pool_initializer.initialize_pools().await?;
+    let fetched_block_number = registered_pools.fetched_block_number;
+    let fetched_block_hash = web3
+        .eth()
+        .block(BlockId::Number(fetched_block_number.into()))
+        .await?
+        .context("failed to get block by block number")?
+        .hash
+        .context("missing hash from block")?;
+    let mut registered_pools_by_factory = registered_pools.group_by_factory();
+
+    macro_rules! registry {
+        ($factory:ident, $instance:expr_2021) => {{
+            create_internal_pool_fetcher(
+                contracts.vault.clone(),
+                contracts.vault_extension.clone(),
+                $factory::with_deployment_info(
+                    &$instance.web3(),
+                    $instance.address(),
+                    $instance.deployment_information(),
+                ),
+                block_retriever.clone(),
+                token_infos.clone(),
+                $instance,
+                registered_pools_by_factory
+                    .remove(&$instance.address())
+                    .unwrap_or_else(|| RegisteredPools::empty(fetched_block_number)),
+                fetched_block_number,
+            )?
+        }};
+    }
+
     let mut fetchers = Vec::new();
-
     for (factory_kind, factory_instance) in &contracts.factories {
-        let registered_pools = pool_initializer
-            .get_pools_for_factory(*factory_kind)
-            .await?;
-
-        let fetcher = match factory_kind {
+        let registry = match factory_kind {
             BalancerFactoryKind::Weighted => {
-                create_internal_pool_fetcher(
-                    contracts.vault.clone(),
-                    weighted::BalancerV3WeightedPoolFactory,
-                    block_retriever.clone(),
-                    token_infos.clone(),
-                    factory_instance,
-                    registered_pools,
-                    registered_pools.fetched_block_number,
-                )
-                .await?
+                registry!(BalancerV3WeightedPoolFactory, factory_instance)
             }
         };
+        fetchers.push(registry);
+    }
 
-        fetchers.push(fetcher);
+    // Just to catch cases where new Balancer factories get added for a pool
+    // kind, but we don't index it, log a warning for unused pools.
+    if !registered_pools_by_factory.is_empty() {
+        let total_count = registered_pools_by_factory
+            .values()
+            .map(|registered| registered.pools.len())
+            .sum::<usize>();
+        let factories = registered_pools_by_factory
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
+        tracing::warn!(
+            %total_count, ?factories,
+            "found pools that don't correspond to any known Balancer V3 pool factory",
+        );
     }
 
     Ok(Aggregate::new(fetchers))
@@ -286,6 +326,7 @@ async fn create_aggregate_pool_fetcher(
 
 fn create_internal_pool_fetcher<Factory>(
     vault: BalancerV3Vault,
+    vault_extension: BalancerV3VaultExtension,
     factory: Factory,
     block_retriever: Arc<dyn BlockRetrieving>,
     token_infos: Arc<dyn TokenInfoFetching>,
@@ -298,6 +339,7 @@ where
 {
     let pool_info_fetcher = Arc::new(PoolInfoFetcher::new(
         vault,
+        vault_extension,
         factory_instance.clone(),
         token_infos,
     ));

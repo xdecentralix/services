@@ -10,8 +10,8 @@ use {
         token_info::TokenInfoFetching,
     },
     anyhow::{Context, Result, anyhow, ensure},
-    contracts::{BalancerV3BasePool, BalancerV3Vault},
-    ethcontract::{BlockId, Bytes, H160, H256, U256},
+    contracts::{BalancerV3BasePool, BalancerV3Vault, BalancerV3VaultExtension},
+    ethcontract::{BlockId, Bytes, H160, U256},
     futures::{FutureExt as _, TryFutureExt, future::BoxFuture},
     std::{collections::BTreeMap, future::Future, sync::Arc},
     tokio::sync::oneshot,
@@ -41,6 +41,7 @@ where
 /// on a pool factory type and its inner pool type.
 pub struct PoolInfoFetcher<Factory> {
     vault: BalancerV3Vault,
+    vault_extension: BalancerV3VaultExtension,
     factory: Factory,
     token_infos: Arc<dyn TokenInfoFetching>,
 }
@@ -48,21 +49,23 @@ pub struct PoolInfoFetcher<Factory> {
 impl<Factory> PoolInfoFetcher<Factory> {
     pub fn new(
         vault: BalancerV3Vault,
+        vault_extension: BalancerV3VaultExtension,
         factory: Factory,
         token_infos: Arc<dyn TokenInfoFetching>,
     ) -> Self {
         Self {
             vault,
+            vault_extension,
             factory,
             token_infos,
         }
     }
 
-    /// Returns a Balancer V3 base pool contract instance at the specified address.
-    fn base_pool_at(&self, pool_address: H160) -> BalancerV3BasePool {
-        let web3 = self.vault.raw_instance().web3();
-        BalancerV3BasePool::at(&web3, pool_address)
-    }
+        /// Returns a Balancer V3 base pool contract instance at the specified address.
+        fn base_pool_at(&self, pool_address: H160) -> BalancerV3BasePool {
+            let web3 = self.vault.raw_instance().web3();
+            BalancerV3BasePool::at(&web3, pool_address)
+        }
 
     /// Retrieves the scaling exponents for the specified tokens.
     async fn scaling_factors(&self, tokens: &[H160]) -> Result<Vec<Bfp>> {
@@ -86,13 +89,12 @@ impl<Factory> PoolInfoFetcher<Factory> {
         block_created: u64,
     ) -> Result<PoolInfo> {
         let pool = self.base_pool_at(pool_address);
-
         // For V3, pool_id is the pool address itself (H160)
         let pool_id = pool_address;
-        let (tokens, _, _) = self
-            .vault
+        let (tokens, _, _, _) = self
+            .vault_extension
             .methods()
-            .get_pool_tokens(Bytes(pool_id.0))
+            .get_pool_token_info(pool_address)
             .call()
             .await?;
         let scaling_factors = self.scaling_factors(&tokens).await?;
@@ -112,15 +114,24 @@ impl<Factory> PoolInfoFetcher<Factory> {
         block: BlockId,
     ) -> BoxFuture<'static, Result<PoolState>> {
         let pool_contract = self.base_pool_at(pool.address);
-        let fetch_paused = pool_contract
-            .get_paused_state()
+
+        let fetch_paused = self
+            .vault_extension
+            .methods()
+            .get_pool_paused_state(pool.address)
             .block(block)
             .call()
             .map_ok(|result| result.0);
-        let fetch_swap_fee = pool_contract.get_swap_fee_percentage().block(block).call();
+        let fetch_swap_fee = self
+            .vault_extension
+            .methods()
+            .get_static_swap_fee_percentage(pool.address)
+            .block(block)
+            .call();
         let fetch_balances = self
-            .vault
-            .get_pool_tokens(Bytes(pool.id.0))
+            .vault_extension
+            .methods()
+            .get_pool_token_info(pool.address)
             .block(block)
             .call();
 
@@ -134,9 +145,9 @@ impl<Factory> PoolInfoFetcher<Factory> {
                 futures::try_join!(fetch_paused, fetch_swap_fee, fetch_balances)?;
             let swap_fee = Bfp::from_wei(swap_fee);
 
-            let (token_addresses, balances, _) = balances;
+            let (token_addresses, _, balances_raw, _) = balances;
             ensure!(pool.tokens == token_addresses, "pool token mismatch");
-            let tokens = itertools::izip!(&pool.tokens, balances, &pool.scaling_factors)
+            let tokens = itertools::izip!(&pool.tokens, balances_raw, &pool.scaling_factors)
                 .map(|(&address, balance, &scaling_factor)| {
                     (
                         address,
@@ -289,7 +300,7 @@ pub fn scaling_factor_from_decimals(decimals: u8) -> Result<Bfp> {
 pub fn scaling_exponent_from_decimals(decimals: u8) -> Result<u8> {
     // Technically this should never fail for Balancer Pools since tokens
     // with more than 18 decimals (not supported by balancer contracts)
-    // https://github.com/balancer-labs/balancer-v2-monorepo/blob/deployments-latest/pkg/pool-utils/contracts/BasePool.sol#L476-L487
+    // V3 uses the same scaling factor logic as V2
     18u8.checked_sub(decimals)
         .context("unsupported token with more than 18 decimals")
 }
@@ -363,13 +374,12 @@ mod tests {
         let mock = Mock::new(42);
         let web3 = mock.web3();
 
-        let pool = mock.deploy(BalancerV3BasePool::raw_contract().interface.abi.clone());
-
         let vault = mock.deploy(BalancerV3Vault::raw_contract().interface.abi.clone());
-        vault
-            .expect_call(BalancerV3Vault::signatures().get_pool_tokens())
-            .predicate((predicate::eq(Bytes(pool_id.0)),))
-            .returns((tokens.to_vec(), vec![], U256::zero()));
+        let vault_extension = mock.deploy(BalancerV3VaultExtension::raw_contract().interface.abi.clone());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_token_info())
+            .predicate((predicate::eq(pool_id),))
+            .returns((tokens.to_vec(), vec![], vec![], vec![]));
 
         let mut token_infos = MockTokenInfoFetching::new();
         token_infos
@@ -385,6 +395,7 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault: BalancerV3Vault::at(&web3, vault.address()),
+            vault_extension: BalancerV3VaultExtension::at(&web3, vault_extension.address()),
             factory: MockFactoryIndexing::new(),
             token_infos: Arc::new(token_infos),
         };
@@ -415,32 +426,37 @@ mod tests {
         let mock = Mock::new(42);
         let web3 = mock.web3();
 
-        let pool = mock.deploy(BalancerV3BasePool::raw_contract().interface.abi.clone());
-        pool.expect_call(BalancerV3BasePool::signatures().get_paused_state())
-            .returns((false, 0.into(), 0.into()));
-        pool.expect_call(BalancerV3BasePool::signatures().get_swap_fee_percentage())
-            .returns(bfp!("0.003").as_uint256());
-
         let vault = mock.deploy(BalancerV3Vault::raw_contract().interface.abi.clone());
-        vault
-            .expect_call(BalancerV3Vault::signatures().get_pool_tokens())
-            .predicate((predicate::eq(Bytes(pool_id.0)),))
+        let vault_extension = mock.deploy(BalancerV3VaultExtension::raw_contract().interface.abi.clone());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_paused_state())
+            .predicate((predicate::eq(pool_id),))
+            .returns((false, 0.into(), 0.into(), H160::zero()));
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_static_swap_fee_percentage())
+            .predicate((predicate::eq(pool_id),))
+            .returns(bfp!("0.003").as_uint256());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_token_info())
+            .predicate((predicate::eq(pool_id),))
             .returns((
                 tokens.to_vec(),
+                vec![],
                 balances.into_iter().map(Bfp::as_uint256).collect(),
-                0.into(),
+                vec![],
             ));
 
         let token_infos = MockTokenInfoFetching::new();
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault: BalancerV3Vault::at(&web3, vault.address()),
+            vault_extension: BalancerV3VaultExtension::at(&web3, vault_extension.address()),
             factory: MockFactoryIndexing::new(),
             token_infos: Arc::new(token_infos),
         };
         let pool_info = PoolInfo {
             id: pool_id,
-            address: pool.address(),
+            address: pool_id,
             tokens: tokens.to_vec(),
             scaling_factors: scaling_factors.to_vec(),
             block_created: 1337,
@@ -480,36 +496,42 @@ mod tests {
     #[tokio::test]
     async fn fetch_state_errors_on_token_mismatch() {
         let tokens = [H160([1; 20]), H160([2; 20]), H160([3; 20])];
+        let pool_id = H160::zero();
 
         let mock = Mock::new(42);
         let web3 = mock.web3();
 
-        let pool = mock.deploy(BalancerV3BasePool::raw_contract().interface.abi.clone());
-        pool.expect_call(BalancerV3BasePool::signatures().get_paused_state())
-            .returns((false, 0.into(), 0.into()));
-        pool.expect_call(BalancerV3BasePool::signatures().get_swap_fee_percentage())
-            .returns(0.into());
-
         let vault = mock.deploy(BalancerV3Vault::raw_contract().interface.abi.clone());
-        vault
-            .expect_call(BalancerV3Vault::signatures().get_pool_tokens())
-            .predicate((predicate::eq(Bytes(Default::default())),))
+        let vault_extension = mock.deploy(BalancerV3VaultExtension::raw_contract().interface.abi.clone());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_paused_state())
+            .predicate((predicate::eq(pool_id),))
+            .returns((false, 0.into(), 0.into(), H160::zero()));
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_static_swap_fee_percentage())
+            .predicate((predicate::eq(pool_id),))
+            .returns(0.into());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_token_info())
+            .predicate((predicate::eq(pool_id),))
             .returns((
                 vec![H160([1; 20]), H160([4; 20])],
+                vec![],
                 vec![0.into(), 0.into()],
-                0.into(),
+                vec![],
             ));
 
         let token_infos = MockTokenInfoFetching::new();
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault: BalancerV3Vault::at(&web3, vault.address()),
+            vault_extension: BalancerV3VaultExtension::at(&web3, vault_extension.address()),
             factory: MockFactoryIndexing::new(),
             token_infos: Arc::new(token_infos),
         };
         let pool_info = PoolInfo {
-            id: pool.address(),
-            address: pool.address(),
+            id: pool_id,
+            address: pool_id,
             tokens: tokens.to_vec(),
             scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0), Bfp::exp10(0)],
             block_created: 1337,
@@ -533,20 +555,24 @@ mod tests {
         let mock = Mock::new(42);
         let web3 = mock.web3();
 
-        let pool = mock.deploy(BalancerV3BasePool::raw_contract().interface.abi.clone());
-        pool.expect_call(BalancerV3BasePool::signatures().get_paused_state())
-            .returns((false, 0.into(), 0.into()));
-        pool.expect_call(BalancerV3BasePool::signatures().get_swap_fee_percentage())
-            .returns(bfp!("0.003").as_uint256());
-
         let vault = mock.deploy(BalancerV3Vault::raw_contract().interface.abi.clone());
-        vault
-            .expect_call(BalancerV3Vault::signatures().get_pool_tokens())
-            .predicate((predicate::eq(Bytes(pool_id.0)),))
+        let vault_extension = mock.deploy(BalancerV3VaultExtension::raw_contract().interface.abi.clone());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_paused_state())
+            .predicate((predicate::eq(pool_id),))
+            .returns((false, 0.into(), 0.into(), H160::zero()));
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_static_swap_fee_percentage())
+            .predicate((predicate::eq(pool_id),))
+            .returns(bfp!("0.003").as_uint256());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_token_info())
+            .predicate((predicate::eq(pool_id),))
             .returns((
                 tokens.to_vec(),
+                vec![],
                 balances.into_iter().map(Bfp::as_uint256).collect(),
-                0.into(),
+                vec![],
             ));
 
         let mut mock_factory = MockFactoryIndexing::new();
@@ -572,13 +598,14 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault: BalancerV3Vault::at(&web3, vault.address()),
+            vault_extension: BalancerV3VaultExtension::at(&web3, vault_extension.address()),
             factory: mock_factory,
             token_infos: Arc::new(token_infos),
         };
         let pool_info = weighted::PoolInfo {
             common: PoolInfo {
                 id: pool_id,
-                address: pool.address(),
+                address: pool_id,
                 tokens: tokens.to_vec(),
                 scaling_factors: scaling_factors.to_vec(),
                 block_created: 1337,
@@ -612,11 +639,12 @@ mod tests {
         let mock = Mock::new(42);
         let web3 = mock.web3();
 
-        let pool = mock.deploy(BalancerV3BasePool::raw_contract().interface.abi.clone());
-        pool.expect_call(BalancerV3BasePool::signatures().get_paused_state())
-            .returns((true, 0.into(), 0.into()));
-
         let vault = mock.deploy(BalancerV3Vault::raw_contract().interface.abi.clone());
+        let vault_extension = mock.deploy(BalancerV3VaultExtension::raw_contract().interface.abi.clone());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_paused_state())
+            .predicate((predicate::eq(pool_id),))
+            .returns((true, 0.into(), 0.into(), H160::zero()));
 
         let mut mock_factory = MockFactoryIndexing::new();
         mock_factory
@@ -630,13 +658,14 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault: BalancerV3Vault::at(&web3, vault.address()),
+            vault_extension: BalancerV3VaultExtension::at(&web3, vault_extension.address()),
             factory: mock_factory,
             token_infos: Arc::new(token_infos),
         };
         let pool_info = weighted::PoolInfo {
             common: PoolInfo {
                 id: pool_id,
-                address: pool.address(),
+                address: pool_id,
                 tokens: vec![H160([1; 20]), H160([2; 20])],
                 scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0)],
                 block_created: 1337,
@@ -664,20 +693,24 @@ mod tests {
         let mock = Mock::new(42);
         let web3 = mock.web3();
 
-        let pool = mock.deploy(BalancerV3BasePool::raw_contract().interface.abi.clone());
-        pool.expect_call(BalancerV3BasePool::signatures().get_paused_state())
-            .returns((false, 0.into(), 0.into()));
-        pool.expect_call(BalancerV3BasePool::signatures().get_swap_fee_percentage())
-            .returns(bfp!("0.003").as_uint256());
-
         let vault = mock.deploy(BalancerV3Vault::raw_contract().interface.abi.clone());
-        vault
-            .expect_call(BalancerV3Vault::signatures().get_pool_tokens())
-            .predicate((predicate::eq(Bytes(pool_id.0)),))
+        let vault_extension = mock.deploy(BalancerV3VaultExtension::raw_contract().interface.abi.clone());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_paused_state())
+            .predicate((predicate::eq(pool_id),))
+            .returns((false, 0.into(), 0.into(), H160::zero()));
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_static_swap_fee_percentage())
+            .predicate((predicate::eq(pool_id),))
+            .returns(bfp!("0.003").as_uint256());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_token_info())
+            .predicate((predicate::eq(pool_id),))
             .returns((
                 tokens.to_vec(),
+                vec![],
                 balances.into_iter().map(Bfp::as_uint256).collect(),
-                0.into(),
+                vec![],
             ));
 
         let mut mock_factory = MockFactoryIndexing::new();
@@ -689,13 +722,14 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault: BalancerV3Vault::at(&web3, vault.address()),
+            vault_extension: BalancerV3VaultExtension::at(&web3, vault_extension.address()),
             factory: mock_factory,
             token_infos: Arc::new(token_infos),
         };
         let pool_info = weighted::PoolInfo {
             common: PoolInfo {
                 id: pool_id,
-                address: pool.address(),
+                address: pool_id,
                 tokens: tokens.to_vec(),
                 scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0)],
                 block_created: 1337,
@@ -722,13 +756,12 @@ mod tests {
         let mock = Mock::new(42);
         let web3 = mock.web3();
 
-        let pool = mock.deploy(BalancerV3BasePool::raw_contract().interface.abi.clone());
-
         let vault = mock.deploy(BalancerV3Vault::raw_contract().interface.abi.clone());
-        vault
-            .expect_call(BalancerV3Vault::signatures().get_pool_tokens())
-            .predicate((predicate::eq(Bytes(pool_id.0)),))
-            .returns((tokens.to_vec(), vec![], U256::zero()));
+        let vault_extension = mock.deploy(BalancerV3VaultExtension::raw_contract().interface.abi.clone());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_token_info())
+            .predicate((predicate::eq(pool_id),))
+            .returns((tokens.to_vec(), vec![], vec![], vec![]));
 
         let mut token_infos = MockTokenInfoFetching::new();
         token_infos
@@ -737,6 +770,7 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault: BalancerV3Vault::at(&web3, vault.address()),
+            vault_extension: BalancerV3VaultExtension::at(&web3, vault_extension.address()),
             factory: MockFactoryIndexing::new(),
             token_infos: Arc::new(token_infos),
         };
@@ -753,13 +787,12 @@ mod tests {
         let mock = Mock::new(42);
         let web3 = mock.web3();
 
-        let pool = mock.deploy(BalancerV3BasePool::raw_contract().interface.abi.clone());
-
         let vault = mock.deploy(BalancerV3Vault::raw_contract().interface.abi.clone());
-        vault
-            .expect_call(BalancerV3Vault::signatures().get_pool_tokens())
-            .predicate((predicate::eq(Bytes(pool_id.0)),))
-            .returns((tokens.to_vec(), vec![], U256::zero()));
+        let vault_extension = mock.deploy(BalancerV3VaultExtension::raw_contract().interface.abi.clone());
+        vault_extension
+            .expect_call(BalancerV3VaultExtension::signatures().get_pool_token_info())
+            .predicate((predicate::eq(pool_id),))
+            .returns((tokens.to_vec(), vec![], vec![], vec![]));
 
         let mut token_infos = MockTokenInfoFetching::new();
         token_infos.expect_get_token_infos().returning(|tokens| {
@@ -779,6 +812,7 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault: BalancerV3Vault::at(&web3, vault.address()),
+            vault_extension: BalancerV3VaultExtension::at(&web3, vault_extension.address()),
             factory: MockFactoryIndexing::new(),
             token_infos: Arc::new(token_infos),
         };
