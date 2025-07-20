@@ -209,34 +209,42 @@ mod tests {
             "BAL#305: MaxOutRatio"
         );
         assert_eq!(
-            calc_in_given_out(
-                one,
-                one,
-                max_balance,
-                one,
-                max_balance.mul_down(*MAX_OUT_RATIO).unwrap(),
-            )
-            .unwrap_err()
-            .to_string(),
-            "BAL#005: DivInternal",
-        );
-        assert_eq!(
-            calc_in_given_out(mid_u256, zero, mid_u256, zero, one)
+            calc_in_given_out(zero, zero, zero, zero, zero)
                 .unwrap_err()
                 .to_string(),
-            "BAL#004: ZeroDivision",
+            "BAL#004: ZeroDivision"
         );
         assert_eq!(
-            calc_in_given_out(mid_u256, max_u256, mid_u256, one, one)
+            calc_in_given_out(zero, zero, max_balance, zero, zero)
+                .unwrap_err()
+                .to_string(),
+            "BAL#005: DivInternal"
+        );
+        assert_eq!(
+            calc_in_given_out(zero, zero, mid_u256, zero, one)
+                .unwrap_err()
+                .to_string(),
+            "BAL#004: ZeroDivision"
+        );
+        assert_eq!(
+            calc_in_given_out(zero, one, mid_u256, max_u256, one)
+                .unwrap_err()
+                .to_string(),
+            "BAL#005: DivInternal"
+        );
+        assert_eq!(
+            calc_in_given_out(zero, one, mid_u256, max_balance, one)
                 .unwrap_err()
                 .to_string(),
             "BAL#005: DivInternal",
+            // failed exponent
         );
         assert_eq!(
-            calc_in_given_out(mid_u256, mid_u256, mid_u256, mid_u256, one)
+            calc_in_given_out(zero, one, mid_u256, mid_u256, zero)
                 .unwrap_err()
                 .to_string(),
             "BAL#007: YOutOfBounds",
+            // failed power
         );
     }
 

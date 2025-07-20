@@ -43,6 +43,9 @@ pub enum Version {
 
 impl PoolIndexing for PoolInfo {
     fn from_graph_data(pool: &PoolData, block_created: u64) -> Result<Self> {
+        if pool.pool_type != "WEIGHTED" {
+            return Err(anyhow!("Expected WEIGHTED pool type, got {}", pool.pool_type));
+        }
         Ok(PoolInfo {
             common: common::PoolInfo::for_type(PoolType::Weighted, pool, block_created)?,
             weights: pool
@@ -124,7 +127,7 @@ mod tests {
         super::*,
         crate::sources::balancer_v3::graph_api::{Token, GqlChain, DynamicData, PoolData},
         contracts::dummy_contract,
-        ethcontract::H160,
+        ethcontract::{H160, BlockNumber},
         ethcontract_mock::Mock,
         futures::future,
         maplit::btreemap,
@@ -143,12 +146,12 @@ mod tests {
                 Token {
                     address: H160([0x11; 20]),
                     decimals: 1,
-                    weight: Some(bfp!("1.337")),
+                    weight: Some(bfp_v3!("1.337")),
                 },
                 Token {
                     address: H160([0x22; 20]),
                     decimals: 2,
-                    weight: Some(bfp!("4.2")),
+                    weight: Some(bfp_v3!("4.2")),
                 },
             ],
             dynamic_data: DynamicData { swap_enabled: true },
@@ -159,7 +162,7 @@ mod tests {
             PoolInfo::from_graph_data(&pool, 42).unwrap(),
             PoolInfo {
                 common: common::PoolInfo {
-                    id: H160([0x11; 20]),
+                    id: H160([1; 20]),
                     address: H160([1; 20]),
                     tokens: vec![H160([0x11; 20]), H160([0x22; 20])],
                     scaling_factors: vec![Bfp::exp10(17), Bfp::exp10(16)],
@@ -186,12 +189,12 @@ mod tests {
                 Token {
                     address: H160([0x11; 20]),
                     decimals: 1,
-                    weight: Some(bfp!("1.337")),
+                    weight: Some(bfp_v3!("1.337")),
                 },
                 Token {
                     address: H160([0x22; 20]),
                     decimals: 2,
-                    weight: Some(bfp!("4.2")),
+                    weight: Some(bfp_v3!("4.2")),
                 },
             ],
             dynamic_data: DynamicData { swap_enabled: true },
@@ -203,7 +206,7 @@ mod tests {
 
     #[tokio::test]
     async fn fetch_weighted_pool() {
-        let weights = [bfp!("0.5"), bfp!("0.25"), bfp!("0.25")];
+        let weights = [bfp_v3!("0.5"), bfp_v3!("0.25"), bfp_v3!("0.25")];
 
         let mock = Mock::new(42);
         let web3 = mock.web3();
@@ -265,8 +268,8 @@ mod tests {
         let pool_state = factory
             .fetch_pool_state(
                 &pool_info,
-                Box::pin(future::ok(common_pool_state)),
-                BlockId::Latest,
+                future::ready(common_pool_state).boxed(),
+                BlockId::Number(BlockNumber::Latest),
             )
             .await
             .unwrap()

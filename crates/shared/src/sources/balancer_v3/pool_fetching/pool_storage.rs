@@ -121,9 +121,9 @@ where
             self.pools_by_token
                 .entry(*token)
                 .or_default()
-                .insert(pool.common().address);
+                .insert(pool.common().id);
         }
-        self.pools.insert(pool.common().address, pool);
+        self.pools.insert(pool.common().id, pool);
     }
 
     /// Indexes a new pool creation event.
@@ -229,7 +229,7 @@ mod tests {
     use {
         super::*,
         crate::sources::balancer_v3::{
-            pools::{weighted, common},
+            pools::{weighted, common, MockFactoryIndexing},
             swap::fixed_point::Bfp,
         },
         ethcontract::H160,
@@ -315,7 +315,7 @@ mod tests {
                     ],
                 },
             ],
-            Arc::new(common::MockPoolInfoFetching::<weighted::BalancerV3WeightedPoolFactory>::new()),
+            Arc::new(common::MockPoolInfoFetching::<MockFactoryIndexing>::new()),
         );
 
         assert_eq!(
@@ -334,7 +334,7 @@ mod tests {
         let n = 3usize;
         let (pool_ids, pool_addresses, tokens, weights, creation_events) = pool_init_data(0, n);
 
-        let mut mock_pool_fetcher = common::MockPoolInfoFetching::<weighted::BalancerV3WeightedPoolFactory>::new();
+        let mut mock_pool_fetcher = common::MockPoolInfoFetching::<MockFactoryIndexing>::new();
         for i in 0..n {
             let expected_pool_data = weighted::PoolInfo {
                 common: common::PoolInfo {
@@ -406,7 +406,7 @@ mod tests {
         let (pool_ids, pool_addresses, tokens, weights, creation_events) =
             pool_init_data(start_block, end_block);
 
-        let mut mock_pool_fetcher = common::MockPoolInfoFetching::<weighted::BalancerV3WeightedPoolFactory>::new();
+        let mut mock_pool_fetcher = common::MockPoolInfoFetching::<MockFactoryIndexing>::new();
         for i in start_block..=end_block {
             let expected_pool_data = weighted::PoolInfo {
                 common: common::PoolInfo {
@@ -531,7 +531,7 @@ mod tests {
 
         let mut registry = PoolStorage::new(
             Default::default(),
-            Arc::new(common::MockPoolInfoFetching::<weighted::BalancerV3WeightedPoolFactory>::new()),
+            Arc::new(common::MockPoolInfoFetching::<MockFactoryIndexing>::new()),
         );
         for token_pair in &token_pairs {
             assert_eq!(registry.pool_ids_for_token_pair(token_pair).next(), None);

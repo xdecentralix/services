@@ -28,8 +28,7 @@ pub struct BalancerApiClient {
 }
 
 /// Supported chains in Balancer V3 API.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, Hash)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq, Hash)]
 pub enum GqlChain {
     MAINNET,
     GNOSIS,
@@ -138,7 +137,7 @@ impl RegisteredPools {
 }
 
 /// Pool data from the Balancer V3 API.
-#[derive(Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PoolData {
     pub id: String, // V3 uses 20-byte pool addresses as IDs
@@ -154,7 +153,7 @@ pub struct PoolData {
 }
 
 /// Dynamic data for pools from Balancer V3 API.
-#[derive(Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DynamicData {
     pub swap_enabled: bool,
@@ -266,7 +265,6 @@ mod pools_query {
 mod tests {
     use super::*;
     use ethcontract::H160;
-    use maplit::{hashmap, hashset};
 
     #[test]
     fn decode_pools_data() {

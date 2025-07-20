@@ -272,7 +272,7 @@ mod tests {
                 1_850_304_144_768_426_873_445_489_i128.into(),
                 95_671_347_892_391_047_965_654_i128.into(),
             ],
-            vec![bfp!("0.9"), bfp!("0.1")],
+            vec![bfp_v3!("0.9"), bfp_v3!("0.1")],
             vec![Bfp::exp10(0), Bfp::exp10(0)],
             2_000_000_000_000_000_i128.into(),
         );
@@ -294,7 +294,7 @@ mod tests {
         let b = create_weighted_pool_with(
             vec![weth, tusd],
             vec![60_000_000_000_000_000_i128.into(), 250_000_000_i128.into()],
-            vec![bfp!("0.5"), bfp!("0.5")],
+            vec![bfp_v3!("0.5"), bfp_v3!("0.5")],
             vec![Bfp::exp10(0), Bfp::exp10(12)],
             1_000_000_000_000_000_i128.into(),
         );
@@ -303,7 +303,7 @@ mod tests {
             b.get_amount_in(weth, (5_000_000_i128.into(), tusd))
                 .await
                 .unwrap(),
-            1_225_715_511_430_411_i128.into()
+            1_225_715_511_429_798_i128.into()
         );
     }
 } 

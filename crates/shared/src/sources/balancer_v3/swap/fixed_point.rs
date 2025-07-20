@@ -12,6 +12,7 @@ use {
     std::{
         convert::TryFrom,
         fmt::{self, Debug, Formatter},
+        ops::Add,
         str::FromStr,
         sync::LazyLock,
     },
@@ -210,6 +211,14 @@ impl Bfp {
 
             raw.add(max_error)
         }
+    }
+}
+
+impl Add for Bfp {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        self.add(other).unwrap()
     }
 }
 

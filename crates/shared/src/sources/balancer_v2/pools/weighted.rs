@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn convert_graph_pool_to_weighted_pool_info() {
         let pool = PoolData {
-            id: H256([2; 32]),
+            id: format!("0x{}", hex::encode(H256([2; 32]).0)),
             address: H160([1; 20]),
             pool_type: "WEIGHTED".to_string(),
             protocol_version: 2,
@@ -198,7 +198,7 @@ mod tests {
     #[test]
     fn errors_when_converting_wrong_pool_type() {
         let pool = PoolData {
-            id: H256([2; 32]),
+            id: format!("0x{}", hex::encode(H256([2; 32]).0)),
             address: H160([1; 20]),
             pool_type: "STABLE".to_string(),
             protocol_version: 2,

@@ -276,7 +276,7 @@ mod tests {
     use {
         super::*,
         crate::sources::balancer_v2::swap::fixed_point::Bfp,
-        ethcontract::{H160, H256},
+        ethcontract::{H160},
     };
 
     #[test]
