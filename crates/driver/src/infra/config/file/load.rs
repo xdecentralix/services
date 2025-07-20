@@ -333,6 +333,8 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                     },
                     file::BalancerV3Config::Manual {
                         vault,
+                        vault_extension,
+                        batch_router,
                         weighted,
                         pool_deny_list,
                         graph_url,
@@ -340,6 +342,8 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         ..
                     } => liquidity::config::BalancerV3 {
                         vault: vault.into(),
+                        vault_extension: vault_extension.into(),
+                        batch_router: batch_router.into(),
                         weighted: weighted
                             .into_iter()
                             .map(eth::ContractAddress::from)

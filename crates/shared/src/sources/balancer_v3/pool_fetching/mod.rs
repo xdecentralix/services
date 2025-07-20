@@ -35,13 +35,14 @@ use {
         BalancerV3WeightedPoolFactory,
         BalancerV3Vault,
         BalancerV3VaultExtension,
+        BalancerV3BatchRouter,
     },
-    ethcontract::{BlockId, H160, Instance, dyns::DynInstance},
+    ethcontract::{BlockId, H160, H256, Instance, dyns::DynInstance},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
     model::TokenPair,
     reqwest::{Client, Url},
     std::{
-        collections::{BTreeMap, HashMap, HashSet},
+        collections::{BTreeMap, HashSet},
         sync::Arc,
     },
 };
@@ -109,7 +110,7 @@ impl FetchedBalancerPools {
 
 #[mockall::automock]
 #[async_trait::async_trait]
-pub trait BalancerPoolFetching: Send + Sync {
+pub trait BalancerV3PoolFetching: Send + Sync {
     async fn fetch(
         &self,
         token_pairs: HashSet<TokenPair>,
@@ -148,6 +149,7 @@ impl BalancerFactoryKind {
 pub struct BalancerContracts {
     pub vault: BalancerV3Vault,
     pub vault_extension: BalancerV3VaultExtension,
+    pub batch_router: BalancerV3BatchRouter,
     pub factories: Vec<(BalancerFactoryKind, DynInstance)>,
 }
 
@@ -160,6 +162,9 @@ impl BalancerContracts {
         let vault_extension = BalancerV3VaultExtension::deployed(&web3)
             .await
             .context("Cannot retrieve balancer V3 vault extension")?;
+        let batch_router = BalancerV3BatchRouter::deployed(&web3)
+            .await
+            .context("Cannot retrieve balancer V3 batch router")?;
 
         macro_rules! instance {
             ($factory:ident) => {{
@@ -182,11 +187,12 @@ impl BalancerContracts {
             factories.push((factory_kind, factory_instance));
         }
 
-        Ok(BalancerContracts { vault, vault_extension, factories })
+        Ok(BalancerContracts { vault, vault_extension, batch_router, factories })
     }
 }
 
 impl BalancerPoolFetcher {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         subgraph_url: &Url,
         block_retriever: Arc<dyn BlockRetrieving>,
@@ -199,20 +205,23 @@ impl BalancerPoolFetcher {
         deny_listed_pool_ids: Vec<H160>,
         chain: GqlChain,
     ) -> Result<Self> {
-        let api_client = BalancerApiClient::from_subgraph_url(subgraph_url, client, chain)?;
-        let registered_pools = api_client.get_registered_pools().await?;
-        let aggregate = create_aggregate_pool_fetcher(
-            web3,
-            PoolInitializing::new(registered_pools),
-            block_retriever,
-            token_infos,
-            contracts,
-        )
-        .await?;
-        let fetcher = Cache::new(aggregate, config, block_stream)?;
+        let pool_initializer = BalancerApiClient::from_subgraph_url(subgraph_url, client, chain)?;
+        let web3 = ethrpc::instrumented::instrument_with_label(&web3, "balancerV3".into());
+        let fetcher = Arc::new(Cache::new(
+            create_aggregate_pool_fetcher(
+                web3,
+                pool_initializer,
+                block_retriever,
+                token_infos,
+                contracts,
+            )
+            .await?,
+            config,
+            block_stream,
+        )?);
 
         Ok(Self {
-            fetcher: Arc::new(fetcher),
+            fetcher,
             pool_id_deny_list: deny_listed_pool_ids,
         })
     }
@@ -222,34 +231,40 @@ impl BalancerPoolFetcher {
         token_pairs: HashSet<TokenPair>,
         at_block: Block,
     ) -> Result<Vec<Pool>> {
-        let pool_ids = self.fetcher.pool_ids_for_token_pairs(token_pairs).await;
-        let filtered_pool_ids: HashSet<H160> = pool_ids
-            .into_iter()
-            .filter(|pool_id| !self.pool_id_deny_list.contains(pool_id))
-            .collect();
-        self.fetcher.pools_by_id(filtered_pool_ids, at_block).await
+        let mut pool_ids = self.fetcher.pool_ids_for_token_pairs(token_pairs).await;
+        for id in &self.pool_id_deny_list {
+            pool_ids.remove(id);
+        }
+        let pools = self.fetcher.pools_by_id(pool_ids, at_block).await?;
+
+        Ok(pools)
     }
 }
 
-impl BalancerPoolFetching for BalancerPoolFetcher {
+#[async_trait::async_trait]
+impl BalancerV3PoolFetching for BalancerPoolFetcher {
     async fn fetch(
         &self,
         token_pairs: HashSet<TokenPair>,
         at_block: Block,
     ) -> Result<FetchedBalancerPools> {
         let pools = self.fetch_pools(token_pairs, at_block).await?;
-        let mut fetched_pools = FetchedBalancerPools::default();
 
-        for pool in pools {
-            match pool {
-                Pool::Weighted(weighted_pool) => {
-                    fetched_pools.weighted_pools.push(WeightedPool::new_unpaused(
-                        weighted_pool.common.id,
-                        weighted_pool,
-                    ));
+        // For now, split the `Vec<Pool>` into a `FetchedBalancerPools` to keep
+        // compatibility with the rest of the project. This should eventually
+        // be removed and we should use `balancer_v2::pools::Pool` everywhere
+        // instead.
+        let fetched_pools = pools.into_iter().fold(
+            FetchedBalancerPools::default(),
+            |mut fetched_pools, pool| {
+                match pool.kind {
+                    PoolKind::Weighted(state) => fetched_pools
+                        .weighted_pools
+                        .push(WeightedPool::new_unpaused(pool.id, state)),
                 }
-            }
-        }
+                fetched_pools
+            },
+        );
 
         Ok(fetched_pools)
     }
@@ -276,7 +291,6 @@ async fn create_aggregate_pool_fetcher(
     macro_rules! registry {
         ($factory:ident, $instance:expr_2021) => {{
             create_internal_pool_fetcher(
-                contracts.vault.clone(),
                 contracts.vault_extension.clone(),
                 $factory::with_deployment_info(
                     &$instance.web3(),
@@ -289,16 +303,16 @@ async fn create_aggregate_pool_fetcher(
                 registered_pools_by_factory
                     .remove(&$instance.address())
                     .unwrap_or_else(|| RegisteredPools::empty(fetched_block_number)),
-                fetched_block_number,
+                fetched_block_hash,
             )?
         }};
     }
 
     let mut fetchers = Vec::new();
-    for (factory_kind, factory_instance) in &contracts.factories {
-        let registry = match factory_kind {
+    for (kind, instance) in &contracts.factories {
+        let registry = match kind {
             BalancerFactoryKind::Weighted => {
-                registry!(BalancerV3WeightedPoolFactory, factory_instance)
+                registry!(BalancerV3WeightedPoolFactory, instance)
             }
         };
         fetchers.push(registry);
@@ -325,44 +339,29 @@ async fn create_aggregate_pool_fetcher(
 }
 
 fn create_internal_pool_fetcher<Factory>(
-    vault: BalancerV3Vault,
     vault_extension: BalancerV3VaultExtension,
     factory: Factory,
     block_retriever: Arc<dyn BlockRetrieving>,
     token_infos: Arc<dyn TokenInfoFetching>,
     factory_instance: &Instance<Web3Transport>,
     registered_pools: RegisteredPools,
-    fetched_block_hash: u64,
+    fetched_block_hash: H256,
 ) -> Result<Box<dyn InternalPoolFetching>>
 where
     Factory: FactoryIndexing,
 {
-    let pool_info_fetcher = Arc::new(PoolInfoFetcher::new(
-        vault,
-        vault_extension,
-        factory_instance.clone(),
-        token_infos,
-    ));
+    let initial_pools = registered_pools
+        .pools
+        .iter()
+        .map(|pool| Factory::PoolInfo::from_graph_data(pool, registered_pools.fetched_block_number))
+        .collect::<Result<_>>()?;
+    let start_sync_at_block = Some((registered_pools.fetched_block_number, fetched_block_hash));
 
-    let storage = pool_storage::PoolStorage::new(
-        registered_pools.pools.into_iter().map(|pool_data| {
-            Factory::PoolInfo::from_graph_data(pool_data, fetched_block_hash)
-        }).collect(),
-        pool_info_fetcher,
-    );
-
-    let registry = Registry::new(storage, block_retriever);
-    Ok(Box::new(registry))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn can_extract_address_from_pool_id() {
-        let pool_id = H160([1; 20]);
-        let address = pool_address_from_id(pool_id);
-        assert_eq!(address, pool_id);
-    }
+    Ok(Box::new(Registry::new(
+        block_retriever,
+        Arc::new(PoolInfoFetcher::new(vault_extension, factory, token_infos)),
+        factory_instance,
+        initial_pools,
+        start_sync_at_block,
+    )))
 } 

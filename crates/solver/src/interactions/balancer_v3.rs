@@ -1,7 +1,7 @@
 //! Module for Balancer V3 swap interactions.
 
 use {
-    contracts::{BalancerV3Vault, GPv2Settlement},
+    contracts::{BalancerV3BatchRouter, GPv2Settlement},
     ethcontract::{Bytes, H160},
     primitive_types::U256,
     shared::{
@@ -14,8 +14,8 @@ use {
 #[derive(Clone, Debug)]
 pub struct BalancerV3SwapGivenOutInteraction {
     pub settlement: GPv2Settlement,
-    pub vault: BalancerV3Vault,
-    pub pool_id: H160,
+    pub batch_router: BalancerV3BatchRouter,
+    pub pool: H160,
     pub asset_in_max: TokenAmount,
     pub asset_out: TokenAmount,
     pub user_data: Bytes<Vec<u8>>,
@@ -28,25 +28,23 @@ pub static NEVER: LazyLock<U256> = LazyLock::new(|| U256::from(1) << 255);
 
 impl BalancerV3SwapGivenOutInteraction {
     pub fn encode_swap(&self) -> EncodedInteraction {
-        // Convert H160 pool_id to bytes32 for V3 vault
-        let pool_id_bytes = self.pool_id.0;
-        let mut pool_id_32 = [0u8; 32];
-        pool_id_32[12..].copy_from_slice(&pool_id_bytes);
-
-        let method = self.vault.swap(
-            pool_id_32.into(),
-            0, // GivenOut for V3
-            self.asset_in_max.token,
-            self.asset_out.token,
-            self.asset_out.amount,
-            self.user_data.clone(),
-            self.settlement.address(), // sender
-            self.settlement.address(), // recipient
-            false,                     // fromInternalBalance
-            false,                     // toInternalBalance
+        let method = self.batch_router.swap_exact_out(
+            vec![(                              // SwapPathExactAmountOut[]
+                self.asset_in_max.token,        // tokenIn (H160)
+                vec![(                          // steps[]
+                    self.pool,                  // pool (H160)
+                    self.asset_out.token,       // tokenOut (H160)
+                    false,                      // isBuffer (bool)
+                )],
+                self.asset_in_max.amount,       // maxAmountIn (U256)
+                self.asset_out.amount,          // exactAmountOut (U256)   
+            )],
+            *NEVER,                             // deadline (U256)
+            false,                              // wethIsEth (bool)
+            self.user_data.clone(),             // userData (Bytes)
         );
         let calldata = method.tx.data.expect("no calldata").0;
-        (self.vault.address(), 0.into(), Bytes(calldata))
+        (self.batch_router.address(), 0.into(), Bytes(calldata))
     }
 }
 
@@ -62,11 +60,11 @@ mod tests {
 
     #[test]
     fn encode_unwrap_weth() {
-        let vault = dummy_contract!(BalancerV3Vault, [0x01; 20]);
+        let batch_router = dummy_contract!(BalancerV3BatchRouter, [0x01; 20]);
         let interaction = BalancerV3SwapGivenOutInteraction {
             settlement: dummy_contract!(GPv2Settlement, [0x02; 20]),
-            vault: vault.clone(),
-            pool_id: H160([0x03; 20]),
+            batch_router: batch_router.clone(),
+            pool: H160([0x03; 20]),
             asset_in_max: TokenAmount::new(H160([0x04; 20]), 1_337_000_000_000_000_000_000u128),
             asset_out: TokenAmount::new(H160([0x05; 20]), 42_000_000_000_000_000_000u128),
             user_data: Bytes::default(),
@@ -75,7 +73,7 @@ mod tests {
         // V3 uses a different method signature, so the encoded calldata will be different
         // The test verifies that encoding works without errors
         let encoded = interaction.encode();
-        assert_eq!(encoded.0, vault.address());
+        assert_eq!(encoded.0, batch_router.address());
         assert_eq!(encoded.1, 0.into());
         assert!(!encoded.2 .0.is_empty());
     }

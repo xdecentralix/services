@@ -8,6 +8,7 @@ use {
             TokenState,
             WeightedPool,
             WeightedTokenState,
+            WeightedPoolVersion,
         },
     },
     error::Error,
@@ -71,6 +72,7 @@ impl TokenState {
 pub struct WeightedPoolRef<'a> {
     pub reserves: &'a BTreeMap<H160, WeightedTokenState>,
     pub swap_fee: Bfp,
+    pub version: WeightedPoolVersion,
 }
 
 impl WeightedPoolRef<'_> {
@@ -141,47 +143,47 @@ impl BaselineSolvable for WeightedPoolRef<'_> {
     }
 }
 
+/// Balancer V3 pools are "unstable", where if you compute an input amount large
+/// enough to buy X tokens, selling the computed amount over the same pool in
+/// the exact same state will yield X-𝛿 tokens. To work around this, for each
+/// hop, we try to converge to some sell amount >= the required buy amount.
 fn converge_in_amount(
     in_amount: U256,
     exact_out_amount: U256,
     get_amount_out: impl Fn(U256) -> Option<U256>,
 ) -> Option<U256> {
-    // Binary search to find the exact input amount that produces the desired output
-    let mut low = U256::zero();
-    let mut high = in_amount;
-    let mut best_in_amount = in_amount;
-    let mut best_out_amount = get_amount_out(in_amount)?;
-
-    // If we're already close enough, return the current amount
-    if best_out_amount >= exact_out_amount {
+    let out_amount = get_amount_out(in_amount)?;
+    if out_amount >= exact_out_amount {
         return Some(in_amount);
     }
 
-    // Binary search with a maximum of 256 iterations to prevent infinite loops
-    for _ in 0..256 {
-        let mid = (low + high) / U256::from(2);
-        if mid == low || mid == high {
-            break;
+    // If the computed output amount is not enough; we bump the sell amount a
+    // bit. We start by approximating the out amount deficit to in tokens at the
+    // trading price and multiply the amount to bump by 10 for each iteration.
+    let mut bump = (exact_out_amount - out_amount)
+        .checked_mul(in_amount)?
+        .ceil_div(&out_amount.max(U256::one()))
+        .max(U256::one());
+
+    for _ in 0..6 {
+        let bumped_in_amount = in_amount.checked_add(bump)?;
+        let out_amount = get_amount_out(bumped_in_amount)?;
+        if out_amount >= exact_out_amount {
+            return Some(bumped_in_amount);
         }
 
-        let out_amount = get_amount_out(mid)?;
-        if out_amount >= exact_out_amount {
-            high = mid;
-            best_in_amount = mid;
-            best_out_amount = out_amount;
-        } else {
-            low = mid;
-        }
+        bump *= 10;
     }
 
-    Some(best_in_amount)
+    None
 }
 
 impl WeightedPool {
     fn as_pool_ref(&self) -> WeightedPoolRef {
         WeightedPoolRef {
             reserves: &self.reserves,
-            swap_fee: self.swap_fee,
+            swap_fee: self.common.swap_fee,
+            version: self.version,
         }
     }
 }
@@ -202,8 +204,10 @@ impl BaselineSolvable for WeightedPool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::sources::balancer_v3::pool_fetching::common::PoolInfo;
+    use {
+        super::*,
+        crate::sources::balancer_v3::pool_fetching::CommonPoolState,
+    };
 
     fn create_weighted_pool_with(
         tokens: Vec<H160>,
@@ -212,87 +216,94 @@ mod tests {
         scaling_factors: Vec<Bfp>,
         swap_fee: U256,
     ) -> WeightedPool {
-        assert_eq!(tokens.len(), balances.len());
-        assert_eq!(tokens.len(), weights.len());
-        assert_eq!(tokens.len(), scaling_factors.len());
-
         let mut reserves = BTreeMap::new();
-        for (i, token) in tokens.iter().enumerate() {
-            let common = TokenState {
-                balance: balances[i],
-                scaling_factor: scaling_factors[i],
-            };
-            let weighted_token_state = WeightedTokenState {
-                common,
-                weight: weights[i],
-            };
-            reserves.insert(*token, weighted_token_state);
+        for i in 0..tokens.len() {
+            let (token, balance, weight, scaling_factor) =
+                (tokens[i], balances[i], weights[i], scaling_factors[i]);
+            reserves.insert(
+                token,
+                WeightedTokenState {
+                    common: TokenState {
+                        balance,
+                        scaling_factor,
+                    },
+                    weight,
+                },
+            );
         }
-
         WeightedPool {
-            common: PoolInfo {
-                id: H160([1; 20]),
-                address: H160([1; 20]),
-                tokens,
-                scaling_factors,
-                block_created: 0,
+            common: CommonPoolState {
+                id: Default::default(),
+                address: H160::zero(),
+                swap_fee: Bfp::from_wei(swap_fee),
+                paused: true,
             },
             reserves,
-            swap_fee: Bfp::from_wei(swap_fee),
+            version: Default::default(),
         }
     }
 
     #[test]
     fn downscale() {
         let token_state = TokenState {
-            balance: U256::from(1000),
-            scaling_factor: Bfp::from_wei(U256::from(1_000_000_000_000_000_000u128)),
+            balance: Default::default(),
+            scaling_factor: Bfp::exp10(12),
         };
-
-        let upscaled = token_state.upscaled_balance().unwrap();
-        let downscaled_up = token_state.downscale_up(upscaled).unwrap();
-        let downscaled_down = token_state.downscale_down(upscaled).unwrap();
-
-        assert_eq!(downscaled_up, U256::from(1000));
-        assert_eq!(downscaled_down, U256::from(1000));
+        let input = Bfp::from_wei(900_546_079_866_630_330_575_i128.into());
+        assert_eq!(
+            token_state.downscale_up(input).unwrap(),
+            U256::from(900_546_080_u128)
+        );
+        assert_eq!(
+            token_state.downscale_down(input).unwrap(),
+            U256::from(900_546_079_u128)
+        );
     }
 
     #[tokio::test]
     async fn weighted_get_amount_out() {
-        let tokens = vec![H160([1; 20]), H160([2; 20])];
-        let balances = vec![U256::from(1_000_000), U256::from(1_000_000)];
-        let weights = vec![Bfp::from_wei(U256::from(500_000_000_000_000_000u128)), Bfp::from_wei(U256::from(500_000_000_000_000_000u128))];
-        let scaling_factors = vec![Bfp::from_wei(U256::from(1_000_000_000_000_000_000u128)), Bfp::from_wei(U256::from(1_000_000_000_000_000_000u128))];
-        let swap_fee = U256::from(3_000_000_000_000_000u128); // 0.3%
+        // Values obtained from this transaction:
+        // https://dashboard.tenderly.co/tx/main/0xa9f571c9bfd4289bd4bd270465d73e1b7e010622ed089d54d81ec63a0365ec22/debugger
+        let crv = H160::repeat_byte(21);
+        let sdvecrv_dao = H160::repeat_byte(42);
+        let b = create_weighted_pool_with(
+            vec![crv, sdvecrv_dao],
+            vec![
+                1_850_304_144_768_426_873_445_489_i128.into(),
+                95_671_347_892_391_047_965_654_i128.into(),
+            ],
+            vec![bfp!("0.9"), bfp!("0.1")],
+            vec![Bfp::exp10(0), Bfp::exp10(0)],
+            2_000_000_000_000_000_i128.into(),
+        );
 
-        let pool = create_weighted_pool_with(tokens, balances, weights, scaling_factors, swap_fee);
-
-        let amount_out = pool
-            .get_amount_out(H160([2; 20]), (U256::from(100_000), H160([1; 20])))
-            .await
-            .unwrap();
-
-        // Should be less than input due to fees and slippage
-        assert!(amount_out < U256::from(100_000));
-        assert!(amount_out > U256::zero());
+        assert_eq!(
+            b.get_amount_out(crv, (227_937_106_828_652_254_870_i128.into(), sdvecrv_dao))
+                .await
+                .unwrap(),
+            488_192_591_864_344_551_330_i128.into()
+        );
     }
 
     #[tokio::test]
     async fn weighted_get_amount_in() {
-        let tokens = vec![H160([1; 20]), H160([2; 20])];
-        let balances = vec![U256::from(1_000_000), U256::from(1_000_000)];
-        let weights = vec![Bfp::from_wei(U256::from(500_000_000_000_000_000u128)), Bfp::from_wei(U256::from(500_000_000_000_000_000u128))];
-        let scaling_factors = vec![Bfp::from_wei(U256::from(1_000_000_000_000_000_000u128)), Bfp::from_wei(U256::from(1_000_000_000_000_000_000u128))];
-        let swap_fee = U256::from(3_000_000_000_000_000u128); // 0.3%
+        // Values obtained from this transaction:
+        // https://dashboard.tenderly.co/tx/main/0xafc3dd6a636a85d9c1976dfa5aee33f78e6ee902f285c9d4cf80a0014aa2a052/debugger
+        let weth = H160::repeat_byte(21);
+        let tusd = H160::repeat_byte(42);
+        let b = create_weighted_pool_with(
+            vec![weth, tusd],
+            vec![60_000_000_000_000_000_i128.into(), 250_000_000_i128.into()],
+            vec![bfp!("0.5"), bfp!("0.5")],
+            vec![Bfp::exp10(0), Bfp::exp10(12)],
+            1_000_000_000_000_000_i128.into(),
+        );
 
-        let pool = create_weighted_pool_with(tokens, balances, weights, scaling_factors, swap_fee);
-
-        let amount_in = pool
-            .get_amount_in(H160([1; 20]), (U256::from(100_000), H160([2; 20])))
-            .await
-            .unwrap();
-
-        // Should be more than output due to fees and slippage
-        assert!(amount_in > U256::from(100_000));
+        assert_eq!(
+            b.get_amount_in(weth, (5_000_000_i128.into(), tusd))
+                .await
+                .unwrap(),
+            1_225_715_511_430_411_i128.into()
+        );
     }
 } 

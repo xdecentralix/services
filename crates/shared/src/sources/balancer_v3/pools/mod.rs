@@ -13,7 +13,7 @@ pub mod weighted;
 use {
     super::graph_api::PoolData,
     anyhow::Result,
-    ethcontract::{BlockId, H256, H160},
+    ethcontract::{BlockId, H160},
     futures::future::BoxFuture,
 };
 

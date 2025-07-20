@@ -21,7 +21,7 @@ use {
         sources::balancer_v3::pools::{FactoryIndexing, PoolIndexing, common},
     },
     anyhow::{Context, Result},
-    contracts::balancer_v3_base_pool_factory::{
+    contracts::balancer_v3_weighted_pool_factory::{
         Event as BasePoolFactoryEvent,
         event_data::PoolCreated,
     },
@@ -200,10 +200,16 @@ where
 
         for event in events {
             let block_created = event.meta.context("event missing metadata")?.block_number;
-            let BasePoolFactoryEvent::PoolCreated(pool_created) = event.data;
-
-            self.index_pool_creation(pool_created, block_created)
-                .await?;
+            match event.data {
+                BasePoolFactoryEvent::PoolCreated(pool_created) => {
+                    self.index_pool_creation(pool_created, block_created)
+                        .await?;
+                }
+                BasePoolFactoryEvent::FactoryDisabled(_) => {
+                    // Ignore factory disabled events
+                    tracing::debug!("ignoring factory disabled event");
+                }
+            }
         }
 
         Ok(())

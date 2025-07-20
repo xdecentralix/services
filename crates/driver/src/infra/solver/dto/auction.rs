@@ -50,6 +50,7 @@ pub fn new(
             liquidity::Kind::UniswapV3(pool) => vec![pool.tokens.get().0, pool.tokens.get().1],
             liquidity::Kind::BalancerV2Stable(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV2Weighted(pool) => pool.reserves.tokens().collect(),
+            liquidity::Kind::BalancerV3Weighted(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::Swapr(pool) => pool.base.reserves.iter().map(|r| r.token).collect(),
             liquidity::Kind::ZeroEx(limit_order) => {
                 vec![
@@ -268,6 +269,44 @@ pub fn new(
                         },
                     )
                 }
+                liquidity::Kind::BalancerV3Weighted(pool) => {
+                    solvers_dto::auction::Liquidity::WeightedProduct(
+                        solvers_dto::auction::WeightedProductPool {
+                            id: liquidity.id.0.to_string(),
+                            address: pool.id.address().into(),
+                            balancer_pool_id: {
+                                let pool_id_h160: eth::H160 = pool.id.into();
+                                pool_id_h160.into()
+                            },
+                            gas_estimate: liquidity.gas.into(),
+                            tokens: pool
+                                .reserves
+                                .iter()
+                                .map(|r| {
+                                    (
+                                        r.asset.token.into(),
+                                        solvers_dto::auction::WeightedProductReserve {
+                                            balance: r.asset.amount.into(),
+                                            scaling_factor: scaling_factor_to_decimal_v3(r.scale),
+                                            weight: weight_to_decimal_v3(r.weight),
+                                        },
+                                    )
+                                })
+                                .collect(),
+                            fee: fee_to_decimal_v3(pool.fee),
+                            version: match pool.version {
+                                liquidity::balancer::v3::weighted::Version::V1 => {
+                                    // V3 V1 pools use the same math as V2 V3Plus pools
+                                    solvers_dto::auction::WeightedProductVersion::V3Plus
+                                }
+                                // Future versions can be added here:
+                                // liquidity::balancer::v3::weighted::Version::V2 => {
+                                //     solvers_dto::auction::WeightedProductVersion::V2
+                                // }
+                            },
+                        },
+                    )
+                }
                 liquidity::Kind::Swapr(pool) => solvers_dto::auction::Liquidity::ConstantProduct(
                     solvers_dto::auction::ConstantProductPool {
                         id: liquidity.id.0.to_string(),
@@ -374,12 +413,30 @@ fn fee_to_decimal(fee: liquidity::balancer::v2::Fee) -> bigdecimal::BigDecimal {
     bigdecimal::BigDecimal::new(fee.as_raw().to_big_int(), 18)
 }
 
+fn fee_to_decimal_v3(
+    fee: liquidity::balancer::v3::Fee,
+) -> bigdecimal::BigDecimal {
+    bigdecimal::BigDecimal::new(fee.as_raw().to_big_int(), 18)
+}
+
 fn weight_to_decimal(weight: liquidity::balancer::v2::weighted::Weight) -> bigdecimal::BigDecimal {
+    bigdecimal::BigDecimal::new(weight.as_raw().to_big_int(), 18)
+}
+
+fn weight_to_decimal_v3(
+    weight: liquidity::balancer::v3::weighted::Weight,
+) -> bigdecimal::BigDecimal {
     bigdecimal::BigDecimal::new(weight.as_raw().to_big_int(), 18)
 }
 
 fn scaling_factor_to_decimal(
     scale: liquidity::balancer::v2::ScalingFactor,
+) -> bigdecimal::BigDecimal {
+    bigdecimal::BigDecimal::new(scale.as_raw().to_big_int(), 18)
+}
+
+fn scaling_factor_to_decimal_v3(
+    scale: liquidity::balancer::v3::ScalingFactor,
 ) -> bigdecimal::BigDecimal {
     bigdecimal::BigDecimal::new(scale.as_raw().to_big_int(), 18)
 }

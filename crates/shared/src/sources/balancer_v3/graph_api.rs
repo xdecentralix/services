@@ -13,7 +13,7 @@ use {
     super::swap::fixed_point::Bfp,
     crate::subgraph::SubgraphClient,
     anyhow::{Context, Result},
-    ethcontract::{H160, H256},
+    ethcontract::{H160},
     reqwest::{Client, Url},
     serde::{Deserialize, Serialize},
     serde_json::json,
@@ -219,7 +219,7 @@ impl PoolData {
 }
 
 mod pools_query {
-    use {super::PoolData, serde::Deserialize};
+    use {serde::Deserialize};
 
     pub const QUERY: &str = r#"
         query PoolGetPools(

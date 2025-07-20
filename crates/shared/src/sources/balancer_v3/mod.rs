@@ -44,6 +44,6 @@ pub mod swap;
 
 pub use self::{
     graph_api::GqlChain,
-    pool_fetching::{BalancerFactoryKind, BalancerPoolFetcher, BalancerPoolFetching},
+    pool_fetching::{BalancerFactoryKind, BalancerPoolFetcher, BalancerV3PoolFetching},
     pools::{Pool, PoolKind},
 }; 

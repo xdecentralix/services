@@ -27,14 +27,14 @@ use {
                     WeightedPoolVersion,
                     WeightedTokenState,
                 },
-                swap::fixed_point::Bfp,
+                swap::fixed_point::Bfp as Bfp,
             },
             balancer_v3::{
                 pool_fetching::{
-                    WeightedPoolVersion,
-                    WeightedTokenState,
+                    WeightedPoolVersion as V3WeightedPoolVersion,
+                    WeightedTokenState as V3WeightedTokenState,
                 },
-                swap::fixed_point::Bfp,
+                swap::fixed_point::Bfp as V3Bfp,
             },
             uniswap_v2::pool_fetching::Pool,
             uniswap_v3::pool_fetching::PoolInfo,
@@ -310,11 +310,14 @@ pub struct WeightedProductOrder {
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
 }
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
 pub struct BalancerV3WeightedProductOrder {
     pub address: H160,
-    pub reserves: BTreeMap<H160, WeightedTokenState>,
-    pub fee: Bfp,
-    pub version: WeightedPoolVersion,
+    pub reserves: BTreeMap<H160, V3WeightedTokenState>,
+    pub fee: V3Bfp,
+    pub version: V3WeightedPoolVersion,
     #[cfg_attr(test, derivative(PartialEq = "ignore"))]
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
 }

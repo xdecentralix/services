@@ -3,7 +3,7 @@
 use {
     crate::{
         interactions::{
-            balancer_v3::BalancerV3SwapGivenOutInteraction,
+            BalancerV3SwapGivenOutInteraction,
             allowances::{AllowanceManager, AllowanceManaging, Allowances},
         },
         liquidity::{
@@ -16,7 +16,7 @@ use {
         settlement::SettlementEncoder,
     },
     anyhow::Result,
-    contracts::{BalancerV3Vault, GPv2Settlement},
+    contracts::{BalancerV3BatchRouter, GPv2Settlement},
     ethcontract::H160,
     model::TokenPair,
     shared::{
@@ -31,7 +31,7 @@ use {
 /// A liquidity provider for Balancer V3 weighted pools.
 pub struct BalancerV3Liquidity {
     settlement: GPv2Settlement,
-    vault: BalancerV3Vault,
+    batch_router: BalancerV3BatchRouter,
     pool_fetcher: Arc<dyn BalancerV3PoolFetching>,
     allowance_manager: Box<dyn AllowanceManaging>,
 }
@@ -41,12 +41,12 @@ impl BalancerV3Liquidity {
         web3: Web3,
         pool_fetcher: Arc<dyn BalancerV3PoolFetching>,
         settlement: GPv2Settlement,
-        vault: BalancerV3Vault,
+        batch_router: BalancerV3BatchRouter,
     ) -> Self {
         let allowance_manager = AllowanceManager::new(web3, settlement.address());
         Self {
             settlement,
-            vault,
+            batch_router,
             pool_fetcher,
             allowance_manager: Box::new(allowance_manager),
         }
@@ -63,13 +63,13 @@ impl BalancerV3Liquidity {
 
         let allowances = self
             .allowance_manager
-            .get_allowances(tokens, self.vault.address())
+            .get_allowances(tokens, self.batch_router.address())
             .await?;
 
         let inner = Arc::new(Inner {
             allowances,
             settlement: self.settlement.clone(),
-            vault: self.vault.clone(),
+            batch_router: self.batch_router.clone(),
         });
 
         let weighted_product_orders: Vec<_> = pools
@@ -116,7 +116,7 @@ pub struct SettlementHandler {
 
 struct Inner {
     settlement: GPv2Settlement,
-    vault: BalancerV3Vault,
+    batch_router: BalancerV3BatchRouter,
     allowances: Allowances,
 }
 
@@ -124,21 +124,21 @@ impl SettlementHandler {
     pub fn new(
         pool_id: H160,
         settlement: GPv2Settlement,
-        vault: BalancerV3Vault,
+        batch_router: BalancerV3BatchRouter,
         allowances: Allowances,
     ) -> Self {
         SettlementHandler {
             pool_id,
             inner: Arc::new(Inner {
                 settlement,
-                vault,
+                batch_router,
                 allowances,
             }),
         }
     }
 
-    pub fn vault(&self) -> &BalancerV3Vault {
-        &self.inner.vault
+    pub fn batch_router(&self) -> &BalancerV3BatchRouter {
+        &self.inner.batch_router
     }
 
     pub fn pool_id(&self) -> H160 {
@@ -152,8 +152,8 @@ impl SettlementHandler {
     ) -> BalancerV3SwapGivenOutInteraction {
         BalancerV3SwapGivenOutInteraction {
             settlement: self.inner.settlement.clone(),
-            vault: self.inner.vault.clone(),
-            pool_id: self.pool_id,
+            batch_router: self.inner.batch_router.clone(),
+            pool: self.pool_id,
             asset_in_max: input_max,
             asset_out: output,
             // Balancer V3 pools allow passing additional user data in order to
@@ -222,15 +222,15 @@ mod tests {
                     WeightedPoolVersion,
                     WeightedTokenState,
                 },
-                swap::fixed_point::Bfp,
+                swap::fixed_point::Bfp as V3Bfp,
             },
         },
     };
 
-    fn dummy_contracts() -> (GPv2Settlement, BalancerV3Vault) {
+    fn dummy_contracts() -> (GPv2Settlement, BalancerV3BatchRouter) {
         (
             dummy_contract!(GPv2Settlement, H160([0xc0; 20])),
-            dummy_contract!(BalancerV3Vault, H160([0xc1; 20])),
+            dummy_contract!(BalancerV3BatchRouter, H160([0xc1; 20])),
         )
     }
 
@@ -255,21 +255,21 @@ mod tests {
                     H160([0x70; 20]) => WeightedTokenState {
                         common: shared::sources::balancer_v3::pool_fetching::TokenState {
                             balance: 100.into(),
-                            scaling_factor: Bfp::exp10(16),
+                            scaling_factor: V3Bfp::exp10(16),
                         },
                         weight: "0.25".parse().unwrap(),
                     },
                     H160([0x71; 20]) => WeightedTokenState {
                         common: shared::sources::balancer_v3::pool_fetching::TokenState {
                             balance: 1_000_000.into(),
-                            scaling_factor: Bfp::exp10(12),
+                            scaling_factor: V3Bfp::exp10(12),
                         },
                         weight: "0.25".parse().unwrap(),
                     },
                     H160([0xb0; 20]) => WeightedTokenState {
                         common: shared::sources::balancer_v3::pool_fetching::TokenState {
                             balance: 1_000_000_000_000_000_000u128.into(),
-                            scaling_factor: Bfp::exp10(0),
+                            scaling_factor: V3Bfp::exp10(0),
                         },
                         weight: "0.5".parse().unwrap(),
                     },
@@ -287,14 +287,14 @@ mod tests {
                     H160([0x73; 20]) => WeightedTokenState {
                         common: shared::sources::balancer_v3::pool_fetching::TokenState {
                             balance: 1_000_000_000_000_000_000u128.into(),
-                            scaling_factor: Bfp::exp10(0),
+                            scaling_factor: V3Bfp::exp10(0),
                         },
                         weight: "0.5".parse().unwrap(),
                     },
                     H160([0xb0; 20]) => WeightedTokenState {
                         common: shared::sources::balancer_v3::pool_fetching::TokenState {
                             balance: 1_000_000_000_000_000_000u128.into(),
-                            scaling_factor: Bfp::exp10(0),
+                            scaling_factor: V3Bfp::exp10(0),
                         },
                         weight: "0.5".parse().unwrap(),
                     },
@@ -349,10 +349,10 @@ mod tests {
         ];
         let pairs = base_tokens.relevant_pairs(traded_pairs.into_iter());
 
-        let (settlement, vault) = dummy_contracts();
+        let (settlement, batch_router) = dummy_contracts();
         let liquidity_provider = BalancerV3Liquidity {
             settlement,
-            vault,
+            batch_router,
             pool_fetcher: Arc::new(pool_fetcher),
             allowance_manager: Box::new(allowance_manager),
         };
@@ -391,12 +391,12 @@ mod tests {
 
     #[test]
     fn encodes_swaps_in_settlement() {
-        let (settlement, vault) = dummy_contracts();
+        let (settlement, batch_router) = dummy_contracts();
         let inner = Arc::new(Inner {
             settlement: settlement.clone(),
-            vault: vault.clone(),
+            batch_router: batch_router.clone(),
             allowances: Allowances::new(
-                vault.address(),
+                batch_router.address(),
                 hashmap! {
                     H160([0x70; 20]) => 0.into(),
                     H160([0x71; 20]) => 100.into(),
@@ -438,13 +438,13 @@ mod tests {
             [
                 Approval {
                     token: H160([0x70; 20]),
-                    spender: vault.address(),
+                    spender: batch_router.address(),
                 }
                 .encode(),
                 BalancerV3SwapGivenOutInteraction {
                     settlement: settlement.clone(),
-                    vault: vault.clone(),
-                    pool_id: H160([0x90; 20]),
+                    batch_router: batch_router.clone(),
+                    pool: H160([0x90; 20]),
                     asset_in_max: TokenAmount::new(H160([0x70; 20]), 10),
                     asset_out: TokenAmount::new(H160([0x71; 20]), 11),
                     user_data: Default::default(),
@@ -452,8 +452,8 @@ mod tests {
                 .encode(),
                 BalancerV3SwapGivenOutInteraction {
                     settlement,
-                    vault,
-                    pool_id: H160([0x90; 20]),
+                    batch_router,
+                    pool: H160([0x90; 20]),
                     asset_in_max: TokenAmount::new(H160([0x71; 20]), 12),
                     asset_out: TokenAmount::new(H160([0x72; 20]), 13),
                     user_data: Default::default(),

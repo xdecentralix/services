@@ -221,6 +221,10 @@ fn run() -> Result<()> {
         .github(
             "BalancerV3WeightedPoolFactory",
             "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-weighted-pool/artifact/WeightedPoolFactory.json",
+        )?
+        .github(
+            "BalancerV3BatchRouter",
+            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-batch-router/artifact/BatchRouter.json",
         )?;
 
     // Balancer V3 contracts - Individual pools under ABI only (like V2)

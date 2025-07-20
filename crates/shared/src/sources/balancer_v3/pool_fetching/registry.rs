@@ -16,8 +16,8 @@ use {
     },
     anyhow::Result,
     contracts::{
-        BalancerV3BasePoolFactory,
-        balancer_v3_base_pool_factory,
+        BalancerV3WeightedPoolFactory,
+        balancer_v3_weighted_pool_factory,
         errors::EthcontractErrorType,
     },
     ethcontract::{BlockId, H160, H256, Instance, dyns::DynAllEventsBuilder, errors::MethodError},
@@ -32,14 +32,14 @@ use {
     tokio::sync::Mutex,
 };
 
-pub struct BasePoolFactoryContract(BalancerV3BasePoolFactory);
+pub struct BasePoolFactoryContract(BalancerV3WeightedPoolFactory);
 
 const POOL_CREATED_TOPIC: H256 = H256(hex!(
     "83a48fbcfc991335314e74d0496aab6a1987e992ddc85dddbcc4d6dd6ef2e9fc"
 ));
 
 impl EventRetrieving for BasePoolFactoryContract {
-    type Event = balancer_v3_base_pool_factory::Event;
+    type Event = balancer_v3_weighted_pool_factory::Event;
 
     fn get_events(&self) -> DynAllEventsBuilder<Self::Event> {
         let mut events = self.0.all_events();
@@ -128,8 +128,8 @@ where
     }
 }
 
-fn base_pool_factory(contract_instance: &Instance<Web3Transport>) -> BalancerV3BasePoolFactory {
-    BalancerV3BasePoolFactory::with_deployment_info(
+fn base_pool_factory(contract_instance: &Instance<Web3Transport>) -> BalancerV3WeightedPoolFactory {
+    BalancerV3WeightedPoolFactory::with_deployment_info(
         &contract_instance.web3(),
         contract_instance.address(),
         contract_instance.deployment_information(),

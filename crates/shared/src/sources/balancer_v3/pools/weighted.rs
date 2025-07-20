@@ -124,7 +124,7 @@ mod tests {
         super::*,
         crate::sources::balancer_v3::graph_api::{Token, GqlChain, DynamicData, PoolData},
         contracts::dummy_contract,
-        ethcontract::{H160, H256},
+        ethcontract::H160,
         ethcontract_mock::Mock,
         futures::future,
         maplit::btreemap,
