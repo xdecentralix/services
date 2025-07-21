@@ -126,7 +126,6 @@ mod tests {
     use {
         super::*,
         crate::sources::balancer_v3::graph_api::{Token, GqlChain, DynamicData, PoolData},
-        contracts::dummy_contract,
         ethcontract::{H160, BlockNumber},
         ethcontract_mock::Mock,
         futures::future,

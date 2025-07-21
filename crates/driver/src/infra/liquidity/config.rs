@@ -259,9 +259,6 @@ pub struct BalancerV3 {
     /// The address of the Balancer V3 compatible vault contract.
     pub vault: eth::ContractAddress,
 
-    /// The address of the Balancer V3 compatible vault extension contract.
-    pub vault_extension: eth::ContractAddress,
-
     /// The address of the Balancer V3 compatible batch router contract.
     pub batch_router: eth::ContractAddress,
 
@@ -298,7 +295,6 @@ impl BalancerV3 {
 
         Some(Self {
             vault: deployment_address(contracts::BalancerV3Vault::raw_contract(), chain)?,
-            vault_extension: deployment_address(contracts::BalancerV3VaultExtension::raw_contract(), chain)?,
             batch_router: deployment_address(contracts::BalancerV3BatchRouter::raw_contract(), chain)?,
             weighted: factory_addresses(&[
                 contracts::BalancerV3WeightedPoolFactory::raw_contract(),

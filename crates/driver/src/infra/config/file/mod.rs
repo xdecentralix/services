@@ -692,9 +692,6 @@ enum BalancerV3Config {
         /// Addresses of Balancer V3 compatible vault contract.
         vault: eth::H160,
 
-        /// Addresses of Balancer V3 compatible vault extension contract.
-        vault_extension: eth::H160,
-
         /// Addresses of Balancer V3 compatible batch router contract.
         batch_router: eth::H160,
 

@@ -12,7 +12,6 @@ use {
     contracts::{
         BalancerV3BatchRouter,
         BalancerV3Vault,
-        BalancerV3VaultExtension,
         BalancerV3WeightedPoolFactory,
         GPv2Settlement,
     },
@@ -126,7 +125,6 @@ async fn init_liquidity(
     // Create Balancer V3 contracts configuration
     let contracts = BalancerContracts {
         vault: BalancerV3Vault::at(&web3, config.vault.into()),
-        vault_extension: BalancerV3VaultExtension::at(&web3, config.vault_extension.into()),
         batch_router: BalancerV3BatchRouter::at(&web3, config.batch_router.into()),
         factories: [
             config

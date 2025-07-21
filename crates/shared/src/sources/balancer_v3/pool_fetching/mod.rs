@@ -34,7 +34,6 @@ use {
     contracts::{
         BalancerV3WeightedPoolFactory,
         BalancerV3Vault,
-        BalancerV3VaultExtension,
         BalancerV3BatchRouter,
     },
     ethcontract::{BlockId, H160, H256, Instance, dyns::DynInstance},
@@ -148,7 +147,6 @@ impl BalancerFactoryKind {
 /// All balancer V3 related contracts that we expect to exist.
 pub struct BalancerContracts {
     pub vault: BalancerV3Vault,
-    pub vault_extension: BalancerV3VaultExtension,
     pub batch_router: BalancerV3BatchRouter,
     pub factories: Vec<(BalancerFactoryKind, DynInstance)>,
 }
@@ -159,9 +157,6 @@ impl BalancerContracts {
         let vault = BalancerV3Vault::deployed(&web3)
             .await
             .context("Cannot retrieve balancer V3 vault")?;
-        let vault_extension = BalancerV3VaultExtension::deployed(&web3)
-            .await
-            .context("Cannot retrieve balancer V3 vault extension")?;
         let batch_router = BalancerV3BatchRouter::deployed(&web3)
             .await
             .context("Cannot retrieve balancer V3 batch router")?;
@@ -187,7 +182,7 @@ impl BalancerContracts {
             factories.push((factory_kind, factory_instance));
         }
 
-        Ok(BalancerContracts { vault, vault_extension, batch_router, factories })
+        Ok(BalancerContracts { vault, batch_router, factories })
     }
 }
 
@@ -291,7 +286,7 @@ async fn create_aggregate_pool_fetcher(
     macro_rules! registry {
         ($factory:ident, $instance:expr_2021) => {{
             create_internal_pool_fetcher(
-                contracts.vault_extension.clone(),
+                contracts.vault.clone(),
                 $factory::with_deployment_info(
                     &$instance.web3(),
                     $instance.address(),
@@ -339,7 +334,7 @@ async fn create_aggregate_pool_fetcher(
 }
 
 fn create_internal_pool_fetcher<Factory>(
-    vault_extension: BalancerV3VaultExtension,
+    vault: BalancerV3Vault,
     factory: Factory,
     block_retriever: Arc<dyn BlockRetrieving>,
     token_infos: Arc<dyn TokenInfoFetching>,
@@ -359,7 +354,7 @@ where
 
     Ok(Box::new(Registry::new(
         block_retriever,
-        Arc::new(PoolInfoFetcher::new(vault_extension, factory, token_infos)),
+        Arc::new(PoolInfoFetcher::new(vault, factory, token_infos)),
         factory_instance,
         initial_pools,
         start_sync_at_block,
