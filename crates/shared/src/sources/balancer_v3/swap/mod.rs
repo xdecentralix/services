@@ -61,7 +61,7 @@ impl TokenState {
 
     /// Similar to downscale up above, but rounded down, this is just checked
     /// div. https://github.com/balancer-labs/balancer-v2-monorepo/blob/c18ff2686c61a8cbad72cdcfc65e9b11476fdbc3/pkg/pool-utils/contracts/BasePool.sol#L542-L544
-    fn downscale_down(&self, amount: Bfp) -> Result<U256, Error> {
+    pub fn downscale_down(&self, amount: Bfp) -> Result<U256, Error> {
         Ok(amount.div_down(self.scaling_factor)?.as_uint256())
     }
 }

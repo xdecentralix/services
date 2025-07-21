@@ -124,10 +124,16 @@ impl<Factory> PoolInfoFetcher<Factory> {
 
             let tokens = itertools::izip!(&pool.tokens, balances, &pool.scaling_factors)
                 .map(|(&address, balance, &scaling_factor)| {
+                    // Create a temporary TokenState to use the downscale method
+                    let temp_token_state = TokenState {
+                    balance,
+                    scaling_factor,
+                    };
+                    let native_balance = temp_token_state.downscale_down(Bfp::from_wei(balance)).unwrap_or(U256::zero());
                     (
                         address,
                         TokenState {
-                            balance,
+                            balance: native_balance, // Store native decimals!
                             scaling_factor,
                         },
                     )
