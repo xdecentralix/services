@@ -452,7 +452,8 @@ mod tests {
                         scaling_factor: scaling_factors[1],
                     },
                     tokens[2] => TokenState {
-                        balance: balances[2].as_uint256(),
+                        // Downscale 15e18 by 1e12 -> 15e6
+                        balance: U256::from(15_000_000u64),
                         scaling_factor: scaling_factors[2],
                     },
                 },
