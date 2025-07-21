@@ -1065,59 +1065,6 @@ fn main() {
             )
     });
     
-    generate_contract_with_config("BalancerV3VaultExtension", |builder| {
-        builder
-            .add_network(
-                MAINNET,
-                Network {
-                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
-                    deployment_information: Some(DeploymentInformation::BlockNumber(21332121)),
-                },
-            )
-            .add_network(
-                GNOSIS,
-                Network {
-                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
-                    deployment_information: Some(DeploymentInformation::BlockNumber(37360338)),
-                },
-            )
-            .add_network(
-                SEPOLIA,
-                Network {
-                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
-                    deployment_information: Some(DeploymentInformation::BlockNumber(7212247)),
-                },
-            )
-            .add_network(
-                ARBITRUM_ONE,
-                Network {
-                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
-                    deployment_information: Some(DeploymentInformation::BlockNumber(297810187)),
-                },
-            )
-            .add_network(
-                BASE,
-                Network {
-                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
-                    deployment_information: Some(DeploymentInformation::BlockNumber(25343854)),
-                },
-            )
-            .add_network(
-                AVALANCHE,
-                Network {
-                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
-                    deployment_information: Some(DeploymentInformation::BlockNumber(59955604)),
-                },
-            )
-            .add_network(
-                OPTIMISM,
-                Network {
-                    address: addr("0x0E8B07657D719B86e06bF0806D6729e3D528C9A9"),
-                    deployment_information: Some(DeploymentInformation::BlockNumber(133969439)),
-                },
-            )
-    });
-    
     generate_contract_with_config("BalancerV3WeightedPoolFactory", |builder| {
         builder
             .add_network(
@@ -1171,8 +1118,101 @@ fn main() {
                 },
             )
     });
+
+    generate_contract_with_config("BalancerV3StablePoolFactory", |builder| {
+        builder
+            .add_network(
+                ARBITRUM_ONE,
+                Network {
+                    address: addr("0xEB1eeaBF0126d813589C3D2CfeFFE410D9aE3863"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(297829373)),
+                },
+            )
+            .add_network(
+                BASE,
+                Network {
+                    address: addr("0xb9F8AB3ED3F3aCBa64Bc6cd2DcA74B7F38fD7B88"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(25347318)),
+                },
+            )
+            .add_network(
+                GNOSIS,
+                Network {
+                    address: addr("0x22625eEDd92c81a219A83e1dc48f88d54786B017"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(37371860)),
+                },
+            )
+            .add_network(
+                MAINNET,
+                Network {
+                    address: addr("0xB9d01CA61b9C181dA1051bFDd28e1097e920AB14"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(21337005)),
+                },
+            )
+            .add_network(
+                SEPOLIA,
+                Network {
+                    address: addr("0xd67F485C07D258B3e93835a3799d862ffcB55923"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(7217020)),
+                },
+            )
+        });
+
+    generate_contract_with_config("BalancerV3StablePoolFactoryV2", |builder| {
+        builder
+            .add_network(
+                ARBITRUM_ONE,
+                Network {
+                    address: addr("0x44d33798dddCdAbc93Fe6a40C80588033Dc502d3"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(317750010)),
+                },
+            )
+            .add_network(
+                AVALANCHE,
+                Network {
+                    address: addr("0xEAedc32a51c510d35ebC11088fD5fF2b47aACF2E"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(59966208)),
+                },
+            )
+            .add_network(
+                BASE,
+                Network {
+                    address: addr("0xC49Ca921c4CD1117162eAEEc0ee969649997950c"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(27852880)),
+                },
+            )
+            .add_network(
+                GNOSIS,
+                Network {
+                    address: addr("0x161f4014C27773840ccb4EC1957113e6DD028846"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(39136290)),
+                },
+            )
+            .add_network(
+                MAINNET,
+                Network {
+                    address: addr("0xe42C2E153BB0A8899b59C73F5Ff941f9742F1197"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(22089887)),
+                },
+            )
+            .add_network(
+                OPTIMISM,
+                Network {
+                    address: addr("0x268E2EE1413D768b6e2dc3F5a4ddc9Ae03d9AF42"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(133969860)),
+                },
+            )
+            .add_network(
+                SEPOLIA,
+                Network {
+                    address: addr("0xc274A11E09a3c92Ac64eAff5bEC4ee8f5dfEe207"),
+                    deployment_information: Some(DeploymentInformation::BlockNumber(7944011)),
+                },
+            )
+        });
     
     generate_contract("BalancerV3WeightedPool");
+    generate_contract("BalancerV3StablePool");
     generate_contract_with_config("BalancerV3BatchRouter", |builder| {
         builder
             .add_network(

@@ -215,16 +215,20 @@ fn run() -> Result<()> {
             "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241204-v3-vault/artifact/Vault.json",
         )?
         .github(
-            "BalancerV3VaultExtension",
-            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241204-v3-vault/artifact/VaultExtension.json",
+            "BalancerV3BatchRouter",
+            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-batch-router/artifact/BatchRouter.json",
         )?
         .github(
             "BalancerV3WeightedPoolFactory",
             "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-weighted-pool/artifact/WeightedPoolFactory.json",
         )?
         .github(
-            "BalancerV3BatchRouter",
-            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-batch-router/artifact/BatchRouter.json",
+            "BalancerV3StablePoolFactory",
+            "balancer/balancer-deployments/refs/heads/master/v3/deprecated/20241205-v3-stable-pool/artifact/StablePoolFactory.json",
+        )?
+        .github(
+            "BalancerV3StablePoolFactoryV2",
+            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20250324-v3-stable-pool-v2/artifact/StablePoolFactory.json",
         )?;
 
     // Balancer V3 contracts - Individual pools under ABI only (like V2)
@@ -233,6 +237,10 @@ fn run() -> Result<()> {
         .github(
             "BalancerV3WeightedPool",
             "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-weighted-pool/artifact/WeightedPool.json",
+        )?
+        .github(
+            "BalancerV3StablePool",
+            "balancer/balancer-deployments/refs/heads/master/v3/deprecated/20241205-v3-stable-pool/artifact/StablePool.json",
         )?;
 
     Ok(())
