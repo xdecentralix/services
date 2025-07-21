@@ -1,6 +1,7 @@
 //! Top-level module organizing all baseline liquidity sources.
 
 pub mod balancer_v2;
+pub mod balancer_v3;
 pub mod swapr;
 pub mod uniswap_v2;
 pub mod uniswap_v3;
@@ -24,6 +25,7 @@ pub enum BaselineSource {
     Honeyswap,
     SushiSwap,
     BalancerV2,
+    BalancerV3,
     Baoswap,
     Swapr,
     ZeroEx,
@@ -38,6 +40,7 @@ pub fn defaults_for_network(chain: &Chain) -> Vec<BaselineSource> {
             BaselineSource::SushiSwap,
             BaselineSource::Swapr,
             BaselineSource::BalancerV2,
+            BaselineSource::BalancerV3,
             BaselineSource::ZeroEx,
             BaselineSource::UniswapV3,
         ],
@@ -45,22 +48,33 @@ pub fn defaults_for_network(chain: &Chain) -> Vec<BaselineSource> {
             BaselineSource::UniswapV2,
             BaselineSource::SushiSwap,
             BaselineSource::BalancerV2,
+            BaselineSource::BalancerV3,
         ],
         Chain::Gnosis => vec![
             BaselineSource::Honeyswap,
             BaselineSource::SushiSwap,
             BaselineSource::Baoswap,
             BaselineSource::Swapr,
+            BaselineSource::BalancerV3,
         ],
         Chain::ArbitrumOne => vec![
             BaselineSource::UniswapV2,
             BaselineSource::SushiSwap,
             BaselineSource::Swapr,
             BaselineSource::BalancerV2,
+            BaselineSource::BalancerV3,
             BaselineSource::ZeroEx,
             BaselineSource::UniswapV3,
         ],
-        Chain::Base | Chain::Bnb | Chain::Avalanche | Chain::Polygon | Chain::Optimism => vec![
+        Chain::Base | Chain::Avalanche | Chain::Optimism => vec![
+            BaselineSource::UniswapV2,
+            BaselineSource::SushiSwap,
+            BaselineSource::BalancerV2,
+            BaselineSource::BalancerV3,
+            BaselineSource::ZeroEx,
+            BaselineSource::UniswapV3,
+        ],
+        Chain::Bnb | Chain::Polygon => vec![
             BaselineSource::UniswapV2,
             BaselineSource::SushiSwap,
             BaselineSource::BalancerV2,

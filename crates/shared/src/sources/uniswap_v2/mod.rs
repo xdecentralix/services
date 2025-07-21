@@ -64,7 +64,7 @@ impl UniV2BaselineSourceParameters {
     pub fn from_baseline_source(source: BaselineSource, chain: &str) -> Option<Self> {
         use BaselineSource as BS;
         let (contract, init_code_digest, pool_reading) = match source {
-            BS::None | BS::BalancerV2 | BS::ZeroEx | BS::UniswapV3 => None,
+            BS::None | BS::BalancerV2 | BS::BalancerV3 | BS::ZeroEx | BS::UniswapV3 => None,
             BS::UniswapV2 => Some((
                 contracts::UniswapV2Router02::raw_contract(),
                 UNISWAP_INIT,

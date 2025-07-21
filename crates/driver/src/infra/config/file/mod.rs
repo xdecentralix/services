@@ -617,10 +617,6 @@ enum BalancerV2Config {
         /// access to new pools.
         #[serde(with = "humantime_serde", default = "default_reinit_interval")]
         reinit_interval: Option<Duration>,
-
-        /// Graph API key for subgraph queries
-        #[serde(rename = "graph-api-key")]
-        graph_api_key: Option<String>,
     },
 
     #[serde(rename_all = "kebab-case")]
@@ -662,10 +658,6 @@ enum BalancerV2Config {
         /// access to new pools.
         #[serde(with = "humantime_serde", default = "default_reinit_interval")]
         reinit_interval: Option<Duration>,
-
-        /// Graph API key for subgraph queries
-        #[serde(rename = "graph-api-key")]
-        graph_api_key: Option<String>,
     },
 }
 
@@ -684,7 +676,7 @@ enum BalancerV3Config {
 
         /// Deny listed Balancer V3 pools.
         #[serde(default)]
-        pool_deny_list: Vec<eth::H256>,
+        pool_deny_list: Vec<eth::H160>,
 
         /// The URL used to connect to balancer v3 subgraph client.
         graph_url: Url,
@@ -693,10 +685,6 @@ enum BalancerV3Config {
         /// access to new pools.
         #[serde(with = "humantime_serde", default = "default_reinit_interval")]
         reinit_interval: Option<Duration>,
-
-        /// Graph API key for subgraph queries
-        #[serde(rename = "graph-api-key")]
-        graph_api_key: Option<String>,
     },
 
     #[serde(rename_all = "kebab-case")]
@@ -704,13 +692,16 @@ enum BalancerV3Config {
         /// Addresses of Balancer V3 compatible vault contract.
         vault: eth::H160,
 
+        /// Addresses of Balancer V3 compatible batch router contract.
+        batch_router: eth::H160,
+
         /// The weighted pool factory contract addresses.
         #[serde(default)]
         weighted: Vec<eth::H160>,
 
         /// Deny listed Balancer V3 pools.
         #[serde(default)]
-        pool_deny_list: Vec<eth::H256>,
+        pool_deny_list: Vec<eth::H160>,
 
         /// The URL used to connect to balancer v3 subgraph client.
         graph_url: Url,
@@ -719,10 +710,6 @@ enum BalancerV3Config {
         /// access to new pools.
         #[serde(with = "humantime_serde", default = "default_reinit_interval")]
         reinit_interval: Option<Duration>,
-
-        /// Graph API key for subgraph queries
-        #[serde(rename = "graph-api-key")]
-        graph_api_key: Option<String>,
     },
 }
 

@@ -262,15 +262,13 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         pool_deny_list,
                         graph_url,
                         reinit_interval,
-                        graph_api_key,
                         ..
                     } => liquidity::config::BalancerV2 {
                         pool_deny_list: pool_deny_list.clone(),
                         reinit_interval,
-                        graph_api_key: graph_api_key.clone(),
                         ..match preset {
                             file::BalancerV2Preset::BalancerV2 => {
-                                liquidity::config::BalancerV2::balancer_v2(&graph_url, chain, graph_api_key)
+                                liquidity::config::BalancerV2::balancer_v2(&graph_url, chain, None)
                             }
                         }
                         .expect("no Balancer V2 preset for current network")
@@ -285,7 +283,6 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         pool_deny_list,
                         graph_url,
                         reinit_interval,
-                        graph_api_key,
                         ..
                     } => liquidity::config::BalancerV2 {
                         vault: vault.into(),
@@ -309,7 +306,6 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         pool_deny_list: pool_deny_list.clone(),
                         graph_url,
                         reinit_interval,
-                        graph_api_key,
                     },
                 })
                 .collect(),
@@ -324,29 +320,28 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         pool_deny_list,
                         graph_url,
                         reinit_interval,
-                        graph_api_key,
                         ..
                     } => liquidity::config::BalancerV3 {
                         pool_deny_list: pool_deny_list.clone(),
                         reinit_interval,
-                        graph_api_key: graph_api_key.clone(),
                         ..match preset {
                             file::BalancerV3Preset::BalancerV3 => {
-                                liquidity::config::BalancerV3::balancer_v3(&graph_url, chain, graph_api_key)
+                                liquidity::config::BalancerV3::balancer_v3(&graph_url, chain, None)
                             }
                         }
                         .expect("no Balancer V3 preset for current network")
                     },
                     file::BalancerV3Config::Manual {
                         vault,
+                        batch_router,
                         weighted,
                         pool_deny_list,
                         graph_url,
                         reinit_interval,
-                        graph_api_key,
                         ..
                     } => liquidity::config::BalancerV3 {
                         vault: vault.into(),
+                        batch_router: batch_router.into(),
                         weighted: weighted
                             .into_iter()
                             .map(eth::ContractAddress::from)
@@ -354,7 +349,6 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         pool_deny_list: pool_deny_list.clone(),
                         graph_url,
                         reinit_interval,
-                        graph_api_key,
                     },
                 })
                 .collect(),

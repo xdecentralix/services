@@ -92,6 +92,12 @@ impl Fetcher {
             })
             .collect();
 
+        let bal_v3: Vec<_> = config
+            .balancer_v3
+            .iter()
+            .map(|config| balancer::v3::collector(eth, block_stream.clone(), block_retriever.clone(), config))
+            .collect();
+
         let uni_v3: Vec<_> = config
             .uniswap_v3
             .iter()
@@ -121,7 +127,7 @@ impl Fetcher {
         Ok(Self {
             blocks: block_stream.clone(),
             inner: LiquidityCollector {
-                liquidity_sources: [uni_v2, swapr, bal_v2, uni_v3, zeroex]
+                liquidity_sources: [uni_v2, swapr, bal_v2, bal_v3, uni_v3, zeroex]
                     .into_iter()
                     .flatten()
                     .collect(),
@@ -169,6 +175,7 @@ impl Fetcher {
                         }
                     }
                     Liquidity::BalancerWeighted(pool) => balancer::v2::weighted::to_domain(id, pool),
+                    Liquidity::BalancerV3Weighted(pool) => balancer::v3::weighted::to_domain(id, pool),
                     Liquidity::BalancerStable(pool) => balancer::v2::stable::to_domain(id, pool),
                     Liquidity::LimitOrder(pool) => zeroex::to_domain(id, pool),
                     Liquidity::Concentrated(pool) => uniswap::v3::to_domain(id, pool),

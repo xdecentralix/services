@@ -1,4 +1,5 @@
 pub mod balancer_v2;
+pub mod balancer_v3;
 pub mod order_converter;
 pub mod slippage;
 pub mod uniswap_v2;
@@ -26,7 +27,14 @@ use {
                     WeightedPoolVersion,
                     WeightedTokenState,
                 },
-                swap::fixed_point::Bfp,
+                swap::fixed_point::Bfp as Bfp,
+            },
+            balancer_v3::{
+                pool_fetching::{
+                    WeightedPoolVersion as V3WeightedPoolVersion,
+                    WeightedTokenState as V3WeightedTokenState,
+                },
+                swap::fixed_point::Bfp as V3Bfp,
             },
             uniswap_v2::pool_fetching::Pool,
             uniswap_v3::pool_fetching::PoolInfo,
@@ -42,6 +50,7 @@ use {
 pub enum Liquidity {
     ConstantProduct(ConstantProductOrder),
     BalancerWeighted(WeightedProductOrder),
+    BalancerV3Weighted(BalancerV3WeightedProductOrder),
     BalancerStable(StablePoolOrder),
     LimitOrder(LimitOrder),
     Concentrated(ConcentratedLiquidity),
@@ -301,9 +310,27 @@ pub struct WeightedProductOrder {
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
 }
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
+pub struct BalancerV3WeightedProductOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, V3WeightedTokenState>,
+    pub fee: V3Bfp,
+    pub version: V3WeightedPoolVersion,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
 impl std::fmt::Debug for WeightedProductOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Weighted Product AMM {:?}", self.reserves.keys())
+    }
+}
+
+impl std::fmt::Debug for BalancerV3WeightedProductOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Balancer V3 Weighted Product AMM {:?}", self.reserves.keys())
     }
 }
 
@@ -353,6 +380,14 @@ impl Settleable for ConstantProductOrder {
 }
 
 impl Settleable for WeightedProductOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for BalancerV3WeightedProductOrder {
     type Execution = AmmOrderExecution;
 
     fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {

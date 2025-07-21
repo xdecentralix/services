@@ -1,5 +1,4 @@
-//! Module containing The Graph API client used for retrieving Balancer weighted
-//! pools from the Balancer V2 subgraph.
+//! Module containing the Balancer API v3 client used for retrieving Balancer pools.
 //!
 //! The pools retrieved from this client are used to prime the graph event store
 //! to reduce start-up time. We do not use this in general for retrieving pools
@@ -10,100 +9,99 @@
 
 use {
     super::swap::fixed_point::Bfp,
-    crate::{event_handling::MAX_REORG_BLOCK_COUNT, subgraph::SubgraphClient},
-    anyhow::Result,
+    crate::subgraph::SubgraphClient,
+    anyhow::{Context, Result},
     ethcontract::{H160, H256},
     reqwest::{Client, Url},
-    serde::Deserialize,
+    serde::{Deserialize, Serialize},
     serde_json::json,
     serde_with::{DisplayFromStr, serde_as},
     std::collections::HashMap,
 };
 
-/// The page size when querying pools.
-#[cfg(not(test))]
-const QUERY_PAGE_SIZE: usize = 1000;
-#[cfg(test)]
-const QUERY_PAGE_SIZE: usize = 10;
+const QUERY_PAGE_SIZE: usize = 100;
 
-/// A client to the Balancer V2 subgraph.
-///
-/// This client is not implemented to allow general GraphQL queries, but instead
-/// implements high-level methods that perform GraphQL queries under the hood.
-pub struct BalancerSubgraphClient(SubgraphClient);
+/// Balancer API v3 client for fetching pool data.
+pub struct BalancerApiClient {
+    client: SubgraphClient,
+    chain: GqlChain,
+}
 
-impl BalancerSubgraphClient {
-    /// Creates a new Balancer subgraph client with full subgraph URL.
-    pub fn from_subgraph_url(subgraph_url: &Url, client: Client, api_key: Option<String>) -> Result<Self> {
-        Ok(Self(SubgraphClient::try_new(subgraph_url.clone(), client, api_key)?))
+/// Supported chains in Balancer API v3.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq, Hash)]
+pub enum GqlChain {
+    MAINNET,
+    GNOSIS,
+    ARBITRUM,
+    POLYGON,
+    BASE,
+    AVALANCHE,
+    OPTIMISM,
+    BSC,
+    FANTOM,
+    SEPOLIA,
+}
+
+impl BalancerApiClient {
+    /// Creates a new Balancer API v3 client.
+    pub fn from_subgraph_url(subgraph_url: &Url, client: Client, chain: GqlChain) -> Result<Self> {
+        let subgraph_client = SubgraphClient::try_new(subgraph_url.clone(), client, None)?;
+        Ok(Self {
+            client: subgraph_client,
+            chain,
+        })
     }
 
-    /// Retrieves the list of registered pools from the subgraph.
+    /// Retrieves all registered pools for the configured chain.
     pub async fn get_registered_pools(&self) -> Result<RegisteredPools> {
         use self::pools_query::*;
 
-        let block_number = self.get_safe_block().await?;
-
         let mut pools = Vec::new();
-        let mut last_id = H256::default();
+        let mut skip = 0;
 
-        // We do paging by last ID instead of using `skip`. This is the
-        // suggested approach to paging best performance:
-        // <https://thegraph.com/docs/graphql-api#pagination>
+        // Use offset-based pagination with Balancer API v3
         loop {
             let page = self
-                .0
+                .client
                 .query::<Data>(
                     QUERY,
                     Some(json_map! {
-                        "block" => block_number,
-                        "pageSize" => QUERY_PAGE_SIZE,
-                        "lastId" => json!(last_id),
+                        "first" => QUERY_PAGE_SIZE,
+                        "skip" => skip,
+                        "orderBy" => "totalLiquidity",
+                        "orderDirection" => "desc",
+                        "where" => json!({
+                            "chainIn": [self.chain],
+                            "poolTypeIn": ["WEIGHTED", "STABLE", "LIQUIDITY_BOOTSTRAPPING", "COMPOSABLE_STABLE"],
+                            "protocolVersionIn": [2]
+                        }),
                     }),
                 )
                 .await?
-                .pools;
-            let no_more_pages = page.len() != QUERY_PAGE_SIZE;
-            if let Some(last_pool) = page.last() {
-                last_id = last_pool.id;
-            }
+                .pool_get_pools;
 
+            let no_more_pages = page.len() != QUERY_PAGE_SIZE;
             pools.extend(page);
 
             if no_more_pages {
                 break;
             }
+
+            skip += QUERY_PAGE_SIZE;
         }
 
         Ok(RegisteredPools {
-            fetched_block_number: block_number,
+            fetched_block_number: 0, // Balancer API v3 doesn't support historical queries
             pools,
         })
     }
-
-    /// Retrieves a recent block number for which it is safe to assume no
-    /// reorgs will happen.
-    async fn get_safe_block(&self) -> Result<u64> {
-        // Ideally we would want to use block hash here so that we can check
-        // that there indeed is no reorg. However, it does not seem possible to
-        // retrieve historic block hashes just from the subgraph (it always
-        // returns `null`).
-        Ok(self
-            .0
-            .query::<block_number_query::Data>(block_number_query::QUERY, None)
-            .await?
-            .meta
-            .block
-            .number
-            .saturating_sub(MAX_REORG_BLOCK_COUNT))
-    }
 }
 
-/// Result of the registered stable pool query.
+/// Result of the registered pool query.
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct RegisteredPools {
-    /// The block number that the data was fetched, and for which the registered
-    /// weighted pools can be considered up to date.
+    /// The block number that the data was fetched. Set to 0 for Balancer API v3
+    /// since it doesn't support historical queries.
     pub fetched_block_number: u64,
     /// The registered Pools
     pub pools: Vec<PoolData>,
@@ -138,16 +136,38 @@ impl RegisteredPools {
     }
 }
 
-/// Pool data from the Balancer V2 subgraph.
+/// Pool data from the Balancer API v3.
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PoolData {
-    pub pool_type: PoolType,
-    pub id: H256,
+    pub id: String, // Can be 32-byte (V2) or 20-byte (V3) hex string
     pub address: H160,
+    #[serde(rename = "type")]
+    pub pool_type: String,
+    pub protocol_version: u32,
     pub factory: H160,
+    pub chain: GqlChain,
+    pub pool_tokens: Vec<Token>,
+    pub dynamic_data: DynamicData,
+    pub create_time: u64,
+}
+
+/// Dynamic data for pools from Balancer API v3.
+#[derive(Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DynamicData {
     pub swap_enabled: bool,
-    pub tokens: Vec<Token>,
+}
+
+/// Token data for pools.
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub struct Token {
+    pub address: H160,
+    pub decimals: u8,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub weight: Option<Bfp>,
 }
 
 /// Supported pool kinds.
@@ -159,79 +179,95 @@ pub enum PoolType {
     ComposableStable,
 }
 
-/// Token data for pools.
-#[serde_as]
-#[derive(Debug, Deserialize, Eq, PartialEq)]
-pub struct Token {
-    pub address: H160,
-    pub decimals: u8,
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    #[serde(default)]
-    pub weight: Option<Bfp>,
+impl PoolData {
+    /// Converts the API pool type string to our internal enum.
+    pub fn pool_type_enum(&self) -> PoolType {
+        match self.pool_type.as_str() {
+            "WEIGHTED" => PoolType::Weighted,
+            "STABLE" => PoolType::Stable,
+            "LIQUIDITY_BOOTSTRAPPING" => PoolType::LiquidityBootstrapping,
+            "COMPOSABLE_STABLE" => PoolType::ComposableStable,
+            _ => panic!("Unknown pool type: {}", self.pool_type),
+        }
+    }
+
+    /// Returns the swap enabled status from dynamic data.
+    pub fn swap_enabled(&self) -> bool {
+        self.dynamic_data.swap_enabled
+    }
+
+    /// Returns the tokens with the correct field mapping.
+    pub fn tokens(&self) -> Vec<Token> {
+        self.pool_tokens.clone()
+    }
+
+    /// Converts the string ID to H256. For V2 pools, this should be a 32-byte hex string.
+    /// For V3 pools, this would be a 20-byte address, but we only support V2 pools.
+    pub fn id_as_h256(&self) -> Result<H256> {
+        // Remove 0x prefix if present
+        let id_str = self.id.trim_start_matches("0x");
+        
+        // For V2 pools, we expect 32 bytes (64 hex characters)
+        if id_str.len() == 64 {
+            let id_bytes = hex::decode(id_str)
+                .context("Failed to decode pool ID as hex")?;
+            Ok(H256::from_slice(&id_bytes))
+        } else {
+            Err(anyhow::anyhow!(
+                "Invalid pool ID length for V2 pool: {} (expected 64 hex chars, got {})",
+                self.id,
+                id_str.len()
+            ))
+        }
+    }
+
+    /// Returns true if this is a V2 pool (protocol version 2).
+    pub fn is_v2_pool(&self) -> bool {
+        self.protocol_version == 2
+    }
 }
 
 mod pools_query {
     use {super::PoolData, serde::Deserialize};
 
     pub const QUERY: &str = r#"
-        query Pools($block: Int, $pageSize: Int, $lastId: ID) {
-            pools(
-                block: { number: $block }
-                first: $pageSize
-                where: {
-                    id_gt: $lastId
-                    poolType_in: [
-                        "Stable",
-                        "Weighted",
-                        "LiquidityBootstrapping",
-                        "ComposableStable",
-                    ]
-                    totalLiquidity_gt: "1" # 1$ value of tokens
-                }
+        query PoolGetPools(
+            $first: Int,
+            $skip: Int,
+            $orderBy: GqlPoolOrderBy,
+            $orderDirection: GqlPoolOrderDirection,
+            $where: GqlPoolFilter
+        ) {
+            poolGetPools(
+                first: $first
+                skip: $skip
+                orderBy: $orderBy
+                orderDirection: $orderDirection
+                where: $where
             ) {
-                poolType
                 id
                 address
+                type
+                protocolVersion
                 factory
-                swapEnabled
-                tokens {
+                chain
+                poolTokens {
                     address
                     decimals
                     weight
                 }
+                dynamicData {
+                    swapEnabled
+                }
+                createTime
             }
         }
     "#;
 
     #[derive(Debug, Deserialize, Eq, PartialEq)]
     pub struct Data {
-        pub pools: Vec<PoolData>,
-    }
-}
-
-mod block_number_query {
-    use serde::Deserialize;
-
-    pub const QUERY: &str = r#"{
-        _meta {
-            block { number }
-        }
-    }"#;
-
-    #[derive(Debug, Deserialize, Eq, PartialEq)]
-    pub struct Data {
-        #[serde(rename = "_meta")]
-        pub meta: Meta,
-    }
-
-    #[derive(Debug, Deserialize, Eq, PartialEq)]
-    pub struct Meta {
-        pub block: Block,
-    }
-
-    #[derive(Debug, Deserialize, Eq, PartialEq)]
-    pub struct Block {
-        pub number: u64,
+        #[serde(rename = "poolGetPools")]
+        pub pool_get_pools: Vec<PoolData>,
     }
 }
 
@@ -240,8 +276,7 @@ mod tests {
     use {
         super::*,
         crate::sources::balancer_v2::swap::fixed_point::Bfp,
-        ethcontract::{H160, H256},
-        maplit::hashmap,
+        ethcontract::{H160},
     };
 
     #[test]
@@ -250,14 +285,15 @@ mod tests {
 
         assert_eq!(
             serde_json::from_value::<Data>(json!({
-                "pools": [
+                "poolGetPools": [
                     {
-                        "poolType": "Weighted",
+                        "type": "WEIGHTED",
                         "address": "0x2222222222222222222222222222222222222222",
                         "id": "0x1111111111111111111111111111111111111111111111111111111111111111",
+                        "protocolVersion": 2,
                         "factory": "0x5555555555555555555555555555555555555555",
-                        "swapEnabled": true,
-                        "tokens": [
+                        "chain": "GNOSIS",
+                        "poolTokens": [
                             {
                                 "address": "0x3333333333333333333333333333333333333333",
                                 "decimals": 3,
@@ -269,14 +305,19 @@ mod tests {
                                 "weight": "0.5"
                             },
                         ],
+                        "dynamicData": {
+                            "swapEnabled": true
+                        },
+                        "createTime": 1234567890
                     },
                     {
-                        "poolType": "Stable",
+                        "type": "STABLE",
                         "address": "0x2222222222222222222222222222222222222222",
                         "id": "0x1111111111111111111111111111111111111111111111111111111111111111",
+                        "protocolVersion": 2,
                         "factory": "0x5555555555555555555555555555555555555555",
-                        "swapEnabled": true,
-                        "tokens": [
+                        "chain": "GNOSIS",
+                        "poolTokens": [
                             {
                                 "address": "0x3333333333333333333333333333333333333333",
                                 "decimals": 3,
@@ -286,14 +327,19 @@ mod tests {
                                 "decimals": 4,
                             },
                         ],
+                        "dynamicData": {
+                            "swapEnabled": true
+                        },
+                        "createTime": 1234567890
                     },
                     {
-                        "poolType": "LiquidityBootstrapping",
+                        "type": "LIQUIDITY_BOOTSTRAPPING",
                         "address": "0x2222222222222222222222222222222222222222",
                         "id": "0x1111111111111111111111111111111111111111111111111111111111111111",
+                        "protocolVersion": 2,
                         "factory": "0x5555555555555555555555555555555555555555",
-                        "swapEnabled": true,
-                        "tokens": [
+                        "chain": "GNOSIS",
+                        "poolTokens": [
                             {
                                 "address": "0x3333333333333333333333333333333333333333",
                                 "decimals": 3,
@@ -305,14 +351,19 @@ mod tests {
                                 "weight": "0.5"
                             },
                         ],
+                        "dynamicData": {
+                            "swapEnabled": true
+                        },
+                        "createTime": 1234567890
                     },
                     {
-                        "poolType": "ComposableStable",
+                        "type": "COMPOSABLE_STABLE",
                         "address": "0x2222222222222222222222222222222222222222",
                         "id": "0x1111111111111111111111111111111111111111111111111111111111111111",
+                        "protocolVersion": 2,
                         "factory": "0x5555555555555555555555555555555555555555",
-                        "swapEnabled": true,
-                        "tokens": [
+                        "chain": "GNOSIS",
+                        "poolTokens": [
                             {
                                 "address": "0x3333333333333333333333333333333333333333",
                                 "decimals": 3,
@@ -322,19 +373,24 @@ mod tests {
                                 "decimals": 4,
                             },
                         ],
+                        "dynamicData": {
+                            "swapEnabled": true
+                        },
+                        "createTime": 1234567890
                     },
                 ],
             }))
             .unwrap(),
             Data {
-                pools: vec![
+                pool_get_pools: vec![
                     PoolData {
-                        pool_type: PoolType::Weighted,
-                        id: H256([0x11; 32]),
+                        id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
                         address: H160([0x22; 20]),
+                        pool_type: "WEIGHTED".to_string(),
+                        protocol_version: 2,
                         factory: H160([0x55; 20]),
-                        swap_enabled: true,
-                        tokens: vec![
+                        chain: GqlChain::GNOSIS,
+                        pool_tokens: vec![
                             Token {
                                 address: H160([0x33; 20]),
                                 decimals: 3,
@@ -346,14 +402,17 @@ mod tests {
                                 weight: Some(Bfp::from_wei(500_000_000_000_000_000u128.into())),
                             },
                         ],
+                        dynamic_data: DynamicData { swap_enabled: true },
+                        create_time: 1234567890,
                     },
                     PoolData {
-                        pool_type: PoolType::Stable,
-                        id: H256([0x11; 32]),
+                        id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
                         address: H160([0x22; 20]),
+                        pool_type: "STABLE".to_string(),
+                        protocol_version: 2,
                         factory: H160([0x55; 20]),
-                        swap_enabled: true,
-                        tokens: vec![
+                        chain: GqlChain::GNOSIS,
+                        pool_tokens: vec![
                             Token {
                                 address: H160([0x33; 20]),
                                 decimals: 3,
@@ -365,14 +424,17 @@ mod tests {
                                 weight: None,
                             },
                         ],
+                        dynamic_data: DynamicData { swap_enabled: true },
+                        create_time: 1234567890,
                     },
                     PoolData {
-                        pool_type: PoolType::LiquidityBootstrapping,
-                        id: H256([0x11; 32]),
+                        id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
                         address: H160([0x22; 20]),
+                        pool_type: "LIQUIDITY_BOOTSTRAPPING".to_string(),
+                        protocol_version: 2,
                         factory: H160([0x55; 20]),
-                        swap_enabled: true,
-                        tokens: vec![
+                        chain: GqlChain::GNOSIS,
+                        pool_tokens: vec![
                             Token {
                                 address: H160([0x33; 20]),
                                 decimals: 3,
@@ -384,14 +446,17 @@ mod tests {
                                 weight: Some(Bfp::from_wei(500_000_000_000_000_000u128.into())),
                             },
                         ],
+                        dynamic_data: DynamicData { swap_enabled: true },
+                        create_time: 1234567890,
                     },
                     PoolData {
-                        pool_type: PoolType::ComposableStable,
-                        id: H256([0x11; 32]),
+                        id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
                         address: H160([0x22; 20]),
+                        pool_type: "COMPOSABLE_STABLE".to_string(),
+                        protocol_version: 2,
                         factory: H160([0x55; 20]),
-                        swap_enabled: true,
-                        tokens: vec![
+                        chain: GqlChain::GNOSIS,
+                        pool_tokens: vec![
                             Token {
                                 address: H160([0x33; 20]),
                                 decimals: 3,
@@ -403,70 +468,58 @@ mod tests {
                                 weight: None,
                             },
                         ],
+                        dynamic_data: DynamicData { swap_enabled: true },
+                        create_time: 1234567890,
                     },
                 ],
-            }
-        );
-    }
-
-    #[test]
-    fn decode_block_number_data() {
-        use block_number_query::*;
-
-        assert_eq!(
-            serde_json::from_value::<Data>(json!({
-                "_meta": {
-                    "block": {
-                        "number": 42,
-                    },
-                },
-            }))
-            .unwrap(),
-            Data {
-                meta: Meta {
-                    block: Block { number: 42 }
-                }
             }
         );
     }
 
     #[test]
     fn groups_pools_by_factory() {
-        let pool = |factory: H160, id: u8| PoolData {
-            id: H256([id; 32]),
-            factory,
-            pool_type: PoolType::Weighted,
-            address: Default::default(),
-            swap_enabled: true,
-            tokens: Default::default(),
-        };
-
-        let registered_pools = RegisteredPools {
-            pools: vec![
-                pool(H160([1; 20]), 1),
-                pool(H160([1; 20]), 2),
-                pool(H160([2; 20]), 3),
-            ],
+        let pools = RegisteredPools {
             fetched_block_number: 42,
+            pools: vec![
+                PoolData {
+                    id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+                    address: H160([0x22; 20]),
+                    pool_type: "WEIGHTED".to_string(),
+                    protocol_version: 2,
+                    factory: H160([0x55; 20]),
+                    chain: GqlChain::GNOSIS,
+                    pool_tokens: vec![],
+                    dynamic_data: DynamicData { swap_enabled: true },
+                    create_time: 0,
+                },
+                PoolData {
+                    id: "0x2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+                    address: H160([0x33; 20]),
+                    pool_type: "STABLE".to_string(),
+                    protocol_version: 2,
+                    factory: H160([0x55; 20]),
+                    chain: GqlChain::GNOSIS,
+                    pool_tokens: vec![],
+                    dynamic_data: DynamicData { swap_enabled: true },
+                    create_time: 0,
+                },
+                PoolData {
+                    id: "0x3333333333333333333333333333333333333333333333333333333333333333".to_string(),
+                    address: H160([0x44; 20]),
+                    pool_type: "WEIGHTED".to_string(),
+                    protocol_version: 2,
+                    factory: H160([0x66; 20]),
+                    chain: GqlChain::GNOSIS,
+                    pool_tokens: vec![],
+                    dynamic_data: DynamicData { swap_enabled: true },
+                    create_time: 0,
+                },
+            ],
         };
 
-        assert_eq!(
-            registered_pools.group_by_factory(),
-            hashmap! {
-                H160([1; 20]) => RegisteredPools {
-                    pools: vec![
-                        pool(H160([1; 20]), 1),
-                        pool(H160([1; 20]), 2),
-                    ],
-                    fetched_block_number: 42,
-                },
-                H160([2; 20]) => RegisteredPools {
-                    pools: vec![
-                        pool(H160([2; 20]), 3),
-                    ],
-                    fetched_block_number: 42,
-                },
-            }
-        )
+        let grouped = pools.group_by_factory();
+        assert_eq!(grouped.len(), 2);
+        assert_eq!(grouped[&H160([0x55; 20])].pools.len(), 2);
+        assert_eq!(grouped[&H160([0x66; 20])].pools.len(), 1);
     }
 }

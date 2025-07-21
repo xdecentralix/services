@@ -184,10 +184,10 @@ mod test {
         };
 
         let source =
-            BackgroundInitLiquiditySource::new("fake", init, Duration::from_millis(10), None);
+            BackgroundInitLiquiditySource::new("fake_delayed", init, Duration::from_millis(10), None);
         let gauge = Metrics::get()
             .liquidity_enabled
-            .with_label_values(&["fake"]);
+            .with_label_values(&["fake_delayed"]);
         assert_eq!(gauge.get(), 0);
 
         let liquidity = source
@@ -225,7 +225,7 @@ mod test {
         };
 
         let source = BackgroundInitLiquiditySource::new(
-            "fake",
+            "fake_reinit",
             init,
             Duration::from_millis(10),
             Some(Duration::from_millis(10)),
@@ -244,7 +244,7 @@ mod test {
 
         let gauge = Metrics::get()
             .liquidity_enabled
-            .with_label_values(&["fake"]);
+            .with_label_values(&["fake_reinit"]);
         assert!((5..=6).contains(&gauge.get()));
     }
 }

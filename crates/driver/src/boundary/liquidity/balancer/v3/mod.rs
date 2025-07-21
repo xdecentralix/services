@@ -10,18 +10,15 @@ use {
     anyhow::{Context, Result},
     chain::Chain,
     contracts::{
-        BalancerV2ComposableStablePoolFactory,
-        BalancerV2LiquidityBootstrappingPoolFactory,
-        BalancerV2StablePoolFactoryV2,
-        BalancerV2Vault,
-        BalancerV2WeightedPoolFactory,
-        BalancerV2WeightedPoolFactoryV3,
+        BalancerV3BatchRouter,
+        BalancerV3Vault,
+        BalancerV3WeightedPoolFactory,
         GPv2Settlement,
     },
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
     shared::{
         http_solver::model::TokenAmount,
-        sources::balancer_v2::{
+        sources::balancer_v3::{
             BalancerFactoryKind,
             BalancerPoolFetcher,
             pool_fetching::BalancerContracts,
@@ -31,16 +28,15 @@ use {
     },
     solver::{
         interactions::allowances::Allowances,
-        liquidity::{balancer_v2, balancer_v2::BalancerV2Liquidity},
+        liquidity::{balancer_v3, balancer_v3::BalancerV3Liquidity},
         liquidity_collector::{BackgroundInitLiquiditySource, LiquidityCollecting},
     },
     std::sync::Arc,
 };
 
-pub mod stable;
 pub mod weighted;
 
-/// Maps a Chain to the corresponding GqlChain for Balancer API v3.
+/// Maps a Chain to the corresponding GqlChain for Balancer V3 API.
 fn chain_to_gql_chain(chain: &Chain) -> GqlChain {
     match chain {
         Chain::Mainnet => GqlChain::MAINNET,
@@ -58,8 +54,8 @@ fn chain_to_gql_chain(chain: &Chain) -> GqlChain {
 }
 
 struct Pool {
-    vault: eth::ContractAddress,
-    id: balancer::v2::Id,
+    batch_router: eth::ContractAddress,
+    id: balancer::v3::Id,
 }
 
 fn to_interaction(
@@ -69,13 +65,13 @@ fn to_interaction(
     receiver: &eth::Address,
 ) -> eth::Interaction {
     let web3 = ethrpc::dummy::web3();
-    let handler = balancer_v2::SettlementHandler::new(
+    let handler = balancer_v3::SettlementHandler::new(
         pool.id.into(),
         // Note that this code assumes `receiver == sender`. This assumption is
-        // also baked into the Balancer V2 logic in the `shared` crate, so to
+        // also baked into the Balancer V3 logic in the `shared` crate, so to
         // change this assumption, we would need to change it there as well.
         GPv2Settlement::at(&web3, receiver.0),
-        BalancerV2Vault::at(&web3, pool.vault.into()),
+        BalancerV3BatchRouter::at(&web3, pool.batch_router.into()),
         Allowances::empty(receiver.0),
     );
 
@@ -97,9 +93,9 @@ pub fn collector(
     eth: &Ethereum,
     block_stream: CurrentBlockWatcher,
     block_retriever: Arc<dyn BlockRetrieving>,
-    config: &infra::liquidity::config::BalancerV2,
+    config: &infra::liquidity::config::BalancerV3,
 ) -> Box<dyn LiquidityCollecting> {
-    let eth = Arc::new(eth.with_metric_label("balancerV2".into()));
+    let eth = Arc::new(eth.with_metric_label("balancerV3".into()));
     let reinit_interval = config.reinit_interval;
     let config = Arc::new(config.clone());
     let init = move || {
@@ -111,7 +107,7 @@ pub fn collector(
     };
     const TEN_MINUTES: std::time::Duration = std::time::Duration::from_secs(10 * 60);
     Box::new(BackgroundInitLiquiditySource::new(
-        "balancer-v2",
+        "balancer-v3",
         init,
         TEN_MINUTES,
         reinit_interval,
@@ -122,11 +118,14 @@ async fn init_liquidity(
     eth: &Ethereum,
     block_stream: &CurrentBlockWatcher,
     block_retriever: Arc<dyn BlockRetrieving>,
-    config: &infra::liquidity::config::BalancerV2,
+    config: &infra::liquidity::config::BalancerV3,
 ) -> Result<impl LiquidityCollecting + use<>> {
     let web3 = boundary::web3(eth);
+    
+    // Create Balancer V3 contracts configuration
     let contracts = BalancerContracts {
-        vault: BalancerV2Vault::at(&web3, config.vault.into()),
+        vault: BalancerV3Vault::at(&web3, config.vault.into()),
+        batch_router: BalancerV3BatchRouter::at(&web3, config.batch_router.into()),
         factories: [
             config
                 .weighted
@@ -134,55 +133,7 @@ async fn init_liquidity(
                 .map(|&factory| {
                     (
                         BalancerFactoryKind::Weighted,
-                        BalancerV2WeightedPoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
-                    )
-                })
-                .collect::<Vec<_>>(),
-            config
-                .weighted_v3plus
-                .iter()
-                .map(|&factory| {
-                    (
-                        BalancerFactoryKind::WeightedV3,
-                        BalancerV2WeightedPoolFactoryV3::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
-                    )
-                })
-                .collect::<Vec<_>>(),
-            config
-                .stable
-                .iter()
-                .map(|&factory| {
-                    (
-                        BalancerFactoryKind::StableV2,
-                        BalancerV2StablePoolFactoryV2::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
-                    )
-                })
-                .collect::<Vec<_>>(),
-            config
-                .liquidity_bootstrapping
-                .iter()
-                .map(|&factory| {
-                    (
-                        BalancerFactoryKind::LiquidityBootstrapping,
-                        BalancerV2LiquidityBootstrappingPoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
-                    )
-                })
-                .collect::<Vec<_>>(),
-            config
-                .composable_stable
-                .iter()
-                .map(|&factory| {
-                    (
-                        BalancerFactoryKind::ComposableStable,
-                        BalancerV2ComposableStablePoolFactory::at(&web3, factory.into())
+                        BalancerV3WeightedPoolFactory::at(&web3, factory.into())
                             .raw_instance()
                             .clone(),
                     )
@@ -211,13 +162,13 @@ async fn init_liquidity(
             chain_to_gql_chain(&eth.chain()),
         )
         .await
-        .context("failed to create balancer pool fetcher")?,
+        .context("failed to create Balancer V3 pool fetcher")?,
     );
 
-    Ok(BalancerV2Liquidity::new(
+    Ok(BalancerV3Liquidity::new(
         web3,
         balancer_pool_fetcher,
         eth.contracts().settlement().clone(),
-        contracts.vault,
+        contracts.batch_router,
     ))
 }

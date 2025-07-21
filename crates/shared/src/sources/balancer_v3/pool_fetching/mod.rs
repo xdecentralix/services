@@ -1,8 +1,8 @@
 //! Pool Fetching is primarily concerned with retrieving relevant pools from the
 //! `BalancerPoolRegistry` when given a collection of `TokenPair`. Each of these
 //! pools are then queried for their `token_balances` and the `PoolFetcher`
-//! returns all up-to-date `Weighted` and `Stable` pools to be consumed by
-//! external users (e.g. Price Estimators and Solvers).
+//! returns all up-to-date `Weighted` pools to be consumed by external users
+//! (e.g. Price Estimators and Solvers).
 
 use {
     self::{
@@ -20,7 +20,6 @@ use {
             PoolIndexing,
             PoolKind,
             common::{self, PoolInfoFetcher},
-            stable,
             weighted,
         },
         swap::fixed_point::Bfp,
@@ -33,32 +32,21 @@ use {
     anyhow::{Context, Result},
     clap::ValueEnum,
     contracts::{
-        BalancerV2ComposableStablePoolFactory,
-        BalancerV2ComposableStablePoolFactoryV3,
-        BalancerV2ComposableStablePoolFactoryV4,
-        BalancerV2ComposableStablePoolFactoryV5,
-        BalancerV2ComposableStablePoolFactoryV6,
-        BalancerV2LiquidityBootstrappingPoolFactory,
-        BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory,
-        BalancerV2StablePoolFactoryV2,
-        BalancerV2Vault,
-        BalancerV2WeightedPool2TokensFactory,
-        BalancerV2WeightedPoolFactory,
-        BalancerV2WeightedPoolFactoryV3,
-        BalancerV2WeightedPoolFactoryV4,
+        BalancerV3WeightedPoolFactory,
+        BalancerV3Vault,
+        BalancerV3BatchRouter,
     },
     ethcontract::{BlockId, H160, H256, Instance, dyns::DynInstance},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
     model::TokenPair,
     reqwest::{Client, Url},
     std::{
-        collections::{BTreeMap, HashMap, HashSet},
+        collections::{BTreeMap, HashSet},
         sync::Arc,
     },
 };
 pub use {
     common::TokenState,
-    stable::AmplificationParameter,
     weighted::{TokenState as WeightedTokenState, Version as WeightedPoolVersion},
 };
 
@@ -74,7 +62,7 @@ pub trait BalancerPoolEvaluating {
 
 #[derive(Clone, Debug)]
 pub struct CommonPoolState {
-    pub id: H256,
+    pub id: H160,
     pub address: H160,
     pub swap_fee: Bfp,
     pub paused: bool,
@@ -88,11 +76,11 @@ pub struct WeightedPool {
 }
 
 impl WeightedPool {
-    pub fn new_unpaused(pool_id: H256, weighted_state: weighted::PoolState) -> Self {
+    pub fn new_unpaused(pool_id: H160, weighted_state: weighted::PoolState) -> Self {
         WeightedPool {
             common: CommonPoolState {
                 id: pool_id,
-                address: pool_address_from_id(pool_id),
+                address: pool_id, // V3 pools are contract addresses
                 swap_fee: weighted_state.swap_fee,
                 paused: false,
             },
@@ -102,42 +90,14 @@ impl WeightedPool {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct StablePool {
-    pub common: CommonPoolState,
-    pub reserves: BTreeMap<H160, TokenState>,
-    pub amplification_parameter: AmplificationParameter,
-}
-
-impl StablePool {
-    pub fn new_unpaused(pool_id: H256, stable_state: stable::PoolState) -> Self {
-        StablePool {
-            common: CommonPoolState {
-                id: pool_id,
-                address: pool_address_from_id(pool_id),
-                swap_fee: stable_state.swap_fee,
-                paused: false,
-            },
-            reserves: stable_state.tokens.into_iter().collect(),
-            amplification_parameter: stable_state.amplification_parameter,
-        }
-    }
-}
-
 #[derive(Default)]
 pub struct FetchedBalancerPools {
-    pub stable_pools: Vec<StablePool>,
     pub weighted_pools: Vec<WeightedPool>,
 }
 
 impl FetchedBalancerPools {
     pub fn relevant_tokens(&self) -> HashSet<H160> {
         let mut tokens = HashSet::new();
-        tokens.extend(
-            self.stable_pools
-                .iter()
-                .flat_map(|pool| pool.reserves.keys().copied()),
-        );
         tokens.extend(
             self.weighted_pools
                 .iter()
@@ -149,7 +109,7 @@ impl FetchedBalancerPools {
 
 #[mockall::automock]
 #[async_trait::async_trait]
-pub trait BalancerPoolFetching: Send + Sync {
+pub trait BalancerV3PoolFetching: Send + Sync {
     async fn fetch(
         &self,
         token_pairs: HashSet<TokenPair>,
@@ -159,88 +119,54 @@ pub trait BalancerPoolFetching: Send + Sync {
 
 pub struct BalancerPoolFetcher {
     fetcher: Arc<dyn InternalPoolFetching>,
-    // We observed some balancer pools like https://app.balancer.fi/#/pool/0x072f14b85add63488ddad88f855fda4a99d6ac9b000200000000000000000027
-    // being problematic because their token balance becomes out of sync leading to simulation
+    // We observed some balancer pools being problematic because their token balance becomes out of sync leading to simulation
     // failures.
-    // https://forum.balancer.fi/t/medium-severity-bug-found/3161
-    pool_id_deny_list: Vec<H256>,
+    pool_id_deny_list: Vec<H160>,
 }
 
-/// An enum containing all supported Balancer factory types.
+/// An enum containing all supported Balancer V3 factory types.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ValueEnum)]
 #[clap(rename_all = "verbatim")]
 pub enum BalancerFactoryKind {
     Weighted,
-    WeightedV3,
-    WeightedV4,
-    Weighted2Token,
-    StableV2,
-    LiquidityBootstrapping,
-    NoProtocolFeeLiquidityBootstrapping,
-    ComposableStable,
-    ComposableStableV3,
-    ComposableStableV4,
-    ComposableStableV5,
-    ComposableStableV6,
 }
 
 impl BalancerFactoryKind {
     /// Returns a vector with supported factories for the specified chain ID.
     pub fn for_chain(chain_id: u64) -> Vec<Self> {
         match chain_id {
-            1 => Self::value_variants().to_owned(),
-            5 => vec![
-                Self::Weighted,
-                Self::WeightedV3,
-                Self::WeightedV4,
-                Self::Weighted2Token,
-                Self::StableV2,
-                Self::ComposableStable,
-                Self::ComposableStableV3,
-                Self::ComposableStableV4,
-                Self::ComposableStableV5,
-                Self::ComposableStableV6,
-            ],
-            100 => vec![
-                Self::WeightedV3,
-                Self::WeightedV4,
-                Self::StableV2,
-                Self::ComposableStableV3,
-                Self::ComposableStableV4,
-                Self::ComposableStableV5,
-                Self::ComposableStableV6,
-            ],
-            11155111 => vec![
-                Self::WeightedV4,
-                Self::ComposableStableV4,
-                Self::ComposableStableV5,
-                Self::ComposableStableV6,
-                Self::NoProtocolFeeLiquidityBootstrapping,
-            ],
+            1 => vec![Self::Weighted],
+            5 => vec![Self::Weighted],
+            100 => vec![Self::Weighted],
+            11155111 => vec![Self::Weighted],
             _ => Default::default(),
         }
     }
 }
 
-/// All balancer related contracts that we expect to exist.
+/// All balancer V3 related contracts that we expect to exist.
 pub struct BalancerContracts {
-    pub vault: BalancerV2Vault,
+    pub vault: BalancerV3Vault,
+    pub batch_router: BalancerV3BatchRouter,
     pub factories: Vec<(BalancerFactoryKind, DynInstance)>,
 }
 
 impl BalancerContracts {
     pub async fn try_new(web3: &Web3, factory_kinds: Vec<BalancerFactoryKind>) -> Result<Self> {
-        let web3 = ethrpc::instrumented::instrument_with_label(web3, "balancerV2".into());
-        let vault = BalancerV2Vault::deployed(&web3)
+        let web3 = ethrpc::instrumented::instrument_with_label(web3, "balancerV3".into());
+        let vault = BalancerV3Vault::deployed(&web3)
             .await
-            .context("Cannot retrieve balancer vault")?;
+            .context("Cannot retrieve balancer V3 vault")?;
+        let batch_router = BalancerV3BatchRouter::deployed(&web3)
+            .await
+            .context("Cannot retrieve balancer V3 batch router")?;
 
         macro_rules! instance {
             ($factory:ident) => {{
                 $factory::deployed(&web3)
                     .await
                     .context(format!(
-                        "Cannot retrieve Balancer factory {}",
+                        "Cannot retrieve Balancer V3 factory {}",
                         stringify!($factory)
                     ))?
                     .raw_instance()
@@ -248,46 +174,15 @@ impl BalancerContracts {
             }};
         }
 
-        let mut factories = HashMap::new();
-        for kind in factory_kinds {
-            let instance = match &kind {
-                BalancerFactoryKind::Weighted => instance!(BalancerV2WeightedPoolFactory),
-                BalancerFactoryKind::WeightedV3 => instance!(BalancerV2WeightedPoolFactoryV3),
-                BalancerFactoryKind::WeightedV4 => instance!(BalancerV2WeightedPoolFactoryV4),
-                BalancerFactoryKind::Weighted2Token => {
-                    instance!(BalancerV2WeightedPool2TokensFactory)
-                }
-                BalancerFactoryKind::StableV2 => instance!(BalancerV2StablePoolFactoryV2),
-                BalancerFactoryKind::LiquidityBootstrapping => {
-                    instance!(BalancerV2LiquidityBootstrappingPoolFactory)
-                }
-                BalancerFactoryKind::NoProtocolFeeLiquidityBootstrapping => {
-                    instance!(BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory)
-                }
-                BalancerFactoryKind::ComposableStable => {
-                    instance!(BalancerV2ComposableStablePoolFactory)
-                }
-                BalancerFactoryKind::ComposableStableV3 => {
-                    instance!(BalancerV2ComposableStablePoolFactoryV3)
-                }
-                BalancerFactoryKind::ComposableStableV4 => {
-                    instance!(BalancerV2ComposableStablePoolFactoryV4)
-                }
-                BalancerFactoryKind::ComposableStableV5 => {
-                    instance!(BalancerV2ComposableStablePoolFactoryV5)
-                }
-                BalancerFactoryKind::ComposableStableV6 => {
-                    instance!(BalancerV2ComposableStablePoolFactoryV6)
-                }
+        let mut factories = Vec::new();
+        for factory_kind in factory_kinds {
+            let factory_instance = match factory_kind {
+                BalancerFactoryKind::Weighted => instance!(BalancerV3WeightedPoolFactory),
             };
-
-            factories.insert(kind, instance);
+            factories.push((factory_kind, factory_instance));
         }
 
-        Ok(Self {
-            vault,
-            factories: factories.into_iter().collect(),
-        })
+        Ok(BalancerContracts { vault, batch_router, factories })
     }
 }
 
@@ -302,11 +197,11 @@ impl BalancerPoolFetcher {
         client: Client,
         web3: Web3,
         contracts: &BalancerContracts,
-        deny_listed_pool_ids: Vec<H256>,
+        deny_listed_pool_ids: Vec<H160>,
         chain: GqlChain,
     ) -> Result<Self> {
         let pool_initializer = BalancerApiClient::from_subgraph_url(subgraph_url, client, chain)?;
-        let web3 = ethrpc::instrumented::instrument_with_label(&web3, "balancerV2".into());
+        let web3 = ethrpc::instrumented::instrument_with_label(&web3, "balancerV3".into());
         let fetcher = Arc::new(Cache::new(
             create_aggregate_pool_fetcher(
                 web3,
@@ -342,7 +237,7 @@ impl BalancerPoolFetcher {
 }
 
 #[async_trait::async_trait]
-impl BalancerPoolFetching for BalancerPoolFetcher {
+impl BalancerV3PoolFetching for BalancerPoolFetcher {
     async fn fetch(
         &self,
         token_pairs: HashSet<TokenPair>,
@@ -361,9 +256,6 @@ impl BalancerPoolFetching for BalancerPoolFetcher {
                     PoolKind::Weighted(state) => fetched_pools
                         .weighted_pools
                         .push(WeightedPool::new_unpaused(pool.id, state)),
-                    PoolKind::Stable(state) => fetched_pools
-                        .stable_pools
-                        .push(StablePool::new_unpaused(pool.id, state)),
                 }
                 fetched_pools
             },
@@ -373,7 +265,6 @@ impl BalancerPoolFetching for BalancerPoolFetcher {
     }
 }
 
-/// Creates an aggregate fetcher for all supported pool factories.
 async fn create_aggregate_pool_fetcher(
     web3: Web3,
     pool_initializer: impl PoolInitializing,
@@ -415,25 +306,8 @@ async fn create_aggregate_pool_fetcher(
     let mut fetchers = Vec::new();
     for (kind, instance) in &contracts.factories {
         let registry = match kind {
-            BalancerFactoryKind::Weighted | BalancerFactoryKind::Weighted2Token => {
-                registry!(BalancerV2WeightedPoolFactory, instance)
-            }
-            BalancerFactoryKind::WeightedV3 | BalancerFactoryKind::WeightedV4 => {
-                registry!(BalancerV2WeightedPoolFactoryV3, instance)
-            }
-            BalancerFactoryKind::StableV2 => {
-                registry!(BalancerV2StablePoolFactoryV2, instance)
-            }
-            BalancerFactoryKind::LiquidityBootstrapping
-            | BalancerFactoryKind::NoProtocolFeeLiquidityBootstrapping => {
-                registry!(BalancerV2LiquidityBootstrappingPoolFactory, instance)
-            }
-            BalancerFactoryKind::ComposableStable
-            | BalancerFactoryKind::ComposableStableV3
-            | BalancerFactoryKind::ComposableStableV4
-            | BalancerFactoryKind::ComposableStableV5
-            | BalancerFactoryKind::ComposableStableV6 => {
-                registry!(BalancerV2ComposableStablePoolFactory, instance)
+            BalancerFactoryKind::Weighted => {
+                registry!(BalancerV3WeightedPoolFactory, instance)
             }
         };
         fetchers.push(registry);
@@ -452,17 +326,15 @@ async fn create_aggregate_pool_fetcher(
             .collect::<Vec<_>>();
         tracing::warn!(
             %total_count, ?factories,
-            "found pools that don't correspond to any known Balancer pool factory",
+            "found pools that don't correspond to any known Balancer V3 pool factory",
         );
     }
 
     Ok(Aggregate::new(fetchers))
 }
 
-/// Helper method for creating a boxed `InternalPoolFetching` instance for the
-/// specified factory and parameters.
 fn create_internal_pool_fetcher<Factory>(
-    vault: BalancerV2Vault,
+    vault: BalancerV3Vault,
     factory: Factory,
     block_retriever: Arc<dyn BlockRetrieving>,
     token_infos: Arc<dyn TokenInfoFetching>,
@@ -487,31 +359,4 @@ where
         initial_pools,
         start_sync_at_block,
     )))
-}
-
-/// Extract the pool address from an ID.
-///
-/// This takes advantage that the first 20 bytes of the ID is the address of
-/// the pool. For example the GNO-BAL pool with ID
-/// `0x36128d5436d2d70cab39c9af9cce146c38554ff0000200000000000000000009`:
-/// <https://etherscan.io/address/0x36128D5436d2d70cab39C9AF9CcE146C38554ff0>
-fn pool_address_from_id(pool_id: H256) -> H160 {
-    let mut address = H160::default();
-    address.0.copy_from_slice(&pool_id.0[..20]);
-    address
-}
-
-#[cfg(test)]
-mod tests {
-    use {super::*, hex_literal::hex};
-
-    #[test]
-    fn can_extract_address_from_pool_id() {
-        assert_eq!(
-            pool_address_from_id(H256(hex!(
-                "36128d5436d2d70cab39c9af9cce146c38554ff0000200000000000000000009"
-            ))),
-            addr!("36128d5436d2d70cab39c9af9cce146c38554ff0"),
-        );
-    }
-}
+} 
