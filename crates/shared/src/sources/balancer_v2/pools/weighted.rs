@@ -144,7 +144,7 @@ fn pool_state(
 mod tests {
     use {
         super::*,
-        crate::sources::balancer_v2::graph_api::{Token, GqlChain, DynamicData, PoolData},
+        crate::sources::balancer_v2::graph_api::{DynamicData, GqlChain, PoolData, Token},
         contracts::dummy_contract,
         ethcontract::{H160, H256},
         ethcontract_mock::Mock,

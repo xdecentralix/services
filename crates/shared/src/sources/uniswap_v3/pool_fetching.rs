@@ -278,7 +278,8 @@ impl UniswapV3PoolFetcher {
     ) -> Result<Self> {
         let web3 = ethrpc::instrumented::instrument_with_label(&web3, "uniswapV3".into());
         let checkpoint =
-            PoolsCheckpointHandler::new(subgraph_url, client, max_pools_to_initialize, api_key).await?;
+            PoolsCheckpointHandler::new(subgraph_url, client, max_pools_to_initialize, api_key)
+                .await?;
 
         let init_block = checkpoint.pools_checkpoint.lock().unwrap().block_number;
         let init_block = block_retriever.block(init_block).await?;

@@ -8,9 +8,9 @@ use {
         },
         liquidity::{
             AmmOrderExecution,
+            BalancerV3WeightedProductOrder,
             Liquidity,
             SettlementHandling,
-            BalancerV3WeightedProductOrder,
         },
         liquidity_collector::LiquidityCollecting,
         settlement::SettlementEncoder,
@@ -463,4 +463,4 @@ mod tests {
             ],
         );
     }
-} 
+}

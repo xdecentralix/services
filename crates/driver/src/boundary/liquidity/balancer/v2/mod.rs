@@ -24,8 +24,8 @@ use {
         sources::balancer_v2::{
             BalancerFactoryKind,
             BalancerPoolFetcher,
-            pool_fetching::BalancerContracts,
             GqlChain,
+            pool_fetching::BalancerContracts,
         },
         token_info::{CachedTokenInfoFetcher, TokenInfoFetcher},
     },

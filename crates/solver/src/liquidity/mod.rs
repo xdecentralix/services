@@ -27,14 +27,14 @@ use {
                     WeightedPoolVersion,
                     WeightedTokenState,
                 },
-                swap::fixed_point::Bfp as Bfp,
+                swap::fixed_point::Bfp,
             },
             balancer_v3::{
                 pool_fetching::{
-                    WeightedPoolVersion as V3WeightedPoolVersion,
-                    WeightedTokenState as V3WeightedTokenState,
                     StablePoolVersion as V3StablePoolVersion,
                     StableTokenState as V3StableTokenState,
+                    WeightedPoolVersion as V3WeightedPoolVersion,
+                    WeightedTokenState as V3WeightedTokenState,
                 },
                 swap::fixed_point::Bfp as V3Bfp,
             },
@@ -333,10 +333,13 @@ impl std::fmt::Debug for WeightedProductOrder {
 
 impl std::fmt::Debug for BalancerV3WeightedProductOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Balancer V3 Weighted Product AMM {:?}", self.reserves.keys())
+        write!(
+            f,
+            "Balancer V3 Weighted Product AMM {:?}",
+            self.reserves.keys()
+        )
     }
 }
-
 
 #[derive(Clone)]
 #[cfg_attr(test, derive(Derivative))]

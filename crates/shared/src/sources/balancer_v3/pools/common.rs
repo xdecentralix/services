@@ -10,11 +10,11 @@ use {
         token_info::TokenInfoFetching,
     },
     anyhow::{Context, Result, anyhow, ensure},
+    contracts::{BalancerV3StablePool, BalancerV3Vault, BalancerV3WeightedPool},
     ethcontract::{BlockId, H160, U256},
     futures::{FutureExt as _, future::BoxFuture},
     std::{collections::BTreeMap, future::Future, sync::Arc},
     tokio::sync::oneshot,
-    contracts::{BalancerV3WeightedPool, BalancerV3Vault, BalancerV3StablePool},
 };
 
 /// Trait for fetching pool data that is generic on a factory type.
@@ -57,6 +57,7 @@ impl<Factory> PoolInfoFetcher<Factory> {
             token_infos,
         }
     }
+
     fn weighted_pool_at(&self, pool_address: H160) -> BalancerV3WeightedPool {
         let web3 = self.vault.raw_instance().web3();
         BalancerV3WeightedPool::at(&web3, pool_address)
@@ -119,22 +120,37 @@ impl<Factory> PoolInfoFetcher<Factory> {
         let pool = pool.clone();
         async move {
             let dynamic_data = fetch_dynamic_data.await?;
-            let (balances_live_scaled18, _token_rates, static_swap_fee_percentage, _total_supply, _is_pool_initialized, is_pool_paused, _is_pool_in_recovery_mode) = dynamic_data;
+            let (
+                balances_live_scaled18,
+                _token_rates,
+                static_swap_fee_percentage,
+                _total_supply,
+                _is_pool_initialized,
+                is_pool_paused,
+                _is_pool_in_recovery_mode,
+            ) = dynamic_data;
             let paused = is_pool_paused;
             let swap_fee = Bfp::from_wei(static_swap_fee_percentage);
             let balances = balances_live_scaled18;
 
             // Ensure the number of balances matches the number of tokens
-            ensure!(pool.tokens.len() == balances.len(), "pool token mismatch: expected {} tokens, got {} balances", pool.tokens.len(), balances.len());
+            ensure!(
+                pool.tokens.len() == balances.len(),
+                "pool token mismatch: expected {} tokens, got {} balances",
+                pool.tokens.len(),
+                balances.len()
+            );
 
             let tokens = itertools::izip!(&pool.tokens, balances, &pool.scaling_factors)
                 .map(|(&address, balance, &scaling_factor)| {
                     // Create a temporary TokenState to use the downscale method
                     let temp_token_state = TokenState {
-                    balance,
-                    scaling_factor,
+                        balance,
+                        scaling_factor,
                     };
-                    let native_balance = temp_token_state.downscale_down(Bfp::from_wei(balance)).unwrap_or(U256::zero());
+                    let native_balance = temp_token_state
+                        .downscale_down(Bfp::from_wei(balance))
+                        .unwrap_or(U256::zero());
                     (
                         address,
                         TokenState {
@@ -291,8 +307,6 @@ pub fn scaling_exponent_from_decimals(decimals: u8) -> Result<u8> {
         .context("unsupported token with more than 18 decimals")
 }
 
-
-
 /// An internal utility method for sharing the success value for an
 /// `anyhow::Result`.
 ///
@@ -338,7 +352,7 @@ mod tests {
         super::*,
         crate::{
             sources::balancer_v3::{
-                graph_api::{Token, GqlChain, DynamicData, PoolData},
+                graph_api::{DynamicData, GqlChain, PoolData, Token},
                 pools::{MockFactoryIndexing, PoolKind, weighted},
             },
             token_info::{MockTokenInfoFetching, TokenInfo},
@@ -406,7 +420,8 @@ mod tests {
         let web3 = mock.web3();
 
         let mock_pool = mock.deploy(BalancerV3WeightedPool::raw_contract().interface.abi.clone());
-        mock_pool.expect_call(BalancerV3WeightedPool::signatures().get_weighted_pool_dynamic_data())
+        mock_pool
+            .expect_call(BalancerV3WeightedPool::signatures().get_weighted_pool_dynamic_data())
             .returns((
                 balances.into_iter().map(Bfp::as_uint256).collect(),
                 vec![U256::zero(), U256::zero(), U256::zero()],
@@ -474,7 +489,8 @@ mod tests {
         let web3 = mock.web3();
 
         let mock_pool = mock.deploy(BalancerV3WeightedPool::raw_contract().interface.abi.clone());
-        mock_pool.expect_call(BalancerV3WeightedPool::signatures().get_weighted_pool_dynamic_data())
+        mock_pool
+            .expect_call(BalancerV3WeightedPool::signatures().get_weighted_pool_dynamic_data())
             .returns((
                 vec![U256::zero(), U256::zero()], // Only 2 balances instead of 3
                 vec![U256::zero(), U256::zero()],
@@ -518,7 +534,8 @@ mod tests {
         let web3 = mock.web3();
 
         let mock_pool = mock.deploy(BalancerV3WeightedPool::raw_contract().interface.abi.clone());
-        mock_pool.expect_call(BalancerV3WeightedPool::signatures().get_weighted_pool_dynamic_data())
+        mock_pool
+            .expect_call(BalancerV3WeightedPool::signatures().get_weighted_pool_dynamic_data())
             .returns((
                 balances.into_iter().map(Bfp::as_uint256).collect(),
                 vec![U256::zero(), U256::zero()],
@@ -577,7 +594,10 @@ mod tests {
 
         let pool_status = {
             let block = web3.eth().block_number().await.unwrap();
-            pool_info_fetcher.fetch_pool(&pool_info, block.into()).await.unwrap()
+            pool_info_fetcher
+                .fetch_pool(&pool_info, block.into())
+                .await
+                .unwrap()
         };
 
         match pool_status {
@@ -590,7 +610,8 @@ mod tests {
                     }
                     PoolKind::Stable(_) => {
                         // Stable pools are not tested in this specific test
-                        // This is just to handle the exhaustive pattern matching
+                        // This is just to handle the exhaustive pattern
+                        // matching
                     }
                 }
             }
@@ -604,7 +625,8 @@ mod tests {
         let web3 = mock.web3();
 
         let mock_pool = mock.deploy(BalancerV3WeightedPool::raw_contract().interface.abi.clone());
-        mock_pool.expect_call(BalancerV3WeightedPool::signatures().get_weighted_pool_dynamic_data())
+        mock_pool
+            .expect_call(BalancerV3WeightedPool::signatures().get_weighted_pool_dynamic_data())
             .returns((
                 vec![bfp_v3!("1000.0").as_uint256(), bfp_v3!("10.0").as_uint256()],
                 vec![U256::zero(), U256::zero()],
@@ -616,13 +638,13 @@ mod tests {
             ));
 
         let mut mock_factory = MockFactoryIndexing::new();
-        mock_factory
-            .expect_fetch_pool_state()
-            .returning(|_, _, _| Box::pin(future::ok(Some(weighted::PoolState {
+        mock_factory.expect_fetch_pool_state().returning(|_, _, _| {
+            Box::pin(future::ok(Some(weighted::PoolState {
                 tokens: btreemap! {},
                 swap_fee: bfp_v3!("0.003"),
                 version: weighted::Version::V1,
-            }))));
+            })))
+        });
 
         let token_infos = MockTokenInfoFetching::new();
 
@@ -644,7 +666,10 @@ mod tests {
 
         let pool_status = {
             let block = web3.eth().block_number().await.unwrap();
-            pool_info_fetcher.fetch_pool(&pool_info, block.into()).await.unwrap()
+            pool_info_fetcher
+                .fetch_pool(&pool_info, block.into())
+                .await
+                .unwrap()
         };
 
         match pool_status {
@@ -662,7 +687,8 @@ mod tests {
         let web3 = mock.web3();
 
         let mock_pool = mock.deploy(BalancerV3WeightedPool::raw_contract().interface.abi.clone());
-        mock_pool.expect_call(BalancerV3WeightedPool::signatures().get_weighted_pool_dynamic_data())
+        mock_pool
+            .expect_call(BalancerV3WeightedPool::signatures().get_weighted_pool_dynamic_data())
             .returns((
                 balances.into_iter().map(|b| b.as_uint256()).collect(),
                 vec![U256::zero(), U256::zero()],
@@ -698,7 +724,10 @@ mod tests {
 
         let pool_status = {
             let block = web3.eth().block_number().await.unwrap();
-            pool_info_fetcher.fetch_pool(&pool_info, block.into()).await.unwrap()
+            pool_info_fetcher
+                .fetch_pool(&pool_info, block.into())
+                .await
+                .unwrap()
         };
 
         match pool_status {
@@ -731,7 +760,9 @@ mod tests {
             token_infos: Arc::new(token_infos),
         };
 
-        let result = pool_info_fetcher.fetch_common_pool_info(pool.address(), 1337).await;
+        let result = pool_info_fetcher
+            .fetch_common_pool_info(pool.address(), 1337)
+            .await;
         assert!(result.is_err());
     }
 
@@ -770,7 +801,9 @@ mod tests {
             token_infos: Arc::new(token_infos),
         };
 
-        let result = pool_info_fetcher.fetch_common_pool_info(pool.address(), 1337).await;
+        let result = pool_info_fetcher
+            .fetch_common_pool_info(pool.address(), 1337)
+            .await;
         assert!(result.is_err());
     }
 
@@ -804,7 +837,10 @@ mod tests {
         assert_eq!(pool_info.id, H160([0x22; 20])); // For V3, pool ID is the pool address
         assert_eq!(pool_info.address, H160([0x22; 20]));
         assert_eq!(pool_info.tokens, vec![H160([0x33; 20]), H160([0x44; 20])]);
-        assert_eq!(pool_info.scaling_factors, vec![Bfp::exp10(0), Bfp::exp10(12)]);
+        assert_eq!(
+            pool_info.scaling_factors,
+            vec![Bfp::exp10(0), Bfp::exp10(12)]
+        );
         assert_eq!(pool_info.block_created, 42);
     }
 
@@ -817,13 +853,11 @@ mod tests {
             protocol_version: 3,
             factory: H160([0x55; 20]),
             chain: GqlChain::MAINNET,
-            pool_tokens: vec![
-                Token {
-                    address: H160([0x33; 20]),
-                    decimals: 18,
-                    weight: Some(Bfp::from_wei(U256::from(500_000_000_000_000_000u128))),
-                },
-            ],
+            pool_tokens: vec![Token {
+                address: H160([0x33; 20]),
+                decimals: 18,
+                weight: Some(Bfp::from_wei(U256::from(500_000_000_000_000_000u128))),
+            }],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 1234567890,
         };
@@ -863,14 +897,8 @@ mod tests {
 
     #[test]
     fn scaling_factor_from_decimals_ok_and_err() {
-        assert_eq!(
-            scaling_factor_from_decimals(18).unwrap(),
-            Bfp::exp10(0)
-        );
-        assert_eq!(
-            scaling_factor_from_decimals(6).unwrap(),
-            Bfp::exp10(12)
-        );
+        assert_eq!(scaling_factor_from_decimals(18).unwrap(), Bfp::exp10(0));
+        assert_eq!(scaling_factor_from_decimals(6).unwrap(), Bfp::exp10(12));
         assert!(scaling_factor_from_decimals(19).is_err());
     }
 
@@ -891,7 +919,8 @@ mod tests {
     #[tokio::test]
     #[should_panic]
     async fn shared_pool_state_future_panics_if_pending() {
-        let (_shared_fut, shared_rx) = share_common_pool_state(future::pending::<Result<PoolState>>());
+        let (_shared_fut, shared_rx) =
+            share_common_pool_state(future::pending::<Result<PoolState>>());
 
         let _ = shared_rx.await;
     }
@@ -911,7 +940,8 @@ mod tests {
     #[tokio::test]
     #[should_panic]
     async fn share_pool_state_future_if_errored() {
-        let (shared_fut, shared_rx) = share_common_pool_state(future::err::<PoolState, _>(anyhow!("test error")));
+        let (shared_fut, shared_rx) =
+            share_common_pool_state(future::err::<PoolState, _>(anyhow!("test error")));
 
         let _ = shared_fut.await;
         shared_rx.await;
@@ -932,4 +962,4 @@ mod tests {
             U256::from(1)
         );
     }
-} 
+}

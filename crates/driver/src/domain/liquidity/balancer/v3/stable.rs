@@ -147,8 +147,10 @@ pub enum InvalidAmplificationParameter {
 /// The stable pool version. Balancer V3 supports V1 and V2 stable pools.
 #[derive(Clone, Copy, Debug)]
 pub enum Version {
-    /// Stable pool math for Balancer V3 stable pools (BalancerV3StablePoolFactory).
+    /// Stable pool math for Balancer V3 stable pools
+    /// (BalancerV3StablePoolFactory).
     V1,
-    /// Stable pool math for Balancer V3 stable pools (BalancerV3StablePoolFactoryV2).
+    /// Stable pool math for Balancer V3 stable pools
+    /// (BalancerV3StablePoolFactoryV2).
     V2,
 }

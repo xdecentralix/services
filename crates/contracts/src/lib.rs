@@ -150,7 +150,7 @@ mod tests {
     const BASE: u64 = 8453;
     const ARBITRUM_ONE: u64 = 42161;
     const AVALANCHE: u64 = 43114;
-    const SEPOLIA: u64 = 11155111;   
+    const SEPOLIA: u64 = 11155111;
 
     use {
         super::*,
@@ -213,7 +213,17 @@ mod tests {
             }};
         }
 
-        for network in &[MAINNET, GNOSIS, SEPOLIA, ARBITRUM_ONE, OPTIMISM, BNB, AVALANCHE, POLYGON, BASE] {
+        for network in &[
+            MAINNET,
+            GNOSIS,
+            SEPOLIA,
+            ARBITRUM_ONE,
+            OPTIMISM,
+            BNB,
+            AVALANCHE,
+            POLYGON,
+            BASE,
+        ] {
             assert_has_deployment_address!(GPv2Settlement for *network);
             assert_has_deployment_address!(WETH9 for *network);
             assert_has_deployment_address!(HooksTrampoline for *network);

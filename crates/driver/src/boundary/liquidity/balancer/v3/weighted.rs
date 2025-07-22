@@ -14,7 +14,10 @@ use {
 // TODO: Estimate actual gas usage for Balancer V3
 const GAS_PER_SWAP: u64 = 100_000;
 
-pub fn to_domain(id: liquidity::Id, pool: BalancerV3WeightedProductOrder) -> Result<liquidity::Liquidity> {
+pub fn to_domain(
+    id: liquidity::Id,
+    pool: BalancerV3WeightedProductOrder,
+) -> Result<liquidity::Liquidity> {
     Ok(liquidity::Liquidity {
         id,
         gas: GAS_PER_SWAP.into(),

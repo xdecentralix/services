@@ -34,10 +34,10 @@ use {
     clap::ValueEnum,
     contracts::{
         BalancerV3BatchRouter,
-        BalancerV3Vault,
-        BalancerV3WeightedPoolFactory,
         BalancerV3StablePoolFactory,
         BalancerV3StablePoolFactoryV2,
+        BalancerV3Vault,
+        BalancerV3WeightedPoolFactory,
     },
     ethcontract::{BlockId, H160, H256, Instance, dyns::DynInstance},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
@@ -50,8 +50,11 @@ use {
 };
 pub use {
     common::TokenState,
-    stable::AmplificationParameter,
-    stable::{TokenState as StableTokenState, Version as StablePoolVersion},
+    stable::{
+        AmplificationParameter,
+        TokenState as StableTokenState,
+        Version as StablePoolVersion,
+    },
     weighted::{TokenState as WeightedTokenState, Version as WeightedPoolVersion},
 };
 
@@ -154,8 +157,8 @@ pub trait BalancerV3PoolFetching: Send + Sync {
 
 pub struct BalancerPoolFetcher {
     fetcher: Arc<dyn InternalPoolFetching>,
-    // We observed some balancer pools being problematic because their token balance becomes out of sync leading to simulation
-    // failures.
+    // We observed some balancer pools being problematic because their token balance becomes out of
+    // sync leading to simulation failures.
     pool_id_deny_list: Vec<H160>,
 }
 
@@ -173,17 +176,9 @@ impl BalancerFactoryKind {
     pub fn for_chain(chain_id: u64) -> Vec<Self> {
         match chain_id {
             // Mainnet
-            1 => vec![
-                Self::Weighted,
-                Self::Stable,
-                Self::StableV2,
-            ],
+            1 => vec![Self::Weighted, Self::Stable, Self::StableV2],
             // Gnosis
-            100 => vec![
-                Self::Weighted,
-                Self::Stable,
-                Self::StableV2,
-            ],
+            100 => vec![Self::Weighted, Self::Stable, Self::StableV2],
             _ => Default::default(),
         }
     }
@@ -229,7 +224,11 @@ impl BalancerContracts {
             factories.push((factory_kind, factory_instance));
         }
 
-        Ok(BalancerContracts { vault, batch_router, factories })
+        Ok(BalancerContracts {
+            vault,
+            batch_router,
+            factories,
+        })
     }
 }
 
@@ -415,4 +414,4 @@ where
         initial_pools,
         start_sync_at_block,
     )))
-} 
+}

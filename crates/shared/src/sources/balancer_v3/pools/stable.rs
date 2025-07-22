@@ -25,7 +25,10 @@ pub struct PoolInfo {
 impl PoolIndexing for PoolInfo {
     fn from_graph_data(pool: &PoolData, block_created: u64) -> Result<Self> {
         if pool.pool_type != "STABLE" {
-            return Err(anyhow::anyhow!("Expected STABLE pool type, got {}", pool.pool_type));
+            return Err(anyhow::anyhow!(
+                "Expected STABLE pool type, got {}",
+                pool.pool_type
+            ));
         }
         Ok(PoolInfo {
             common: common::PoolInfo::for_type(PoolType::Stable, pool, block_created)?,
@@ -183,8 +186,8 @@ impl FactoryIndexing for BalancerV3StablePoolFactoryV2 {
 mod tests {
     use {
         super::*,
-        crate::sources::balancer_v3::graph_api::{Token, GqlChain, DynamicData, PoolData},
-        ethcontract::{H160},
+        crate::sources::balancer_v3::graph_api::{DynamicData, GqlChain, PoolData, Token},
+        ethcontract::H160,
     };
 
     #[test]

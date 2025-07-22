@@ -77,10 +77,7 @@ where
     }
 
     /// Returns all pools containing both tokens from `TokenPair`
-    fn pool_ids_for_token_pair(
-        &self,
-        token_pair: &TokenPair,
-    ) -> impl Iterator<Item = H160> + '_ {
+    fn pool_ids_for_token_pair(&self, token_pair: &TokenPair) -> impl Iterator<Item = H160> + '_ {
         let (token0, token1) = token_pair.get();
 
         let pools0 = self.pools_by_token.get(&token0);
@@ -229,7 +226,7 @@ mod tests {
     use {
         super::*,
         crate::sources::balancer_v3::{
-            pools::{weighted, common, MockFactoryIndexing},
+            pools::{MockFactoryIndexing, common, weighted},
             swap::fixed_point::Bfp,
         },
         ethcontract::H160,
@@ -610,4 +607,4 @@ mod tests {
         assert!(res_0_1_2.contains(&weighted_pools[1].clone()));
         assert!(res_0_1_2.contains(&weighted_pools[2].clone()));
     }
-} 
+}

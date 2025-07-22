@@ -183,8 +183,12 @@ mod test {
             }
         };
 
-        let source =
-            BackgroundInitLiquiditySource::new("fake_delayed", init, Duration::from_millis(10), None);
+        let source = BackgroundInitLiquiditySource::new(
+            "fake_delayed",
+            init,
+            Duration::from_millis(10),
+            None,
+        );
         let gauge = Metrics::get()
             .liquidity_enabled
             .with_label_values(&["fake_delayed"]);

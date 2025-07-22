@@ -328,11 +328,10 @@ pub fn new(
                                 liquidity::balancer::v3::weighted::Version::V1 => {
                                     // V3 V1 pools use the same math as V2 V3Plus pools
                                     solvers_dto::auction::WeightedProductVersion::V3Plus
-                                }
-                                // Future versions can be added here:
-                                // liquidity::balancer::v3::weighted::Version::V2 => {
-                                //     solvers_dto::auction::WeightedProductVersion::V2
-                                // }
+                                } /* Future versions can be added here:
+                                   * liquidity::balancer::v3::weighted::Version::V2 => {
+                                   *     solvers_dto::auction::WeightedProductVersion::V2
+                                   * } */
                             },
                         },
                     )
@@ -443,9 +442,7 @@ fn fee_to_decimal(fee: liquidity::balancer::v2::Fee) -> bigdecimal::BigDecimal {
     bigdecimal::BigDecimal::new(fee.as_raw().to_big_int(), 18)
 }
 
-fn fee_to_decimal_v3(
-    fee: liquidity::balancer::v3::Fee,
-) -> bigdecimal::BigDecimal {
+fn fee_to_decimal_v3(fee: liquidity::balancer::v3::Fee) -> bigdecimal::BigDecimal {
     bigdecimal::BigDecimal::new(fee.as_raw().to_big_int(), 18)
 }
 

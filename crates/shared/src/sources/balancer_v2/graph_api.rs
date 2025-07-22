@@ -1,4 +1,5 @@
-//! Module containing the Balancer API v3 client used for retrieving Balancer pools.
+//! Module containing the Balancer API v3 client used for retrieving Balancer
+//! pools.
 //!
 //! The pools retrieved from this client are used to prime the graph event store
 //! to reduce start-up time. We do not use this in general for retrieving pools
@@ -201,16 +202,16 @@ impl PoolData {
         self.pool_tokens.clone()
     }
 
-    /// Converts the string ID to H256. For V2 pools, this should be a 32-byte hex string.
-    /// For V3 pools, this would be a 20-byte address, but we only support V2 pools.
+    /// Converts the string ID to H256. For V2 pools, this should be a 32-byte
+    /// hex string. For V3 pools, this would be a 20-byte address, but we
+    /// only support V2 pools.
     pub fn id_as_h256(&self) -> Result<H256> {
         // Remove 0x prefix if present
         let id_str = self.id.trim_start_matches("0x");
-        
+
         // For V2 pools, we expect 32 bytes (64 hex characters)
         if id_str.len() == 64 {
-            let id_bytes = hex::decode(id_str)
-                .context("Failed to decode pool ID as hex")?;
+            let id_bytes = hex::decode(id_str).context("Failed to decode pool ID as hex")?;
             Ok(H256::from_slice(&id_bytes))
         } else {
             Err(anyhow::anyhow!(
@@ -273,11 +274,7 @@ mod pools_query {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::sources::balancer_v2::swap::fixed_point::Bfp,
-        ethcontract::{H160},
-    };
+    use {super::*, crate::sources::balancer_v2::swap::fixed_point::Bfp, ethcontract::H160};
 
     #[test]
     fn decode_pools_data() {
@@ -384,7 +381,8 @@ mod tests {
             Data {
                 pool_get_pools: vec![
                     PoolData {
-                        id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+                        id: "0x1111111111111111111111111111111111111111111111111111111111111111"
+                            .to_string(),
                         address: H160([0x22; 20]),
                         pool_type: "WEIGHTED".to_string(),
                         protocol_version: 2,
@@ -406,7 +404,8 @@ mod tests {
                         create_time: 1234567890,
                     },
                     PoolData {
-                        id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+                        id: "0x1111111111111111111111111111111111111111111111111111111111111111"
+                            .to_string(),
                         address: H160([0x22; 20]),
                         pool_type: "STABLE".to_string(),
                         protocol_version: 2,
@@ -428,7 +427,8 @@ mod tests {
                         create_time: 1234567890,
                     },
                     PoolData {
-                        id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+                        id: "0x1111111111111111111111111111111111111111111111111111111111111111"
+                            .to_string(),
                         address: H160([0x22; 20]),
                         pool_type: "LIQUIDITY_BOOTSTRAPPING".to_string(),
                         protocol_version: 2,
@@ -450,7 +450,8 @@ mod tests {
                         create_time: 1234567890,
                     },
                     PoolData {
-                        id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+                        id: "0x1111111111111111111111111111111111111111111111111111111111111111"
+                            .to_string(),
                         address: H160([0x22; 20]),
                         pool_type: "COMPOSABLE_STABLE".to_string(),
                         protocol_version: 2,
@@ -482,7 +483,8 @@ mod tests {
             fetched_block_number: 42,
             pools: vec![
                 PoolData {
-                    id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+                    id: "0x1111111111111111111111111111111111111111111111111111111111111111"
+                        .to_string(),
                     address: H160([0x22; 20]),
                     pool_type: "WEIGHTED".to_string(),
                     protocol_version: 2,
@@ -493,7 +495,8 @@ mod tests {
                     create_time: 0,
                 },
                 PoolData {
-                    id: "0x2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+                    id: "0x2222222222222222222222222222222222222222222222222222222222222222"
+                        .to_string(),
                     address: H160([0x33; 20]),
                     pool_type: "STABLE".to_string(),
                     protocol_version: 2,
@@ -504,7 +507,8 @@ mod tests {
                     create_time: 0,
                 },
                 PoolData {
-                    id: "0x3333333333333333333333333333333333333333333333333333333333333333".to_string(),
+                    id: "0x3333333333333333333333333333333333333333333333333333333333333333"
+                        .to_string(),
                     address: H160([0x44; 20]),
                     pool_type: "WEIGHTED".to_string(),
                     protocol_version: 2,

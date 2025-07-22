@@ -7,10 +7,7 @@ use {
         swap::fixed_point::Bfp,
     },
     anyhow::{Result, anyhow},
-    contracts::{
-        BalancerV3WeightedPool,
-        BalancerV3WeightedPoolFactory,
-    },
+    contracts::{BalancerV3WeightedPool, BalancerV3WeightedPoolFactory},
     ethcontract::{BlockId, H160},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
@@ -44,7 +41,10 @@ pub enum Version {
 impl PoolIndexing for PoolInfo {
     fn from_graph_data(pool: &PoolData, block_created: u64) -> Result<Self> {
         if pool.pool_type != "WEIGHTED" {
-            return Err(anyhow!("Expected WEIGHTED pool type, got {}", pool.pool_type));
+            return Err(anyhow!(
+                "Expected WEIGHTED pool type, got {}",
+                pool.pool_type
+            ));
         }
         Ok(PoolInfo {
             common: common::PoolInfo::for_type(PoolType::Weighted, pool, block_created)?,
@@ -125,8 +125,8 @@ fn pool_state(
 mod tests {
     use {
         super::*,
-        crate::sources::balancer_v3::graph_api::{Token, GqlChain, DynamicData, PoolData},
-        ethcontract::{H160, BlockNumber},
+        crate::sources::balancer_v3::graph_api::{DynamicData, GqlChain, PoolData, Token},
+        ethcontract::{BlockNumber, H160},
         ethcontract_mock::Mock,
         futures::future,
         maplit::btreemap,
@@ -278,4 +278,4 @@ mod tests {
         assert_eq!(pool_state.swap_fee, Bfp::from_wei(3000u64.into()));
         assert_eq!(pool_state.version, Version::V1);
     }
-} 
+}

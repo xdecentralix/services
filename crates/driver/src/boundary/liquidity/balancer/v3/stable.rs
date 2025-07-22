@@ -12,10 +12,14 @@ use {
 
 /// Median gas used per BalancerV3SwapGivenOutInteraction.
 // TODO: Estimate actual gas usage for Balancer V3 stable pools
-// Using same estimate as V2 for now, should be updated with actual V3 measurements
+// Using same estimate as V2 for now, should be updated with actual V3
+// measurements
 const GAS_PER_SWAP: u64 = 88_892;
 
-pub fn to_domain(id: liquidity::Id, pool: BalancerV3StablePoolOrder) -> Result<liquidity::Liquidity> {
+pub fn to_domain(
+    id: liquidity::Id,
+    pool: BalancerV3StablePoolOrder,
+) -> Result<liquidity::Liquidity> {
     Ok(liquidity::Liquidity {
         id,
         gas: GAS_PER_SWAP.into(),

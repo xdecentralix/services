@@ -20,4 +20,4 @@ pub trait InternalPoolFetching: Send + Sync + 'static {
 
     /// Fetches current pool states for the specified IDs and block.
     async fn pools_by_id(&self, pool_ids: HashSet<H160>, block: Block) -> Result<Vec<Pool>>;
-} 
+}

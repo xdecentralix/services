@@ -116,4 +116,4 @@ mod tests {
             "BAL#004: ZeroDivision"
         );
     }
-} 
+}

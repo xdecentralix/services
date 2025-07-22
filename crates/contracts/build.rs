@@ -510,85 +510,90 @@ fn main() {
         // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html>
         // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
-    generate_contract_with_config("BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory",|builder| {
-        builder
-            .contract_mod_override("balancer_v2_no_protocol_fee_liquidity_bootstrapping_pool_factory")
-            .add_network(
-                // <https://docs.balancer.fi/reference/contracts/deployment-addresses/mainnet.html#ungrouped-active-current-contracts>
-                MAINNET,
-                Network {
-                    address: addr("0x0F3e0c4218b7b0108a3643cFe9D3ec0d4F57c54e"),
-                    // <https://etherscan.io/tx/0x298381e567ff6643d9b32e8e7e9ff0f04a80929dce3e004f6fa1a0104b2b69c3>
-                    deployment_information: Some(DeploymentInformation::BlockNumber(13730248)),
-                },
-            )
-            .add_network(
-                // <https://docs.balancer.fi/reference/contracts/deployment-addresses/gnosis.html#ungrouped-active-current-contracts>
-                GNOSIS,
-                Network {
-                    address: addr("0x85a80afee867aDf27B50BdB7b76DA70f1E853062"),
-                    // <https://gnosis.blockscout.com/tx/0xbd56fefdb27e4ff1c0852e405f78311d6bc2befabaf6c87a405ab19de8c1506a>
-                    deployment_information: Some(DeploymentInformation::BlockNumber(25415236)),
-                },
-            )
-            .add_network(
-                // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html#ungrouped-active-current-contracts>
-                SEPOLIA,
-                Network {
-                    address: addr("0x45fFd460cC6642B8D8Fb12373DFd77Ceb0f4932B"),
-                    // <https://sepolia.etherscan.io/tx/0xe0e8feb509a8aa8a1eaa0b0c4b34395ff2fd880fb854fbeeccc0af1826e395c9>
-                    deployment_information: Some(DeploymentInformation::BlockNumber(3419649)),
-                },
-            )
-            .add_network(
-                ARBITRUM_ONE,
-                Network {
-                    address: addr("0x1802953277FD955f9a254B80Aa0582f193cF1d77"),
-                    // <https://arbiscan.io/tx/0x5265176961ba08450afc1d7c7d34321da11b2f1f106a7d652e6c11d923caed24>
-                    deployment_information: Some(DeploymentInformation::BlockNumber(4859669)),
-                },
-            )
-            .add_network(
-                BASE,
-                Network {
-                    address: addr("0x0c6052254551EAe3ECac77B01DFcf1025418828f"),
-                    // <https://basescan.org/tx/0x0529de9dbe772f4b4f48da93ae2c2d2c46e3d3221ced9e0c4063a7a5bc47e874>
-                    deployment_information: Some(DeploymentInformation::BlockNumber(1206531)),
-                },
-            )
-            .add_network(
-                AVALANCHE,
-                Network {
-                    address: addr("0x0F3e0c4218b7b0108a3643cFe9D3ec0d4F57c54e"),
-                    // <https://snowscan.xyz/tx/0x33a75d83436ae9fcda4b4986713417bf3dc80d9ceb8d2541817846b1ac579d9f>
-                    deployment_information: Some(DeploymentInformation::BlockNumber(26386552)),
-                },
-            )
-            .add_network(
-                BNB,
-                Network {
-                    address: addr("0xC128468b7Ce63eA702C1f104D55A2566b13D3ABD"),
-                    // <https://bscscan.com/tx/0x8b964b97e6091bd41c93002c558d49adc26b8b31d2b30f3a33babbbbe8c55f47>
-                    deployment_information: Some(DeploymentInformation::BlockNumber(22691243)),
-                },
-            )
-            .add_network(
-                OPTIMISM,
-                Network {
-                    address: addr("0xf302f9F50958c5593770FDf4d4812309fF77414f"),
-                    // <https://optimistic.etherscan.io/tx/0x14fb43f051eebdec645abf0125e52348dc875b0887b689f8db026d75f9c78dda>
-                    deployment_information: Some(DeploymentInformation::BlockNumber(7005915)),
-                },
-            )
-            .add_network(
-                POLYGON,
-                Network {
-                    address: addr("0x41B953164995c11C81DA73D212ED8Af25741b7Ac"),
-                    // <https://polygonscan.com/tx/0x125bc007a86d771f8dc8f5fa1017de6e5a11162a458a72f25814503404bbeb0b>
-                    deployment_information: Some(DeploymentInformation::BlockNumber(22067480)),
-                },
-            )
-    });
+    generate_contract_with_config(
+        "BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory",
+        |builder| {
+            builder
+                .contract_mod_override(
+                    "balancer_v2_no_protocol_fee_liquidity_bootstrapping_pool_factory",
+                )
+                .add_network(
+                    // <https://docs.balancer.fi/reference/contracts/deployment-addresses/mainnet.html#ungrouped-active-current-contracts>
+                    MAINNET,
+                    Network {
+                        address: addr("0x0F3e0c4218b7b0108a3643cFe9D3ec0d4F57c54e"),
+                        // <https://etherscan.io/tx/0x298381e567ff6643d9b32e8e7e9ff0f04a80929dce3e004f6fa1a0104b2b69c3>
+                        deployment_information: Some(DeploymentInformation::BlockNumber(13730248)),
+                    },
+                )
+                .add_network(
+                    // <https://docs.balancer.fi/reference/contracts/deployment-addresses/gnosis.html#ungrouped-active-current-contracts>
+                    GNOSIS,
+                    Network {
+                        address: addr("0x85a80afee867aDf27B50BdB7b76DA70f1E853062"),
+                        // <https://gnosis.blockscout.com/tx/0xbd56fefdb27e4ff1c0852e405f78311d6bc2befabaf6c87a405ab19de8c1506a>
+                        deployment_information: Some(DeploymentInformation::BlockNumber(25415236)),
+                    },
+                )
+                .add_network(
+                    // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html#ungrouped-active-current-contracts>
+                    SEPOLIA,
+                    Network {
+                        address: addr("0x45fFd460cC6642B8D8Fb12373DFd77Ceb0f4932B"),
+                        // <https://sepolia.etherscan.io/tx/0xe0e8feb509a8aa8a1eaa0b0c4b34395ff2fd880fb854fbeeccc0af1826e395c9>
+                        deployment_information: Some(DeploymentInformation::BlockNumber(3419649)),
+                    },
+                )
+                .add_network(
+                    ARBITRUM_ONE,
+                    Network {
+                        address: addr("0x1802953277FD955f9a254B80Aa0582f193cF1d77"),
+                        // <https://arbiscan.io/tx/0x5265176961ba08450afc1d7c7d34321da11b2f1f106a7d652e6c11d923caed24>
+                        deployment_information: Some(DeploymentInformation::BlockNumber(4859669)),
+                    },
+                )
+                .add_network(
+                    BASE,
+                    Network {
+                        address: addr("0x0c6052254551EAe3ECac77B01DFcf1025418828f"),
+                        // <https://basescan.org/tx/0x0529de9dbe772f4b4f48da93ae2c2d2c46e3d3221ced9e0c4063a7a5bc47e874>
+                        deployment_information: Some(DeploymentInformation::BlockNumber(1206531)),
+                    },
+                )
+                .add_network(
+                    AVALANCHE,
+                    Network {
+                        address: addr("0x0F3e0c4218b7b0108a3643cFe9D3ec0d4F57c54e"),
+                        // <https://snowscan.xyz/tx/0x33a75d83436ae9fcda4b4986713417bf3dc80d9ceb8d2541817846b1ac579d9f>
+                        deployment_information: Some(DeploymentInformation::BlockNumber(26386552)),
+                    },
+                )
+                .add_network(
+                    BNB,
+                    Network {
+                        address: addr("0xC128468b7Ce63eA702C1f104D55A2566b13D3ABD"),
+                        // <https://bscscan.com/tx/0x8b964b97e6091bd41c93002c558d49adc26b8b31d2b30f3a33babbbbe8c55f47>
+                        deployment_information: Some(DeploymentInformation::BlockNumber(22691243)),
+                    },
+                )
+                .add_network(
+                    OPTIMISM,
+                    Network {
+                        address: addr("0xf302f9F50958c5593770FDf4d4812309fF77414f"),
+                        // <https://optimistic.etherscan.io/tx/0x14fb43f051eebdec645abf0125e52348dc875b0887b689f8db026d75f9c78dda>
+                        deployment_information: Some(DeploymentInformation::BlockNumber(7005915)),
+                    },
+                )
+                .add_network(
+                    POLYGON,
+                    Network {
+                        address: addr("0x41B953164995c11C81DA73D212ED8Af25741b7Ac"),
+                        // <https://polygonscan.com/tx/0x125bc007a86d771f8dc8f5fa1017de6e5a11162a458a72f25814503404bbeb0b>
+                        deployment_information: Some(DeploymentInformation::BlockNumber(22067480)),
+                    },
+                )
+        },
+    );
     generate_contract_with_config("BalancerV2ComposableStablePoolFactory", |builder| {
         builder
             .contract_mod_override("balancer_v2_composable_stable_pool_factory")
@@ -1198,11 +1203,11 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(7944011)),
                 },
             )
-        });
-    
+    });
+
     generate_contract("BalancerV3WeightedPool");
     generate_contract("BalancerV3StablePool");
-    
+
     generate_contract_with_config("BaoswapRouter", |builder| {
         builder.add_network_str(GNOSIS, "0x6093AeBAC87d62b1A5a4cEec91204e35020E38bE")
     });

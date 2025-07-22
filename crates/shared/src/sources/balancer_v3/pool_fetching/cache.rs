@@ -86,4 +86,4 @@ where
     async fn fetch_values(&self, pool_ids: HashSet<H160>, at_block: Block) -> Result<Vec<Pool>> {
         self.0.pools_by_id(pool_ids, at_block).await
     }
-} 
+}

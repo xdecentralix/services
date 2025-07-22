@@ -29,19 +29,21 @@ pub static NEVER: LazyLock<U256> = LazyLock::new(|| U256::from(1) << 255);
 impl BalancerV3SwapGivenOutInteraction {
     pub fn encode_swap(&self) -> EncodedInteraction {
         let method = self.batch_router.swap_exact_out(
-            vec![(                              // SwapPathExactAmountOut[]
-                self.asset_in_max.token,        // tokenIn (H160)
-                vec![(                          // steps[]
-                    self.pool,                  // pool (H160)
-                    self.asset_out.token,       // tokenOut (H160)
-                    false,                      // isBuffer (bool)
+            vec![(
+                // SwapPathExactAmountOut[]
+                self.asset_in_max.token, // tokenIn (H160)
+                vec![(
+                    // steps[]
+                    self.pool,            // pool (H160)
+                    self.asset_out.token, // tokenOut (H160)
+                    false,                // isBuffer (bool)
                 )],
-                self.asset_in_max.amount,       // maxAmountIn (U256)
-                self.asset_out.amount,          // exactAmountOut (U256)   
+                self.asset_in_max.amount, // maxAmountIn (U256)
+                self.asset_out.amount,    // exactAmountOut (U256)
             )],
-            *NEVER,                             // deadline (U256)
-            false,                              // wethIsEth (bool)
-            self.user_data.clone(),             // userData (Bytes)
+            *NEVER,                 // deadline (U256)
+            false,                  // wethIsEth (bool)
+            self.user_data.clone(), // userData (Bytes)
         );
         let calldata = method.tx.data.expect("no calldata").0;
         (self.batch_router.address(), 0.into(), Bytes(calldata))
@@ -70,11 +72,11 @@ mod tests {
             user_data: Bytes::default(),
         };
 
-        // V3 uses a different method signature, so the encoded calldata will be different
-        // The test verifies that encoding works without errors
+        // V3 uses a different method signature, so the encoded calldata will be
+        // different The test verifies that encoding works without errors
         let encoded = interaction.encode();
         assert_eq!(encoded.0, batch_router.address());
         assert_eq!(encoded.1, 0.into());
-        assert!(!encoded.2 .0.is_empty());
+        assert!(!encoded.2.0.is_empty());
     }
-} 
+}

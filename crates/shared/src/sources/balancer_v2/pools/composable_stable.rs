@@ -96,7 +96,7 @@ impl FactoryIndexing for BalancerV2ComposableStablePoolFactory {
 mod tests {
     use {
         super::*,
-        crate::sources::balancer_v2::graph_api::{Token, GqlChain, DynamicData, PoolData},
+        crate::sources::balancer_v2::graph_api::{DynamicData, GqlChain, PoolData, Token},
         ethcontract::{H160, H256},
     };
 

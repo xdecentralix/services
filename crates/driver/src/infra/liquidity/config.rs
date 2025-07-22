@@ -164,7 +164,11 @@ pub struct UniswapV3 {
 impl UniswapV3 {
     /// Returns the liquidity configuration for Uniswap V3.
     #[allow(clippy::self_named_constructors)]
-    pub fn uniswap_v3(graph_url: &Url, chain: Chain, graph_api_key: Option<String>) -> Option<Self> {
+    pub fn uniswap_v3(
+        graph_url: &Url,
+        chain: Chain,
+        graph_api_key: Option<String>,
+    ) -> Option<Self> {
         Some(Self {
             router: deployment_address(contracts::UniswapV3SwapRouter::raw_contract(), chain)?,
             max_pools_to_initialize: 100,
@@ -214,7 +218,11 @@ pub struct BalancerV2 {
 impl BalancerV2 {
     /// Returns the liquidity configuration for Balancer V2.
     #[allow(clippy::self_named_constructors)]
-    pub fn balancer_v2(graph_url: &Url, chain: Chain, _graph_api_key: Option<String>) -> Option<Self> {
+    pub fn balancer_v2(
+        graph_url: &Url,
+        chain: Chain,
+        _graph_api_key: Option<String>,
+    ) -> Option<Self> {
         let factory_addresses =
             |contracts: &[&ethcontract::Contract]| -> Vec<eth::ContractAddress> {
                 contracts
@@ -289,7 +297,11 @@ pub struct BalancerV3 {
 impl BalancerV3 {
     /// Returns the liquidity configuration for Balancer V3.
     #[allow(clippy::self_named_constructors)]
-    pub fn balancer_v3(graph_url: &Url, chain: Chain, _graph_api_key: Option<String>) -> Option<Self> {
+    pub fn balancer_v3(
+        graph_url: &Url,
+        chain: Chain,
+        _graph_api_key: Option<String>,
+    ) -> Option<Self> {
         let factory_addresses =
             |contracts: &[&ethcontract::Contract]| -> Vec<eth::ContractAddress> {
                 contracts
@@ -301,12 +313,17 @@ impl BalancerV3 {
 
         Some(Self {
             vault: deployment_address(contracts::BalancerV3Vault::raw_contract(), chain)?,
-            batch_router: deployment_address(contracts::BalancerV3BatchRouter::raw_contract(), chain)?,
-            weighted: factory_addresses(&[
-                contracts::BalancerV3WeightedPoolFactory::raw_contract(),
-            ]),
+            batch_router: deployment_address(
+                contracts::BalancerV3BatchRouter::raw_contract(),
+                chain,
+            )?,
+            weighted: factory_addresses(
+                &[contracts::BalancerV3WeightedPoolFactory::raw_contract()],
+            ),
             stable: factory_addresses(&[contracts::BalancerV3StablePoolFactory::raw_contract()]),
-            stable_v2: factory_addresses(&[contracts::BalancerV3StablePoolFactoryV2::raw_contract()]),
+            stable_v2: factory_addresses(&[
+                contracts::BalancerV3StablePoolFactoryV2::raw_contract(),
+            ]),
             pool_deny_list: Vec::new(),
             graph_url: graph_url.clone(),
             reinit_interval: None,

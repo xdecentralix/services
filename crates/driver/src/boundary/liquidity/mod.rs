@@ -95,7 +95,9 @@ impl Fetcher {
         let bal_v3: Vec<_> = config
             .balancer_v3
             .iter()
-            .map(|config| balancer::v3::collector(eth, block_stream.clone(), block_retriever.clone(), config))
+            .map(|config| {
+                balancer::v3::collector(eth, block_stream.clone(), block_retriever.clone(), config)
+            })
             .collect();
 
         let uni_v3: Vec<_> = config

@@ -10,7 +10,8 @@ use {
 /// Liquidity data tied to a Balancer V3 pool based on "Weighted Math" [^1].
 ///
 /// Balancer V3 currently supports weighted pools as the primary pool type.
-/// Unlike V2, V3 uses a Batch Router for swaps instead of direct Vault interaction.
+/// Unlike V2, V3 uses a Batch Router for swaps instead of direct Vault
+/// interaction.
 ///
 /// [^1]: <https://docs.balancer.fi/concepts/math/weighted-math>
 #[derive(Clone, Debug)]
@@ -123,7 +124,8 @@ impl Weight {
     }
 }
 
-/// The weighted pool version. Balancer V3 currently only supports V1 weighted pools.
+/// The weighted pool version. Balancer V3 currently only supports V1 weighted
+/// pools.
 #[derive(Clone, Copy, Debug)]
 pub enum Version {
     /// Weighted pool math for Balancer V3 weighted pools.

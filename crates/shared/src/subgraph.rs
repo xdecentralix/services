@@ -47,19 +47,17 @@ impl SubgraphClient {
         // introduced retry mechanism that should efficiently help since failures are
         // quick and we need 1 or 2 retries to succeed.
         for _ in 0..MAX_NUMBER_OF_RETRIES {
-            let mut request_builder = self
-                .client
-                .post(self.subgraph_url.clone())
-                .json(&Query {
-                    query,
-                    variables: variables.clone(),
-                });
-            
+            let mut request_builder = self.client.post(self.subgraph_url.clone()).json(&Query {
+                query,
+                variables: variables.clone(),
+            });
+
             // Add Authorization header if API key is provided
             if let Some(api_key) = &self.api_key {
-                request_builder = request_builder.header("Authorization", format!("Bearer {}", api_key));
+                request_builder =
+                    request_builder.header("Authorization", format!("Bearer {}", api_key));
             }
-            
+
             match request_builder
                 .send()
                 .await?

@@ -188,55 +188,8 @@ impl BalancerFactoryKind {
     /// Returns a vector with supported factories for the specified chain ID.
     pub fn for_chain(chain_id: u64) -> Vec<Self> {
         match chain_id {
-            1 => vec![                                         // Mainnet
-                Self::Weighted,
-                Self::WeightedV3,
-                Self::WeightedV4,
-                Self::Weighted2Token,
-                Self::StableV2,
-                Self::LiquidityBootstrapping,
-                Self::NoProtocolFeeLiquidityBootstrapping,
-                Self::ComposableStable,
-                Self::ComposableStableV3,
-                Self::ComposableStableV4,
-                Self::ComposableStableV5,
-                Self::ComposableStableV6,
-                
-            ],
-            10 => vec![                                        // Optimism
-                Self::Weighted,
-                Self::WeightedV3,
-                Self::WeightedV4,
-                Self::Weighted2Token,
-                Self::StableV2,
-                Self::NoProtocolFeeLiquidityBootstrapping,
-                Self::ComposableStable,
-                Self::ComposableStableV3,
-                Self::ComposableStableV4,
-                Self::ComposableStableV5,
-                Self::ComposableStableV6,
-            ],
-            56 => vec![                                        // BNB
-                Self::WeightedV3,
-                Self::WeightedV4,
-                Self::NoProtocolFeeLiquidityBootstrapping,
-                Self::ComposableStable,
-                Self::ComposableStableV3,
-                Self::ComposableStableV4,
-                Self::ComposableStableV5,
-                Self::ComposableStableV6,
-            ],
-            100 => vec![                                       // Gnosis
-                Self::WeightedV3,
-                Self::WeightedV4,
-                Self::StableV2,
-                Self::NoProtocolFeeLiquidityBootstrapping,
-                Self::ComposableStableV3,
-                Self::ComposableStableV4,
-                Self::ComposableStableV5,
-                Self::ComposableStableV6,
-            ],
-            137 => vec![                                       // Polygon
+            1 => vec![
+                // Mainnet
                 Self::Weighted,
                 Self::WeightedV3,
                 Self::WeightedV4,
@@ -250,13 +203,44 @@ impl BalancerFactoryKind {
                 Self::ComposableStableV5,
                 Self::ComposableStableV6,
             ],
-            8453 => vec![                                      // Base
+            10 => vec![
+                // Optimism
+                Self::Weighted,
+                Self::WeightedV3,
                 Self::WeightedV4,
+                Self::Weighted2Token,
+                Self::StableV2,
                 Self::NoProtocolFeeLiquidityBootstrapping,
+                Self::ComposableStable,
+                Self::ComposableStableV3,
+                Self::ComposableStableV4,
                 Self::ComposableStableV5,
                 Self::ComposableStableV6,
             ],
-            42161 => vec![                                     // Arbitrum One
+            56 => vec![
+                // BNB
+                Self::WeightedV3,
+                Self::WeightedV4,
+                Self::NoProtocolFeeLiquidityBootstrapping,
+                Self::ComposableStable,
+                Self::ComposableStableV3,
+                Self::ComposableStableV4,
+                Self::ComposableStableV5,
+                Self::ComposableStableV6,
+            ],
+            100 => vec![
+                // Gnosis
+                Self::WeightedV3,
+                Self::WeightedV4,
+                Self::StableV2,
+                Self::NoProtocolFeeLiquidityBootstrapping,
+                Self::ComposableStableV3,
+                Self::ComposableStableV4,
+                Self::ComposableStableV5,
+                Self::ComposableStableV6,
+            ],
+            137 => vec![
+                // Polygon
                 Self::Weighted,
                 Self::WeightedV3,
                 Self::WeightedV4,
@@ -270,7 +254,30 @@ impl BalancerFactoryKind {
                 Self::ComposableStableV5,
                 Self::ComposableStableV6,
             ],
-            43114 => vec![                                     // Avalanche
+            8453 => vec![
+                // Base
+                Self::WeightedV4,
+                Self::NoProtocolFeeLiquidityBootstrapping,
+                Self::ComposableStableV5,
+                Self::ComposableStableV6,
+            ],
+            42161 => vec![
+                // Arbitrum One
+                Self::Weighted,
+                Self::WeightedV3,
+                Self::WeightedV4,
+                Self::Weighted2Token,
+                Self::StableV2,
+                Self::LiquidityBootstrapping,
+                Self::NoProtocolFeeLiquidityBootstrapping,
+                Self::ComposableStable,
+                Self::ComposableStableV3,
+                Self::ComposableStableV4,
+                Self::ComposableStableV5,
+                Self::ComposableStableV6,
+            ],
+            43114 => vec![
+                // Avalanche
                 Self::WeightedV3,
                 Self::WeightedV4,
                 Self::NoProtocolFeeLiquidityBootstrapping,
@@ -278,7 +285,8 @@ impl BalancerFactoryKind {
                 Self::ComposableStableV5,
                 Self::ComposableStableV6,
             ],
-            11155111 => vec![                                  // Sepolia
+            11155111 => vec![
+                // Sepolia
                 Self::WeightedV4,
                 Self::NoProtocolFeeLiquidityBootstrapping,
                 Self::ComposableStableV4,

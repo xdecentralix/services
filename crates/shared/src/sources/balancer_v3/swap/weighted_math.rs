@@ -260,9 +260,21 @@ mod tests {
         calc_in_given_out(balance, weight, balance, weight, max_out_amount).unwrap();
 
         // These should fail
-        calc_out_given_in(balance, weight, balance, weight, max_in_amount + Bfp::from_wei(1.into()))
-            .unwrap_err();
-        calc_in_given_out(balance, weight, balance, weight, max_out_amount + Bfp::from_wei(1.into()))
-            .unwrap_err();
+        calc_out_given_in(
+            balance,
+            weight,
+            balance,
+            weight,
+            max_in_amount + Bfp::from_wei(1.into()),
+        )
+        .unwrap_err();
+        calc_in_given_out(
+            balance,
+            weight,
+            balance,
+            weight,
+            max_out_amount + Bfp::from_wei(1.into()),
+        )
+        .unwrap_err();
     }
-} 
+}

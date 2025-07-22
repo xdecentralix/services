@@ -3,13 +3,14 @@ use {
     derive_more::{From, Into},
 };
 
-pub mod weighted;
 pub mod stable;
+pub mod weighted;
 
 /// A Balancer V3 pool ID.
 ///
 /// In Balancer V3, pool IDs are simply the pool contract addresses (20 bytes).
-/// This is different from V2 which used 32-byte pool IDs with additional metadata.
+/// This is different from V2 which used 32-byte pool IDs with additional
+/// metadata.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, From, Into)]
 pub struct Id(pub eth::H160);
 

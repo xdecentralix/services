@@ -1,4 +1,5 @@
-//! Module containing the Balancer V3 API client used for retrieving Balancer V3 pools.
+//! Module containing the Balancer V3 API client used for retrieving Balancer V3
+//! pools.
 //!
 //! The pools retrieved from this client are used to prime the graph event store
 //! to reduce start-up time. We do not use this in general for retrieving pools
@@ -13,7 +14,7 @@ use {
     super::swap::fixed_point::Bfp,
     crate::subgraph::SubgraphClient,
     anyhow::{Context, Result},
-    ethcontract::{H160},
+    ethcontract::H160,
     reqwest::{Client, Url},
     serde::{Deserialize, Serialize},
     serde_json::json,
@@ -174,7 +175,7 @@ pub struct Token {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Hash)]
 pub enum PoolType {
     Weighted, // BalancerV3WeightedPoolFactory
-    Stable, // BalancerV3StablePoolFactory, BalancerV3StablePoolFactoryV2
+    Stable,   // BalancerV3StablePoolFactory, BalancerV3StablePoolFactoryV2
 }
 
 impl PoolData {
@@ -197,12 +198,12 @@ impl PoolData {
         self.pool_tokens.clone()
     }
 
-    /// Converts the string ID to H160. For V3 pools, this should be a 20-byte hex string.
+    /// Converts the string ID to H160. For V3 pools, this should be a 20-byte
+    /// hex string.
     pub fn id_as_h160(&self) -> Result<H160> {
         let id_str = self.id.trim_start_matches("0x");
         if id_str.len() == 40 {
-            let id_bytes = hex::decode(id_str)
-                .context("Failed to decode pool ID as hex")?;
+            let id_bytes = hex::decode(id_str).context("Failed to decode pool ID as hex")?;
             Ok(H160::from_slice(&id_bytes))
         } else {
             Err(anyhow::anyhow!(
@@ -220,7 +221,7 @@ impl PoolData {
 }
 
 mod pools_query {
-    use {serde::Deserialize};
+    use serde::Deserialize;
 
     pub const QUERY: &str = r#"
         query PoolGetPools(
@@ -265,8 +266,7 @@ mod pools_query {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use ethcontract::H160;
+    use {super::*, ethcontract::H160};
 
     #[test]
     fn decode_pools_data() {
@@ -326,7 +326,9 @@ mod tests {
             factory: H160([0x22; 20]),
             chain: GqlChain::MAINNET,
             pool_tokens: vec![],
-            dynamic_data: DynamicData { swap_enabled: false },
+            dynamic_data: DynamicData {
+                swap_enabled: false,
+            },
             create_time: 1234567891,
         };
         let pools = RegisteredPools {
@@ -340,4 +342,4 @@ mod tests {
         assert!(group.pools.contains(&pool1));
         assert!(group.pools.contains(&pool2));
     }
-} 
+}

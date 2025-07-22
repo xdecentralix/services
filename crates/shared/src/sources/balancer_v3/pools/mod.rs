@@ -4,12 +4,12 @@
 //! information (such as token addresses for pools) as well as pool "state"
 //! (such as current reserve balances, and current swap fee).
 //!
-//! This abstraction is provided in a way to simplify adding new Balancer V3 pool
-//! types by just implementing the required `BalancerV3Factory` trait.
+//! This abstraction is provided in a way to simplify adding new Balancer V3
+//! pool types by just implementing the required `BalancerV3Factory` trait.
 
 pub mod common;
-pub mod weighted;
 pub mod stable;
+pub mod weighted;
 
 use {
     super::graph_api::PoolData,

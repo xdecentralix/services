@@ -68,4 +68,4 @@ mod tests {
     fn error_parse_fail() {
         let _ = Error::from("Poop");
     }
-} 
+}

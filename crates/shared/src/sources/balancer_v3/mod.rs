@@ -15,19 +15,19 @@
 //! The only public facing components necessary to achieve this are:
 //!
 //! 1. `BalancerPoolRegistry` which contains an event handler for each distinct
-//!    Balancer V3 Pool Factory contract and maintains its own in-memory storage of
-//!    each pool and its static information.
+//!    Balancer V3 Pool Factory contract and maintains its own in-memory storage
+//!    of each pool and its static information.
 //!
 //! 2. `BalancerPoolFetcher` which holds an instance of `BalancerPoolRegistry`,
 //!    implements `BalancerPoolFetching` and thus exposes a `fetch` method which
 //!    returns a collection of relevant `WeightedPools` for a given collection
 //!    of `TokenPair`.
 //!
-//! 3. `WeightedPool`: This is the public facing pool structure
-//!    returned by the `PoolFetcher` consisting of all the pool's most recent
-//!    information (both static and dynamic). Essentially, this is all the
-//!    relevant data from `RegisteredWeightedPool` along with the current balances
-//!    of each of the pool's tokens (aka the pool's "reserves").
+//! 3. `WeightedPool`: This is the public facing pool structure returned by the
+//!    `PoolFetcher` consisting of all the pool's most recent information (both
+//!    static and dynamic). Essentially, this is all the relevant data from
+//!    `RegisteredWeightedPool` along with the current balances of each of the
+//!    pool's tokens (aka the pool's "reserves").
 //!
 //! For this reason, only the `event_handler`, `pool_cache`, `pool_fetching` and
 //!     `swap` are declared as public, others merely contain internal logic
@@ -46,4 +46,4 @@ pub use self::{
     graph_api::GqlChain,
     pool_fetching::{BalancerFactoryKind, BalancerPoolFetcher, BalancerV3PoolFetching},
     pools::{Pool, PoolKind},
-}; 
+};

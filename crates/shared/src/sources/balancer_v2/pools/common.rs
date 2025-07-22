@@ -2,13 +2,13 @@
 
 use {
     super::{FactoryIndexing, Pool, PoolIndexing as _, PoolStatus},
-                    crate::{
-            sources::balancer_v2::{
-                graph_api::{PoolData, PoolType},
-                swap::fixed_point::Bfp,
-            },
-            token_info::TokenInfoFetching,
+    crate::{
+        sources::balancer_v2::{
+            graph_api::{PoolData, PoolType},
+            swap::fixed_point::Bfp,
         },
+        token_info::TokenInfoFetching,
+    },
     anyhow::{Context, Result, anyhow, ensure},
     contracts::{BalancerV2BasePool, BalancerV2Vault},
     ethcontract::{BlockId, Bytes, H160, H256, U256},
@@ -338,7 +338,7 @@ mod tests {
         super::*,
         crate::{
             sources::balancer_v2::{
-                graph_api::{Token, GqlChain, DynamicData, PoolData},
+                graph_api::{DynamicData, GqlChain, PoolData, Token},
                 pools::{MockFactoryIndexing, PoolKind, weighted},
             },
             token_info::{MockTokenInfoFetching, TokenInfo},

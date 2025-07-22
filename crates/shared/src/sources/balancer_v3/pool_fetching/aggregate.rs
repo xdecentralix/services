@@ -48,4 +48,4 @@ impl InternalPoolFetching for Aggregate {
         .flatten()
         .collect())
     }
-} 
+}

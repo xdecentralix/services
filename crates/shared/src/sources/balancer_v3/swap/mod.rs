@@ -9,8 +9,8 @@ use {
             StablePool,
             TokenState,
             WeightedPool,
-            WeightedTokenState,
             WeightedPoolVersion,
+            WeightedTokenState,
         },
     },
     error::Error,
@@ -410,10 +410,7 @@ impl BaselineSolvable for StablePool {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::sources::balancer_v3::pool_fetching::CommonPoolState,
-    };
+    use {super::*, crate::sources::balancer_v3::pool_fetching::CommonPoolState};
 
     fn create_weighted_pool_with(
         tokens: Vec<H160>,
@@ -647,4 +644,4 @@ mod tests {
         let res_out = pool.get_amount_in(usdc, (amount_out, dai)).await;
         assert_eq!(res_out.unwrap(), amount_in.into());
     }
-} 
+}

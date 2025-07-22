@@ -11,10 +11,10 @@ use {
     chain::Chain,
     contracts::{
         BalancerV3BatchRouter,
-        BalancerV3Vault,
-        BalancerV3WeightedPoolFactory,
         BalancerV3StablePoolFactory,
         BalancerV3StablePoolFactoryV2,
+        BalancerV3Vault,
+        BalancerV3WeightedPoolFactory,
         GPv2Settlement,
     },
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
@@ -23,8 +23,8 @@ use {
         sources::balancer_v3::{
             BalancerFactoryKind,
             BalancerPoolFetcher,
-            pool_fetching::BalancerContracts,
             GqlChain,
+            pool_fetching::BalancerContracts,
         },
         token_info::{CachedTokenInfoFetcher, TokenInfoFetcher},
     },
@@ -36,8 +36,8 @@ use {
     std::sync::Arc,
 };
 
-pub mod weighted;
 pub mod stable;
+pub mod weighted;
 
 /// Maps a Chain to the corresponding GqlChain for Balancer V3 API.
 fn chain_to_gql_chain(chain: &Chain) -> GqlChain {
@@ -124,7 +124,7 @@ async fn init_liquidity(
     config: &infra::liquidity::config::BalancerV3,
 ) -> Result<impl LiquidityCollecting + use<>> {
     let web3 = boundary::web3(eth);
-    
+
     // Create Balancer V3 contracts configuration
     let contracts = BalancerContracts {
         vault: BalancerV3Vault::at(&web3, config.vault.into()),
@@ -134,21 +134,36 @@ async fn init_liquidity(
                 .weighted
                 .iter()
                 .map(|&factory| {
-                    (BalancerFactoryKind::Weighted, BalancerV3WeightedPoolFactory::at(&web3, factory.into()).raw_instance().clone())
+                    (
+                        BalancerFactoryKind::Weighted,
+                        BalancerV3WeightedPoolFactory::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
                 })
                 .collect::<Vec<_>>(),
             config
                 .stable
                 .iter()
                 .map(|&factory| {
-                    (BalancerFactoryKind::Stable, BalancerV3StablePoolFactory::at(&web3, factory.into()).raw_instance().clone())
+                    (
+                        BalancerFactoryKind::Stable,
+                        BalancerV3StablePoolFactory::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
                 })
                 .collect::<Vec<_>>(),
             config
                 .stable_v2
                 .iter()
                 .map(|&factory| {
-                    (BalancerFactoryKind::StableV2, BalancerV3StablePoolFactoryV2::at(&web3, factory.into()).raw_instance().clone())
+                    (
+                        BalancerFactoryKind::StableV2,
+                        BalancerV3StablePoolFactoryV2::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
                 })
                 .collect::<Vec<_>>(),
         ]

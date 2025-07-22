@@ -189,5 +189,3 @@ mod tests {
         assert!(collect_pool_results(vec![node_err]).is_err());
     }
 }
-
- 

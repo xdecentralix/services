@@ -230,7 +230,11 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         graph_api_key: graph_api_key.clone(),
                         ..match preset {
                             file::UniswapV3Preset::UniswapV3 => {
-                                liquidity::config::UniswapV3::uniswap_v3(&graph_url, chain, graph_api_key)
+                                liquidity::config::UniswapV3::uniswap_v3(
+                                    &graph_url,
+                                    chain,
+                                    graph_api_key,
+                                )
                             }
                         }
                         .expect("no Uniswap V3 preset for current network")
@@ -344,9 +348,15 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                     } => liquidity::config::BalancerV3 {
                         vault: vault.into(),
                         batch_router: batch_router.into(),
-                        weighted: weighted.into_iter().map(eth::ContractAddress::from).collect(),
+                        weighted: weighted
+                            .into_iter()
+                            .map(eth::ContractAddress::from)
+                            .collect(),
                         stable: stable.into_iter().map(eth::ContractAddress::from).collect(),
-                        stable_v2: stable_v2.into_iter().map(eth::ContractAddress::from).collect(),
+                        stable_v2: stable_v2
+                            .into_iter()
+                            .map(eth::ContractAddress::from)
+                            .collect(),
                         pool_deny_list: pool_deny_list.clone(),
                         graph_url,
                         reinit_interval,
