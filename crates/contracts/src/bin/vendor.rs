@@ -32,40 +32,140 @@ fn run() -> Result<()> {
     let vendor = Vendor::try_new()?;
 
     const ETHFLOW_VERSION: &str = "0.0.0-rc.3";
-
+    // Balancer V2 contracts - Full
     vendor
         .full()
         .github(
             "BalancerV2Authorizer",
-            "balancer-labs/balancer-v2-monorepo/a3b570a2aa655d4c4941a67e3db6a06fbd72ef09/pkg/\
-             deployments/deployed/mainnet/Authorizer.json",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/tasks/20210418-authorizer/artifact/Authorizer.json",
         )?
         .github(
             "BalancerV2Vault",
-            "balancer-labs/balancer-v2-monorepo/a3b570a2aa655d4c4941a67e3db6a06fbd72ef09/pkg/\
-             deployments/deployed/mainnet/Vault.json",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/tasks/20210418-vault/artifact/Vault.json",
         )?
         .github(
             "BalancerV2WeightedPoolFactory",
-            "balancer-labs/balancer-v2-monorepo/a3b570a2aa655d4c4941a67e3db6a06fbd72ef09/pkg/\
-             deployments/deployed/mainnet/WeightedPoolFactory.json",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/deprecated/20210418-weighted-pool/artifact/WeightedPoolFactory.json",
         )?
         .github(
             "BalancerV2WeightedPool2TokensFactory",
-            "balancer-labs/balancer-v2-monorepo/a3b570a2aa655d4c4941a67e3db6a06fbd72ef09/pkg/\
-             deployments/deployed/mainnet/WeightedPool2TokensFactory.json",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/deprecated/20210418-weighted-pool/artifact/WeightedPool2TokensFactory.json",
         )?
+        .github(
+            "BalancerV2WeightedPoolFactoryV3",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/deprecated/20230206-weighted-pool-v3/artifact/WeightedPoolFactory.json",
+        )?
+        .github(
+            "BalancerV2WeightedPoolFactoryV4",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/tasks/20230320-weighted-pool-v4/artifact/WeightedPoolFactory.json",
+        )?
+        .github(
+            "BalancerV2LiquidityBootstrappingPoolFactory",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/deprecated/20210721-liquidity-bootstrapping-pool/artifact/LiquidityBootstrappingPoolFactory.json",
+        )?
+        .github(
+            "BalancerV2StablePoolFactoryV2",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/deprecated/20220609-stable-pool-v2/artifact/StablePoolFactory.json",
+        )?
+        .github(
+            "BalancerV2ComposableStablePoolFactory",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/deprecated/20220906-composable-stable-pool/artifact/ComposableStablePoolFactory.json",
+        )?
+        .github(
+            "BalancerV2ComposableStablePoolFactoryV3",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/deprecated/20230206-composable-stable-pool-v3/artifact/ComposableStablePoolFactory.json",
+        )?
+        .github(
+            "BalancerV2ComposableStablePoolFactoryV4",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/deprecated/20230320-composable-stable-pool-v4/artifact/ComposableStablePoolFactory.json",
+        )?
+        .github(
+            "BalancerV2ComposableStablePoolFactoryV5",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/deprecated/20230711-composable-stable-pool-v5/artifact/ComposableStablePoolFactory.json",
+        )?
+        .github(
+            "BalancerV2ComposableStablePoolFactoryV6",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/tasks/20240223-composable-stable-pool-v6/artifact/ComposableStablePoolFactory.json",
+        )?
+        .github(
+            "BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/tasks/20211202-no-protocol-fee-lbp/artifact/NoProtocolFeeLiquidityBootstrappingPoolFactory.json",
+        )?
+        .github(
+            "BalancerV2LiquidityBootstrappingPool",
+            "balancer-labs/balancer-v2-monorepo/7a643349a5ef4511234b19a33e3f18d30770cb66/pkg/deployments/tasks/20210721-liquidity-bootstrapping-pool/abi/LiquidityBootstrappingPool.json",
+        )?
+        .github(
+            "BalancerV2WeightedPool",
+            "balancer-labs/balancer-v2-monorepo/a3b570a2aa655d4c4941a67e3db6a06fbd72ef09/pkg/deployments/extra-abis/WeightedPool.json",
+        )?
+        .github(
+            "BalancerV2StablePool",
+            "balancer-labs/balancer-subgraph-v2/2b97edd5e65aed06718ce64a69111ccdabccf048/abis/StablePool.json",
+        )?
+        .github(
+            "BalancerV2ComposableStablePool",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v2/deprecated/20230206-composable-stable-pool-v3/artifact/ComposableStablePool.json",
+        )?;
+
+    // Balancer V2 contracts - ABI Only
+    vendor
+        .abi_only()
+        .manual(
+            "BalancerV2BasePool",
+            "Balancer does not publish ABIs for base contracts",
+        )
+        .manual(
+            "BalancerV2BasePoolFactory",
+            "Balancer does not publish ABIs for base contracts",
+        );
+    
+    // Balancer V3 contracts - Full
+    vendor
+        .full()
+        .github(
+            "BalancerV3Vault",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/tasks/20241204-v3-vault/artifact/Vault.json",
+        )?
+        .github(
+            "BalancerV3BatchRouter",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/tasks/20241205-v3-batch-router/artifact/BatchRouter.json",
+        )?
+        .github(
+            "BalancerV3WeightedPoolFactory",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/tasks/20241205-v3-weighted-pool/artifact/WeightedPoolFactory.json",
+        )?
+        .github(
+            "BalancerV3StablePoolFactory",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/deprecated/20241205-v3-stable-pool/artifact/StablePoolFactory.json",
+        )?
+        .github(
+            "BalancerV3StablePoolFactoryV2",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/tasks/20250324-v3-stable-pool-v2/artifact/StablePoolFactory.json",
+        )?;
+
+    // Balancer V3 contracts - ABI Only
+    vendor
+        .abi_only()
+        .github(
+            "BalancerV3WeightedPool",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/tasks/20241205-v3-weighted-pool/artifact/WeightedPool.json",
+        )?
+        .github(
+            "BalancerV3StablePool",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/deprecated/20241205-v3-stable-pool/artifact/StablePool.json",
+        )?;
+
+    // CowSwap contracts - Full
+    vendor
+        .full()
         .npm(
             "CowProtocolToken",
-            "@cowprotocol/token@1.1.0/build/artifacts/src/contracts/CowProtocolToken.sol/\
-             CowProtocolToken.json",
+            "@cowprotocol/token@1.1.0/build/artifacts/src/contracts/CowProtocolToken.sol/CowProtocolToken.json",
         )?
         .github(
             "CoWSwapEthFlow",
-            &format!(
-                "cowprotocol/ethflowcontract/{ETHFLOW_VERSION}-artifacts/hardhat-artifacts/src/\
-                 CoWSwapEthFlow.sol/CoWSwapEthFlow.json"
-            ),
+            &format!("cowprotocol/ethflowcontract/{ETHFLOW_VERSION}-artifacts/hardhat-artifacts/src/CoWSwapEthFlow.sol/CoWSwapEthFlow.json"),
         )?
         .npm(
             "ERC20Mintable",
@@ -75,8 +175,7 @@ fn run() -> Result<()> {
             "GPv2AllowListAuthentication",
             // We use `_Implementation` because the use of a proxy contract makes
             // deploying  for the e2e tests more cumbersome.
-            "@cowprotocol/contracts@1.1.2/deployments/mainnet/\
-             GPv2AllowListAuthentication_Implementation.json",
+            "@cowprotocol/contracts@1.1.2/deployments/mainnet/GPv2AllowListAuthentication_Implementation.json",
         )?
         .npm(
             "GPv2Settlement",
@@ -84,23 +183,19 @@ fn run() -> Result<()> {
         )?
         .npm(
             "GnosisSafe",
-            "@gnosis.pm/safe-contracts@1.3.0/build/artifacts/contracts/GnosisSafe.sol/GnosisSafe.\
-             json",
+            "@gnosis.pm/safe-contracts@1.3.0/build/artifacts/contracts/GnosisSafe.sol/GnosisSafe.json",
         )?
-        .npm(
+        .npm(   
             "GnosisSafeCompatibilityFallbackHandler",
-            "@gnosis.pm/safe-contracts@1.3.0/build/artifacts/contracts/handler/\
-             CompatibilityFallbackHandler.sol/CompatibilityFallbackHandler.json",
+            "@gnosis.pm/safe-contracts@1.3.0/build/artifacts/contracts/handler/CompatibilityFallbackHandler.sol/CompatibilityFallbackHandler.json",
         )?
         .npm(
             "GnosisSafeProxy",
-            "@gnosis.pm/safe-contracts@1.3.0/build/artifacts/contracts/\
-             proxies/GnosisSafeProxy.sol/GnosisSafeProxy.json",
+            "@gnosis.pm/safe-contracts@1.3.0/build/artifacts/contracts/proxies/GnosisSafeProxy.sol/GnosisSafeProxy.json",
         )?
         .npm(
             "GnosisSafeProxyFactory",
-            "@gnosis.pm/safe-contracts@1.3.0/build/artifacts/contracts/\
-             proxies/GnosisSafeProxyFactory.sol/GnosisSafeProxyFactory.json",
+            "@gnosis.pm/safe-contracts@1.3.0/build/artifacts/contracts/proxies/GnosisSafeProxyFactory.sol/GnosisSafeProxyFactory.json",
         )?
         .manual(
             "HooksTrampoline",
@@ -114,55 +209,21 @@ fn run() -> Result<()> {
             "UniswapV2Router02",
             "@uniswap/v2-periphery@1.1.0-beta.0/build/UniswapV2Router02.json",
         )?
-        .npm("WETH9", "canonical-weth@1.4.0/build/contracts/WETH9.json")?;
+        .npm(
+            "WETH9",
+            "canonical-weth@1.4.0/build/contracts/WETH9.json",
+        )?
+        .manual(
+            "WETH9",
+            "Manually vendored ABI and bytecode for WETH9 contract",
+        );
 
+    // CowSwap contracts - ABI Only
     vendor
         .abi_only()
         .github(
-            "BalancerV2ComposableStablePool",
-            "balancer/balancer-deployments/7211ed9f209d767f8ff411bb57262daf83ecb439/\
-             tasks/deprecated/20230206-composable-stable-pool-v3/artifact/\
-             ComposableStablePool.json",
-        )?
-        .github(
-            "BalancerV2ComposableStablePoolFactory",
-            "balancer/balancer-deployments/7211ed9f209d767f8ff411bb57262daf83ecb439/\
-             tasks/deprecated/20230206-composable-stable-pool-v3/artifact/\
-             ComposableStablePoolFactory.json",
-        )?
-        .github(
-            "BalancerV2LiquidityBootstrappingPool",
-            "balancer-labs/balancer-v2-monorepo/7a643349a5ef4511234b19a33e3f18d30770cb66/pkg/\
-             deployments/tasks/20210721-liquidity-bootstrapping-pool/abi/\
-             LiquidityBootstrappingPool.json",
-        )?
-        .github(
-            "BalancerV2LiquidityBootstrappingPoolFactory",
-            "balancer-labs/balancer-v2-monorepo/7a643349a5ef4511234b19a33e3f18d30770cb66/pkg/\
-             deployments/tasks/20210721-liquidity-bootstrapping-pool/abi/\
-             LiquidityBootstrappingPoolFactory.json",
-        )?
-        .github(
-            "BalancerV2WeightedPool",
-            "balancer-labs/balancer-v2-monorepo/a3b570a2aa655d4c4941a67e3db6a06fbd72ef09/pkg/\
-             deployments/extra-abis/WeightedPool.json",
-        )?
-        .github(
-            "BalancerV2StablePool",
-            "balancer-labs/balancer-subgraph-v2/2b97edd5e65aed06718ce64a69111ccdabccf048/abis/\
-             StablePool.json",
-        )?
-        .github(
-            "BalancerV2StablePoolFactoryV2",
-            "balancer-labs/balancer-v2-monorepo/903d34e491a5e9c5d59dabf512c7addf1ccf9bbd/pkg/\
-             deployments/tasks/20220609-stable-pool-v2/abi/StablePoolFactory.json",
-        )?
-        .github(
             "CoWSwapOnchainOrders",
-            &format!(
-                "cowprotocol/ethflowcontract/{ETHFLOW_VERSION}-artifacts/hardhat-artifacts/src/\
-                 mixins/CoWSwapOnchainOrders.sol/CoWSwapOnchainOrders.json"
-            ),
+            &format!("cowprotocol/ethflowcontract/{ETHFLOW_VERSION}-artifacts/hardhat-artifacts/src/mixins/CoWSwapOnchainOrders.sol/CoWSwapOnchainOrders.json"),
         )?
         .npm(
             "ERC20",
@@ -180,23 +241,13 @@ fn run() -> Result<()> {
             "IUniswapLikeRouter",
             "@uniswap/v2-periphery@1.1.0-beta.0/build/IUniswapV2Router02.json",
         )?
-        .manual(
-            "BalancerV2BasePool",
-            "Balancer does not publish ABIs for base contracts",
-        )
-        .manual(
-            "BalancerV2BasePoolFactory",
-            "Balancer does not publish ABIs for base contracts",
-        )
         .npm(
             "IUniswapV3Factory",
-            "@uniswap/v3-core@1.0.0/artifacts/contracts/interfaces/IUniswapV3Factory.sol/\
-             IUniswapV3Factory.json",
+            "@uniswap/v3-core@1.0.0/artifacts/contracts/interfaces/IUniswapV3Factory.sol/IUniswapV3Factory.json",
         )?
         .github(
             "IZeroEx",
-            "0xProject/protocol/c1177416f50c2465ee030dacc14ff996eebd4e74/packages/\
-             contract-artifacts/artifacts/IZeroEx.json",
+            "0xProject/protocol/c1177416f50c2465ee030dacc14ff996eebd4e74/packages/contract-artifacts/artifacts/IZeroEx.json",
         )?
         .github(
             "ISwaprPair",
@@ -206,43 +257,7 @@ fn run() -> Result<()> {
             "ChainalysisOracle",
             "Chainalysis does not publish its code",
         );
-        
-    // Balancer V3 contracts - Vault and Factory under full (like V2)
-    vendor
-        .full()
-        .github(
-            "BalancerV3Vault",
-            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241204-v3-vault/artifact/Vault.json",
-        )?
-        .github(
-            "BalancerV3BatchRouter",
-            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-batch-router/artifact/BatchRouter.json",
-        )?
-        .github(
-            "BalancerV3WeightedPoolFactory",
-            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-weighted-pool/artifact/WeightedPoolFactory.json",
-        )?
-        .github(
-            "BalancerV3StablePoolFactory",
-            "balancer/balancer-deployments/refs/heads/master/v3/deprecated/20241205-v3-stable-pool/artifact/StablePoolFactory.json",
-        )?
-        .github(
-            "BalancerV3StablePoolFactoryV2",
-            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20250324-v3-stable-pool-v2/artifact/StablePoolFactory.json",
-        )?;
-
-    // Balancer V3 contracts - Individual pools under ABI only (like V2)
-    vendor
-        .abi_only()
-        .github(
-            "BalancerV3WeightedPool",
-            "balancer/balancer-deployments/refs/heads/master/v3/tasks/20241205-v3-weighted-pool/artifact/WeightedPool.json",
-        )?
-        .github(
-            "BalancerV3StablePool",
-            "balancer/balancer-deployments/refs/heads/master/v3/deprecated/20241205-v3-stable-pool/artifact/StablePool.json",
-        )?;
-
+    
     Ok(())
 }
 
