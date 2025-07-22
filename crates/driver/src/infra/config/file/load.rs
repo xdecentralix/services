@@ -335,6 +335,8 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         vault,
                         batch_router,
                         weighted,
+                        stable,
+                        stable_v2,
                         pool_deny_list,
                         graph_url,
                         reinit_interval,
@@ -342,10 +344,9 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                     } => liquidity::config::BalancerV3 {
                         vault: vault.into(),
                         batch_router: batch_router.into(),
-                        weighted: weighted
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
+                        weighted: weighted.into_iter().map(eth::ContractAddress::from).collect(),
+                        stable: stable.into_iter().map(eth::ContractAddress::from).collect(),
+                        stable_v2: stable_v2.into_iter().map(eth::ContractAddress::from).collect(),
                         pool_deny_list: pool_deny_list.clone(),
                         graph_url,
                         reinit_interval,

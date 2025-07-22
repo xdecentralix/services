@@ -177,6 +177,7 @@ impl Fetcher {
                     Liquidity::BalancerWeighted(pool) => balancer::v2::weighted::to_domain(id, pool),
                     Liquidity::BalancerV3Weighted(pool) => balancer::v3::weighted::to_domain(id, pool),
                     Liquidity::BalancerStable(pool) => balancer::v2::stable::to_domain(id, pool),
+                    Liquidity::BalancerV3Stable(pool) => balancer::v3::stable::to_domain(id, pool),
                     Liquidity::LimitOrder(pool) => zeroex::to_domain(id, pool),
                     Liquidity::Concentrated(pool) => uniswap::v3::to_domain(id, pool),
                 }

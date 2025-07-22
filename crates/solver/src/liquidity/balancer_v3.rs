@@ -323,6 +323,7 @@ mod tests {
                 move |_, _| {
                     Ok(FetchedBalancerPools {
                         weighted_pools: weighted_pools.clone(),
+                        stable_pools: vec![],
                     })
                 }
             });

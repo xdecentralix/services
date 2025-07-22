@@ -1,3 +1,5 @@
+//! Balancer V2 swap module containing mathematical utilities and swap logic.
+
 use {
     crate::{
         baseline_solver::BaselineSolvable,
@@ -24,7 +26,6 @@ mod stable_math;
 mod weighted_math;
 
 const WEIGHTED_SWAP_GAS_COST: usize = 100_000;
-// See https://dune.xyz/queries/219641 for cost of pure stable swaps
 const STABLE_SWAP_GAS_COST: usize = 183_520;
 
 fn add_swap_fee_amount(amount: U256, swap_fee: Bfp) -> Result<U256, Error> {

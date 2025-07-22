@@ -4,6 +4,7 @@ use {
 };
 
 pub mod weighted;
+pub mod stable;
 
 /// A Balancer V3 pool ID.
 ///

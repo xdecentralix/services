@@ -33,6 +33,8 @@ use {
                 pool_fetching::{
                     WeightedPoolVersion as V3WeightedPoolVersion,
                     WeightedTokenState as V3WeightedTokenState,
+                    StablePoolVersion as V3StablePoolVersion,
+                    StableTokenState as V3StableTokenState,
                 },
                 swap::fixed_point::Bfp as V3Bfp,
             },
@@ -52,6 +54,7 @@ pub enum Liquidity {
     BalancerWeighted(WeightedProductOrder),
     BalancerV3Weighted(BalancerV3WeightedProductOrder),
     BalancerStable(StablePoolOrder),
+    BalancerV3Stable(BalancerV3StablePoolOrder),
     LimitOrder(LimitOrder),
     Concentrated(ConcentratedLiquidity),
 }
@@ -334,6 +337,7 @@ impl std::fmt::Debug for BalancerV3WeightedProductOrder {
     }
 }
 
+
 #[derive(Clone)]
 #[cfg_attr(test, derive(Derivative))]
 #[cfg_attr(test, derivative(PartialEq))]
@@ -346,9 +350,28 @@ pub struct StablePoolOrder {
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
 }
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
+pub struct BalancerV3StablePoolOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, V3StableTokenState>,
+    pub fee: V3Bfp,
+    pub amplification_parameter: AmplificationParameter,
+    pub version: V3StablePoolVersion,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
 impl std::fmt::Debug for StablePoolOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Stable Pool AMM {:?}", self.reserves.keys())
+    }
+}
+
+impl std::fmt::Debug for BalancerV3StablePoolOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Balancer V3 Stable Pool AMM {:?}", self.reserves.keys())
     }
 }
 
@@ -396,6 +419,14 @@ impl Settleable for BalancerV3WeightedProductOrder {
 }
 
 impl Settleable for StablePoolOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for BalancerV3StablePoolOrder {
     type Execution = AmmOrderExecution;
 
     fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {

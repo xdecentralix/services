@@ -142,8 +142,6 @@ fn main() {
     generate_contract_with_config("BalancerV2BasePoolFactory", |builder| {
         builder.contract_mod_override("balancer_v2_base_pool_factory")
     });
-    // Balancer addresses can be obtained from:
-    // <https://github.com/balancer/balancer-subgraph-v2/blob/master/networks.yaml>
     generate_contract_with_config("BalancerV2Vault", |builder| {
         builder
             .contract_mod_override("balancer_v2_vault")
@@ -394,8 +392,6 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(26665331)),
                 },
             )
-        // Not available on Base
-        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
     generate_contract_with_config("BalancerV2WeightedPool2TokensFactory", |builder| {
         builder
@@ -481,9 +477,6 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(29371951)),
                 },
             )
-        // Not available on Sepolia, Base, Avalanche and BNB
-        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html>
-        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
     generate_contract_with_config("BalancerV2LiquidityBootstrappingPoolFactory", |builder| {
         builder
@@ -639,10 +632,6 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(32774224)),
                 },
             )
-        // Not available on Sepolia, Gnosis Chain, Base and Avalanche
-        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/gnosis.html>
-        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html>
-        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
     generate_contract_with_config("BalancerV2ComposableStablePoolFactoryV3", |builder| {
         builder

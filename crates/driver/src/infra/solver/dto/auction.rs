@@ -49,6 +49,7 @@ pub fn new(
             liquidity::Kind::UniswapV2(pool) => pool.reserves.iter().map(|r| r.token).collect(),
             liquidity::Kind::UniswapV3(pool) => vec![pool.tokens.get().0, pool.tokens.get().1],
             liquidity::Kind::BalancerV2Stable(pool) => pool.reserves.tokens().collect(),
+            liquidity::Kind::BalancerV3Stable(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV2Weighted(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3Weighted(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::Swapr(pool) => pool.base.reserves.iter().map(|r| r.token).collect(),
@@ -234,6 +235,35 @@ pub fn new(
                             pool.amplification_parameter.precision().to_big_int(),
                         )),
                         fee: fee_to_decimal(pool.fee),
+                    })
+                }
+                liquidity::Kind::BalancerV3Stable(pool) => {
+                    solvers_dto::auction::Liquidity::Stable(solvers_dto::auction::StablePool {
+                        id: liquidity.id.0.to_string(),
+                        address: pool.id.address().into(),
+                        balancer_pool_id: {
+                            let pool_id_h160: eth::H160 = pool.id.into();
+                            pool_id_h160.into()
+                        },
+                        gas_estimate: liquidity.gas.into(),
+                        tokens: pool
+                            .reserves
+                            .iter()
+                            .map(|r| {
+                                (
+                                    r.asset.token.into(),
+                                    solvers_dto::auction::StableReserve {
+                                        balance: r.asset.amount.into(),
+                                        scaling_factor: scaling_factor_to_decimal_v3(r.scale),
+                                    },
+                                )
+                            })
+                            .collect(),
+                        amplification_parameter: rational_to_big_decimal(&num::BigRational::new(
+                            pool.amplification_parameter.factor().to_big_int(),
+                            pool.amplification_parameter.precision().to_big_int(),
+                        )),
+                        fee: fee_to_decimal_v3(pool.fee),
                     })
                 }
                 liquidity::Kind::BalancerV2Weighted(pool) => {

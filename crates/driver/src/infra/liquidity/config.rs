@@ -265,6 +265,12 @@ pub struct BalancerV3 {
     /// Weighted pool factory addresses.
     pub weighted: Vec<eth::ContractAddress>,
 
+    /// Stable pool factory addresses.
+    pub stable: Vec<eth::ContractAddress>,
+
+    /// Stable pool factory v2 addresses.
+    pub stable_v2: Vec<eth::ContractAddress>,
+
     /// Deny listed Balancer V3 pools.
     ///
     /// Since pools allow for custom controllers and logic, it is possible for
@@ -299,6 +305,8 @@ impl BalancerV3 {
             weighted: factory_addresses(&[
                 contracts::BalancerV3WeightedPoolFactory::raw_contract(),
             ]),
+            stable: factory_addresses(&[contracts::BalancerV3StablePoolFactory::raw_contract()]),
+            stable_v2: factory_addresses(&[contracts::BalancerV3StablePoolFactoryV2::raw_contract()]),
             pool_deny_list: Vec::new(),
             graph_url: graph_url.clone(),
             reinit_interval: None,

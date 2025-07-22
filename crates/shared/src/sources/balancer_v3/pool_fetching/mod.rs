@@ -20,6 +20,7 @@ use {
             PoolIndexing,
             PoolKind,
             common::{self, PoolInfoFetcher},
+            stable,
             weighted,
         },
         swap::fixed_point::Bfp,
@@ -32,9 +33,11 @@ use {
     anyhow::{Context, Result},
     clap::ValueEnum,
     contracts::{
-        BalancerV3WeightedPoolFactory,
-        BalancerV3Vault,
         BalancerV3BatchRouter,
+        BalancerV3Vault,
+        BalancerV3WeightedPoolFactory,
+        BalancerV3StablePoolFactory,
+        BalancerV3StablePoolFactoryV2,
     },
     ethcontract::{BlockId, H160, H256, Instance, dyns::DynInstance},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
@@ -47,6 +50,8 @@ use {
 };
 pub use {
     common::TokenState,
+    stable::AmplificationParameter,
+    stable::{TokenState as StableTokenState, Version as StablePoolVersion},
     weighted::{TokenState as WeightedTokenState, Version as WeightedPoolVersion},
 };
 
@@ -90,8 +95,33 @@ impl WeightedPool {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct StablePool {
+    pub common: CommonPoolState,
+    pub reserves: BTreeMap<H160, StableTokenState>,
+    pub amplification_parameter: AmplificationParameter,
+    pub version: StablePoolVersion,
+}
+
+impl StablePool {
+    pub fn new_unpaused(pool_id: H160, stable_state: stable::PoolState) -> Self {
+        StablePool {
+            common: CommonPoolState {
+                id: pool_id,
+                address: pool_id, // V3 pools are contract addresses
+                swap_fee: stable_state.swap_fee,
+                paused: false,
+            },
+            reserves: stable_state.tokens.into_iter().collect(),
+            amplification_parameter: stable_state.amplification_parameter,
+            version: stable_state.version,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct FetchedBalancerPools {
+    pub stable_pools: Vec<StablePool>,
     pub weighted_pools: Vec<WeightedPool>,
 }
 
@@ -100,6 +130,11 @@ impl FetchedBalancerPools {
         let mut tokens = HashSet::new();
         tokens.extend(
             self.weighted_pools
+                .iter()
+                .flat_map(|pool| pool.reserves.keys().copied()),
+        );
+        tokens.extend(
+            self.stable_pools
                 .iter()
                 .flat_map(|pool| pool.reserves.keys().copied()),
         );
@@ -129,16 +164,26 @@ pub struct BalancerPoolFetcher {
 #[clap(rename_all = "verbatim")]
 pub enum BalancerFactoryKind {
     Weighted,
+    Stable,
+    StableV2,
 }
 
 impl BalancerFactoryKind {
     /// Returns a vector with supported factories for the specified chain ID.
     pub fn for_chain(chain_id: u64) -> Vec<Self> {
         match chain_id {
-            1 => vec![Self::Weighted],
-            5 => vec![Self::Weighted],
-            100 => vec![Self::Weighted],
-            11155111 => vec![Self::Weighted],
+            // Mainnet
+            1 => vec![
+                Self::Weighted,
+                Self::Stable,
+                Self::StableV2,
+            ],
+            // Gnosis
+            100 => vec![
+                Self::Weighted,
+                Self::Stable,
+                Self::StableV2,
+            ],
             _ => Default::default(),
         }
     }
@@ -178,6 +223,8 @@ impl BalancerContracts {
         for factory_kind in factory_kinds {
             let factory_instance = match factory_kind {
                 BalancerFactoryKind::Weighted => instance!(BalancerV3WeightedPoolFactory),
+                BalancerFactoryKind::Stable => instance!(BalancerV3StablePoolFactory),
+                BalancerFactoryKind::StableV2 => instance!(BalancerV3StablePoolFactoryV2),
             };
             factories.push((factory_kind, factory_instance));
         }
@@ -256,6 +303,9 @@ impl BalancerV3PoolFetching for BalancerPoolFetcher {
                     PoolKind::Weighted(state) => fetched_pools
                         .weighted_pools
                         .push(WeightedPool::new_unpaused(pool.id, state)),
+                    PoolKind::Stable(state) => fetched_pools
+                        .stable_pools
+                        .push(StablePool::new_unpaused(pool.id, state)),
                 }
                 fetched_pools
             },
@@ -308,6 +358,12 @@ async fn create_aggregate_pool_fetcher(
         let registry = match kind {
             BalancerFactoryKind::Weighted => {
                 registry!(BalancerV3WeightedPoolFactory, instance)
+            }
+            BalancerFactoryKind::Stable => {
+                registry!(BalancerV3StablePoolFactory, instance)
+            }
+            BalancerFactoryKind::StableV2 => {
+                registry!(BalancerV3StablePoolFactoryV2, instance)
             }
         };
         fetchers.push(registry);

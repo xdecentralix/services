@@ -14,7 +14,7 @@ use {
     futures::{FutureExt as _, future::BoxFuture},
     std::{collections::BTreeMap, future::Future, sync::Arc},
     tokio::sync::oneshot,
-    contracts::{BalancerV3WeightedPool, BalancerV3Vault},
+    contracts::{BalancerV3WeightedPool, BalancerV3Vault, BalancerV3StablePool},
 };
 
 /// Trait for fetching pool data that is generic on a factory type.
@@ -60,6 +60,11 @@ impl<Factory> PoolInfoFetcher<Factory> {
     fn weighted_pool_at(&self, pool_address: H160) -> BalancerV3WeightedPool {
         let web3 = self.vault.raw_instance().web3();
         BalancerV3WeightedPool::at(&web3, pool_address)
+    }
+
+    fn stable_pool_at(&self, pool_address: H160) -> BalancerV3StablePool {
+        let web3 = self.vault.raw_instance().web3();
+        BalancerV3StablePool::at(&web3, pool_address)
     }
 
     /// Retrieves the scaling exponents for the specified tokens.
@@ -582,6 +587,10 @@ mod tests {
                     PoolKind::Weighted(state) => {
                         assert_eq!(state.tokens.len(), 2);
                         assert_eq!(state.swap_fee, bfp_v3!("0.003"));
+                    }
+                    PoolKind::Stable(_) => {
+                        // Stable pools are not tested in this specific test
+                        // This is just to handle the exhaustive pattern matching
                     }
                 }
             }

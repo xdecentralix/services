@@ -398,6 +398,9 @@ pub fn liquidity_interaction(
         liquidity::Kind::BalancerV2Stable(pool) => pool
             .swap(&input, &output, &settlement.address().into())
             .ok(),
+        liquidity::Kind::BalancerV3Stable(pool) => pool
+            .swap(&input, &output, &settlement.address().into())
+            .ok(),
         liquidity::Kind::BalancerV2Weighted(pool) => pool
             .swap(&input, &output, &settlement.address().into())
             .ok(),

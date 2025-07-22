@@ -9,6 +9,7 @@
 
 pub mod common;
 pub mod weighted;
+pub mod stable;
 
 use {
     super::graph_api::PoolData,
@@ -30,6 +31,7 @@ pub struct Pool {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PoolKind {
     Weighted(weighted::PoolState),
+    Stable(stable::PoolState),
 }
 
 macro_rules! impl_from_state {
@@ -43,6 +45,7 @@ macro_rules! impl_from_state {
 }
 
 impl_from_state!(weighted::PoolState, Weighted);
+impl_from_state!(stable::PoolState, Stable);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Balancer V3 pool status.

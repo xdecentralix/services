@@ -699,6 +699,14 @@ enum BalancerV3Config {
         #[serde(default)]
         weighted: Vec<eth::H160>,
 
+        /// The stable pool factory contract addresses.
+        #[serde(default)]
+        stable: Vec<eth::H160>,
+
+        /// The stable pool factory v2 contract addresses.
+        #[serde(default)]
+        stable_v2: Vec<eth::H160>,
+
         /// Deny listed Balancer V3 pools.
         #[serde(default)]
         pool_deny_list: Vec<eth::H160>,

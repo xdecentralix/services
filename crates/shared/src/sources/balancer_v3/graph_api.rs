@@ -72,7 +72,7 @@ impl BalancerApiClient {
                         "orderDirection" => "desc",
                         "where" => json!({
                             "chainIn": [self.chain],
-                            "poolTypeIn": ["WEIGHTED"], // V3 only supports weighted pools
+                            "poolTypeIn": ["WEIGHTED", "STABLE"],
                             "protocolVersionIn": [3] // V3 protocol
                         }),
                     }),
@@ -173,7 +173,8 @@ pub struct Token {
 /// Supported pool kinds for V3.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Hash)]
 pub enum PoolType {
-    Weighted, // V3 only supports weighted pools
+    Weighted, // BalancerV3WeightedPoolFactory
+    Stable, // BalancerV3StablePoolFactory, BalancerV3StablePoolFactoryV2
 }
 
 impl PoolData {
@@ -181,6 +182,7 @@ impl PoolData {
     pub fn pool_type_enum(&self) -> PoolType {
         match self.pool_type.as_str() {
             "WEIGHTED" => PoolType::Weighted,
+            "STABLE" => PoolType::Stable,
             _ => panic!("Unknown pool type: {}", self.pool_type),
         }
     }
