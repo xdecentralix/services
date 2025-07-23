@@ -8,9 +8,10 @@ use {
         },
         liquidity::{
             AmmOrderExecution,
-            BalancerV3WeightedProductOrder,
             Liquidity,
             SettlementHandling,
+            BalancerV3WeightedProductOrder,
+            BalancerV3StablePoolOrder,
         },
         liquidity_collector::LiquidityCollecting,
         settlement::SettlementEncoder,
@@ -56,7 +57,7 @@ impl BalancerV3Liquidity {
         &self,
         pairs: HashSet<TokenPair>,
         block: Block,
-    ) -> Result<Vec<BalancerV3WeightedProductOrder>> {
+    ) -> Result<(Vec<BalancerV3StablePoolOrder>, Vec<BalancerV3WeightedProductOrder>)> {
         let pools = self.pool_fetcher.fetch(pairs, block).await?;
 
         let tokens = pools.relevant_tokens();
@@ -87,7 +88,23 @@ impl BalancerV3Liquidity {
             })
             .collect();
 
-        Ok(weighted_product_orders)
+        let stable_pool_orders: Vec<_> = pools
+            .stable_pools
+            .into_iter()
+            .map(|pool| BalancerV3StablePoolOrder {
+                address: pool.common.address,
+                reserves: pool.reserves,
+                fee: pool.common.swap_fee,
+                amplification_parameter: pool.amplification_parameter,
+                version: pool.version,
+                settlement_handling: Arc::new(SettlementHandler {
+                    pool_id: pool.common.id,
+                    inner: inner.clone(),
+                }),
+            })
+            .collect();
+
+        Ok((stable_pool_orders, weighted_product_orders))
     }
 }
 
@@ -100,10 +117,11 @@ impl LiquidityCollecting for BalancerV3Liquidity {
         pairs: HashSet<TokenPair>,
         block: Block,
     ) -> Result<Vec<Liquidity>> {
-        let weighted = self.get_orders(pairs, block).await?;
-        let liquidity = weighted
+        let (stable, weighted) = self.get_orders(pairs, block).await?;
+        let liquidity = stable
             .into_iter()
-            .map(Liquidity::BalancerV3Weighted)
+            .map(Liquidity::BalancerV3Stable)
+            .chain(weighted.into_iter().map(Liquidity::BalancerV3Weighted))
             .collect();
         Ok(liquidity)
     }
@@ -165,6 +183,16 @@ impl SettlementHandler {
 }
 
 impl SettlementHandling<BalancerV3WeightedProductOrder> for SettlementHandler {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn encode(&self, execution: AmmOrderExecution, encoder: &mut SettlementEncoder) -> Result<()> {
+        self.inner_encode(execution, encoder)
+    }
+}
+
+impl SettlementHandling<BalancerV3StablePoolOrder> for SettlementHandler {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -357,7 +385,7 @@ mod tests {
             pool_fetcher: Arc::new(pool_fetcher),
             allowance_manager: Box::new(allowance_manager),
         };
-        let weighted_orders = liquidity_provider
+        let (stable_orders, weighted_orders) = liquidity_provider
             .get_orders(pairs, Block::Recent)
             .await
             .unwrap();

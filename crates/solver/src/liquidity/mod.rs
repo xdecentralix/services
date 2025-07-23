@@ -31,6 +31,7 @@ use {
             },
             balancer_v3::{
                 pool_fetching::{
+                    AmplificationParameter as V3AmplificationParameter,
                     StablePoolVersion as V3StablePoolVersion,
                     StableTokenState as V3StableTokenState,
                     WeightedPoolVersion as V3WeightedPoolVersion,
@@ -360,7 +361,7 @@ pub struct BalancerV3StablePoolOrder {
     pub address: H160,
     pub reserves: BTreeMap<H160, V3StableTokenState>,
     pub fee: V3Bfp,
-    pub amplification_parameter: AmplificationParameter,
+    pub amplification_parameter: V3AmplificationParameter,
     pub version: V3StablePoolVersion,
     #[cfg_attr(test, derivative(PartialEq = "ignore"))]
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
