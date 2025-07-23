@@ -123,9 +123,10 @@ fn run() -> Result<()> {
     // Balancer V3 contracts - Full
     vendor
         .full()
+        // A bit of a hack: We use the VaultExtension ABI for the Vault contract to get all the methods due to the proxy pattern
         .github(
             "BalancerV3Vault",
-            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/tasks/20241204-v3-vault/artifact/Vault.json",
+            "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/tasks/20241204-v3-vault/artifact/VaultExtension.json",
         )?
         .github(
             "BalancerV3BatchRouter",
