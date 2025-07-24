@@ -440,6 +440,7 @@ mod tests {
                     common: TokenState {
                         balance,
                         scaling_factor,
+                        rate: U256::exp10(18),
                     },
                     weight,
                 },
@@ -472,6 +473,7 @@ mod tests {
                 TokenState {
                     balance,
                     scaling_factor,
+                    rate: U256::exp10(18),
                 },
             );
         }
@@ -492,6 +494,7 @@ mod tests {
         let token_state = TokenState {
             balance: Default::default(),
             scaling_factor: Bfp::exp10(12),
+            rate: U256::exp10(18),
         };
         let input = Bfp::from_wei(900_546_079_866_630_330_575_i128.into());
         assert_eq!(

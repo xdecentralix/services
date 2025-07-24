@@ -10,7 +10,7 @@ use {
         token_info::TokenInfoFetching,
     },
     anyhow::{Context, Result, anyhow, ensure},
-    contracts::{BalancerV2BasePool, BalancerV2Vault},
+    contracts::{BalancerV2BasePool, BalancerV2Vault, IRateProvider},
     ethcontract::{BlockId, Bytes, H160, H256, U256},
     futures::{FutureExt as _, TryFutureExt, future::BoxFuture},
     std::{collections::BTreeMap, future::Future, sync::Arc},
@@ -96,11 +96,17 @@ impl<Factory> PoolInfoFetcher<Factory> {
             .await?;
         let scaling_factors = self.scaling_factors(&tokens).await?;
 
+        let rate_providers = match pool.methods().get_rate_providers().call().await {
+            Ok(rate_providers) => rate_providers,
+            Err(_) => vec![H160::zero(); tokens.len()], // Pool doesn't support rate providers, return zero addresses
+        };
+
         Ok(PoolInfo {
             id: pool_id,
             address: pool_address,
             tokens,
             scaling_factors,
+            rate_providers,
             block_created,
         })
     }
@@ -122,26 +128,50 @@ impl<Factory> PoolInfoFetcher<Factory> {
             .get_pool_tokens(Bytes(pool.id.0))
             .block(block)
             .call();
-
+        let rate_providers = pool.rate_providers.clone();
+        let web3 = self.vault.raw_instance().web3();
+        let fetch_rates = async move {
+            let mut rates = Vec::new();
+            for rate_provider in rate_providers {
+                if rate_provider == H160::zero() {
+                    rates.push(U256::exp10(18)); // Default rate of 1.0 as rate provider is not set
+                } else {
+                    let rate_contract = IRateProvider::at(&web3, rate_provider);
+                    match rate_contract.get_rate().block(block).call().await {
+                        Ok(rate) => rates.push(rate),
+                        Err(error) => {
+                            tracing::debug!(
+                                %rate_provider,
+                                ?error,
+                                "rate provider call failed, using default rate of 1.0"
+                            );
+                            rates.push(U256::exp10(18)); // Default on error
+                        }
+                    }
+                }
+            }
+            Ok(rates)
+        };
         // Because of a `mockall` limitation, we **need** the future returned
         // here to be `'static`. This requires us to clone and move `pool` into
         // the async closure - otherwise it would only live for as long as
         // `pool`, i.e. `'_`.
         let pool = pool.clone();
         async move {
-            let (paused, swap_fee, balances) =
-                futures::try_join!(fetch_paused, fetch_swap_fee, fetch_balances)?;
+            let (paused, swap_fee, balances, rates) =
+                futures::try_join!(fetch_paused, fetch_swap_fee, fetch_balances, fetch_rates)?;
             let swap_fee = Bfp::from_wei(swap_fee);
 
             let (token_addresses, balances, _) = balances;
             ensure!(pool.tokens == token_addresses, "pool token mismatch");
-            let tokens = itertools::izip!(&pool.tokens, balances, &pool.scaling_factors)
-                .map(|(&address, balance, &scaling_factor)| {
+            let tokens = itertools::izip!(&pool.tokens, balances, &pool.scaling_factors, &rates)
+                .map(|(&address, balance, &scaling_factor, &rate)| {
                     (
                         address,
                         TokenState {
                             balance,
                             scaling_factor,
+                            rate,
                         },
                     )
                 })
@@ -211,6 +241,7 @@ pub struct PoolInfo {
     pub address: H160,
     pub tokens: Vec<H160>,
     pub scaling_factors: Vec<Bfp>,
+    pub rate_providers: Vec<H160>,
     pub block_created: u64,
 }
 
@@ -228,6 +259,11 @@ impl PoolInfo {
                 .iter()
                 .map(|token| scaling_factor_from_decimals(token.decimals))
                 .collect::<Result<_>>()?,
+            rate_providers: pool
+                .tokens()
+                .iter()
+                .map(|token| token.price_rate_provider.unwrap_or(H160::zero()))
+                .collect(),
             block_created,
         })
     }
@@ -258,6 +294,7 @@ pub struct PoolState {
 pub struct TokenState {
     pub balance: U256,
     pub scaling_factor: Bfp,
+    pub rate: U256,
 }
 
 /// Compute the scaling rate from a Balancer pool's scaling factor.
@@ -363,6 +400,8 @@ mod tests {
         let pool = mock.deploy(BalancerV2BasePool::raw_contract().interface.abi.clone());
         pool.expect_call(BalancerV2BasePool::signatures().get_pool_id())
             .returns(Bytes(pool_id.0));
+        pool.expect_call(BalancerV2BasePool::signatures().get_rate_providers())
+            .returns(vec![H160::zero(), H160::zero(), H160::zero()]);
 
         let vault = mock.deploy(BalancerV2Vault::raw_contract().interface.abi.clone());
         vault
@@ -399,6 +438,7 @@ mod tests {
                 address: pool.address(),
                 tokens: tokens.to_vec(),
                 scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0), Bfp::exp10(12)],
+                rate_providers: vec![H160::zero(), H160::zero(), H160::zero()],
                 block_created: 1337,
             }
         );
@@ -442,6 +482,7 @@ mod tests {
             address: pool.address(),
             tokens: tokens.to_vec(),
             scaling_factors: scaling_factors.to_vec(),
+            rate_providers: vec![H160::zero(), H160::zero(), H160::zero()],
             block_created: 1337,
         };
 
@@ -462,14 +503,17 @@ mod tests {
                     tokens[0] => TokenState {
                         balance: balances[0].as_uint256(),
                         scaling_factor: scaling_factors[0],
+                        rate: U256::exp10(18),
                     },
                     tokens[1] => TokenState {
                         balance: balances[1].as_uint256(),
                         scaling_factor: scaling_factors[1],
+                        rate: U256::exp10(18),
                     },
                     tokens[2] => TokenState {
                         balance: balances[2].as_uint256(),
                         scaling_factor: scaling_factors[2],
+                        rate: U256::exp10(18),
                     },
                 },
             }
@@ -511,6 +555,7 @@ mod tests {
             address: pool.address(),
             tokens: tokens.to_vec(),
             scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0), Bfp::exp10(0)],
+            rate_providers: vec![H160::zero(), H160::zero(), H160::zero()],
             block_created: 1337,
         };
 
@@ -544,6 +589,7 @@ mod tests {
                 address: pool.address(),
                 tokens: vec![H160([1; 20]), H160([2; 20]), H160([3; 20])],
                 scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0), Bfp::exp10(12)],
+                rate_providers: vec![H160::zero(), H160::zero(), H160::zero()],
                 block_created: 1337,
             },
             weights: vec![bfp!("0.5"), bfp!("0.25"), bfp!("0.25")],
@@ -555,6 +601,7 @@ mod tests {
                     common: TokenState {
                         balance: bfp!("1000.0").as_uint256(),
                         scaling_factor: pool_info.common.scaling_factors[0],
+                        rate: U256::exp10(18),
                     },
                     weight: pool_info.weights[0],
                 },
@@ -562,6 +609,7 @@ mod tests {
                     common: TokenState {
                         balance: bfp!("10.0").as_uint256(),
                         scaling_factor: pool_info.common.scaling_factors[1],
+                        rate: U256::exp10(18),
                     },
                     weight: pool_info.weights[1],
                 },
@@ -569,6 +617,7 @@ mod tests {
                     common: TokenState {
                         balance: bfp!("15.0").as_uint256(),
                         scaling_factor: pool_info.common.scaling_factors[2],
+                        rate: U256::exp10(18),
                     },
                     weight: pool_info.weights[2],
                 },
@@ -669,6 +718,7 @@ mod tests {
                 address: pool.address(),
                 tokens: Default::default(),
                 scaling_factors: Default::default(),
+                rate_providers: Default::default(),
                 block_created: Default::default(),
             },
             weights: Default::default(),
@@ -722,6 +772,7 @@ mod tests {
                 address: pool.address(),
                 tokens: Default::default(),
                 scaling_factors: Default::default(),
+                rate_providers: Default::default(),
                 block_created: Default::default(),
             },
             weights: Default::default(),
@@ -790,11 +841,13 @@ mod tests {
                     address: H160([0x33; 20]),
                     decimals: 3,
                     weight: None,
+                    price_rate_provider: None,
                 },
                 Token {
                     address: H160([0x44; 20]),
                     decimals: 18,
                     weight: None,
+                    price_rate_provider: None,
                 },
             ],
             dynamic_data: DynamicData { swap_enabled: true },
@@ -808,6 +861,7 @@ mod tests {
                 address: H160([3; 20]),
                 tokens: vec![H160([0x33; 20]), H160([0x44; 20])],
                 scaling_factors: vec![Bfp::exp10(15), Bfp::exp10(0)],
+                rate_providers: vec![H160::zero(), H160::zero()],
                 block_created: 42,
             }
         );
@@ -826,6 +880,7 @@ mod tests {
                 address: H160([2; 20]),
                 decimals: 18,
                 weight: Some("1.337".parse().unwrap()),
+                price_rate_provider: None,
             }],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 0,
@@ -847,11 +902,13 @@ mod tests {
                     address: H160([2; 20]),
                     decimals: 19,
                     weight: Some("1.337".parse().unwrap()),
+                    price_rate_provider: None,
                 },
                 Token {
                     address: H160([3; 20]),
                     decimals: 18,
                     weight: Some("1.337".parse().unwrap()),
+                    price_rate_provider: None,
                 },
             ],
             dynamic_data: DynamicData { swap_enabled: true },
