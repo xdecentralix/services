@@ -1,0 +1,36 @@
+{
+    "abi": [
+      {
+        "inputs": [],
+        "name": "getRate",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ],
+    "evm": {
+      "bytecode": {
+        "object": "",
+        "opcodes": "",
+        "sourceMap": ""
+      },
+      "deployedBytecode": {
+        "object": "",
+        "opcodes": "",
+        "sourceMap": ""
+      }
+    },
+    "metadata": "{\"compiler\":{\"version\":\"0.8.0\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"getRate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"evm\":{\"bytecode\":{\"object\":\"\",\"opcodes\":\"\",\"sourceMap\":\"\"},\"deployedBytecode\":{\"object\":\"\",\"opcodes\":\"\",\"sourceMap\":\"\"}},\"metadata\":\"{\\\"compiler\\\":{\\\"version\\\":\\\"0.8.0\\\"},\\\"language\\\":\\\"Solidity\\\",\\\"output\\\":{\\\"abi\\\":[{\\\"inputs\\\":[],\\\"name\\\":\\\"getRate\\\",\\\"outputs\\\":[{\\\"internalType\\\":\\\"uint256\\\",\\\"name\\\":\\\"\\\",\\\"type\\\":\\\"uint256\\\"}],\\\"stateMutability\\\":\\\"view\\\",\\\"type\\\":\\\"function\\\"}],\\\"evm\\\":{\\\"bytecode\\\":{\\\"object\\\":\\\"\\\",\\\"opcodes\\\":\\\"\\\",\\\"sourceMap\\\":\\\"\\\"},\\\"deployedBytecode\\\":{\\\"object\\\":\\\"\\\",\\\"opcodes\\\":\\\"\\\",\\\"sourceMap\\\":\\\"\\\"}}}}\"}",
+    "bytecode": "",
+    "deployedBytecode": "",
+    "compiler": {
+      "version": "0.8.0"
+    },
+    "language": "Solidity"
+  }
