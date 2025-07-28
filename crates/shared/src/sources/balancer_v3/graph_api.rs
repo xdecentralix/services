@@ -169,6 +169,8 @@ pub struct Token {
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[serde(default)]
     pub weight: Option<Bfp>,
+    #[serde(rename = "priceRateProvider")]
+    pub price_rate_provider: Option<H160>,
 }
 
 /// Supported pool kinds for V3.
@@ -248,6 +250,7 @@ mod pools_query {
                     address
                     decimals
                     weight
+                    priceRateProvider
                 }
                 dynamicData {
                     swapEnabled

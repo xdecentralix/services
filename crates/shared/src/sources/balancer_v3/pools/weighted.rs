@@ -126,7 +126,7 @@ mod tests {
     use {
         super::*,
         crate::sources::balancer_v3::graph_api::{DynamicData, GqlChain, PoolData, Token},
-        ethcontract::{BlockNumber, H160},
+        ethcontract::{BlockNumber, H160, U256},
         ethcontract_mock::Mock,
         futures::future,
         maplit::btreemap,
@@ -146,11 +146,13 @@ mod tests {
                     address: H160([0x11; 20]),
                     decimals: 1,
                     weight: Some(bfp_v3!("1.337")),
+                    price_rate_provider: None,
                 },
                 Token {
                     address: H160([0x22; 20]),
                     decimals: 2,
                     weight: Some(bfp_v3!("4.2")),
+                    price_rate_provider: None,
                 },
             ],
             dynamic_data: DynamicData { swap_enabled: true },
@@ -165,6 +167,7 @@ mod tests {
                     address: H160([1; 20]),
                     tokens: vec![H160([0x11; 20]), H160([0x22; 20])],
                     scaling_factors: vec![Bfp::exp10(17), Bfp::exp10(16)],
+                    rate_providers: vec![H160::zero(), H160::zero()],
                     block_created: 42,
                 },
                 weights: vec![
@@ -189,11 +192,13 @@ mod tests {
                     address: H160([0x11; 20]),
                     decimals: 1,
                     weight: Some(bfp_v3!("1.337")),
+                    price_rate_provider: None,
                 },
                 Token {
                     address: H160([0x22; 20]),
                     decimals: 2,
                     weight: Some(bfp_v3!("4.2")),
+                    price_rate_provider: None,
                 },
             ],
             dynamic_data: DynamicData { swap_enabled: true },
@@ -221,6 +226,7 @@ mod tests {
                 address: pool.address(),
                 tokens: vec![H160([0x11; 20]), H160([0x22; 20]), H160([0x33; 20])],
                 scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0), Bfp::exp10(0)],
+                rate_providers: vec![H160::zero(), H160::zero(), H160::zero()],
                 block_created: 42,
             })
             .await
@@ -240,6 +246,7 @@ mod tests {
                 address: H160([1; 20]),
                 tokens: vec![H160([0x11; 20]), H160([0x22; 20])],
                 scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0)],
+                rate_providers: vec![H160::zero(), H160::zero()],
                 block_created: 42,
             },
             weights: vec![
@@ -255,10 +262,12 @@ mod tests {
                 H160([0x11; 20]) => common::TokenState {
                     balance: 1000u64.into(),
                     scaling_factor: Bfp::exp10(0),
+                    rate: U256::exp10(18),
                 },
                 H160([0x22; 20]) => common::TokenState {
                     balance: 2000u64.into(),
                     scaling_factor: Bfp::exp10(0),
+                    rate: U256::exp10(18),
                 },
             },
         };
