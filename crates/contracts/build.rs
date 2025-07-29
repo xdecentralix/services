@@ -510,9 +510,13 @@ fn main() {
         // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html>
         // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
-    generate_contract_with_config("BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory", |builder| {
-        builder
-            .contract_mod_override("balancer_v2_no_protocol_fee_liquidity_bootstrapping_pool_factory")
+    generate_contract_with_config(
+        "BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory",
+        |builder| {
+            builder
+                .contract_mod_override(
+                    "balancer_v2_no_protocol_fee_liquidity_bootstrapping_pool_factory",
+                )
                 .add_network(
                     // <https://docs.balancer.fi/reference/contracts/deployment-addresses/mainnet.html#ungrouped-active-current-contracts>
                     MAINNET,

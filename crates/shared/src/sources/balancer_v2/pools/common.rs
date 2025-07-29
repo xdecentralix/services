@@ -98,7 +98,8 @@ impl<Factory> PoolInfoFetcher<Factory> {
 
         let rate_providers = match pool.methods().get_rate_providers().call().await {
             Ok(rate_providers) => rate_providers,
-            Err(_) => vec![H160::zero(); tokens.len()], // Pool doesn't support rate providers, return zero addresses
+            Err(_) => vec![H160::zero(); tokens.len()], /* Pool doesn't support rate providers,
+                                                         * return zero addresses */
         };
 
         Ok(PoolInfo {

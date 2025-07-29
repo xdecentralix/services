@@ -18,7 +18,7 @@ use {
     },
     anyhow::Result,
     contracts::{BalancerV2Vault, GPv2Settlement},
-    ethcontract::{H256},
+    ethcontract::H256,
     model::TokenPair,
     shared::{
         ethrpc::Web3,
@@ -233,11 +233,11 @@ mod tests {
         super::*,
         crate::interactions::allowances::{Approval, MockAllowanceManaging},
         contracts::dummy_contract,
+        ethcontract::U256,
         maplit::{btreemap, hashmap, hashset},
         mockall::predicate::*,
         model::TokenPair,
         primitive_types::H160,
-        ethcontract::U256,
         shared::{
             baseline_solver::BaseTokens,
             http_solver::model::{InternalizationStrategy, TokenAmount},

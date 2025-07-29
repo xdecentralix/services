@@ -10,7 +10,7 @@ use {
         token_info::TokenInfoFetching,
     },
     anyhow::{Context, Result, anyhow, ensure},
-    contracts::{BalancerV3Vault},
+    contracts::BalancerV3Vault,
     ethcontract::{BlockId, H160, U256},
     futures::{FutureExt as _, future::BoxFuture},
     std::{collections::BTreeMap, future::Future, sync::Arc},
@@ -82,8 +82,10 @@ impl<Factory> PoolInfoFetcher<Factory> {
         // Get the pool ID from the pool address (for V3, pool ID is the pool address)
         let pool_id = pool_address;
 
-        // Use V3 vault getPoolTokenInfo to get the tokens in the pool as well as the rate providers
-        let (tokens, token_infos, _, _) = self.vault.get_pool_token_info(pool_address).call().await?;
+        // Use V3 vault getPoolTokenInfo to get the tokens in the pool as well as the
+        // rate providers
+        let (tokens, token_infos, _, _) =
+            self.vault.get_pool_token_info(pool_address).call().await?;
 
         // Get the rate providers from the token infos
         let rate_providers = token_infos
@@ -113,13 +115,21 @@ impl<Factory> PoolInfoFetcher<Factory> {
         let fetch_paused = self.vault.is_pool_paused(pool.address).block(block).call();
 
         // Use V3 Vault getStaticSwapFeePercentage to get the swap fee
-        let fetch_swap_fee = self.vault.get_static_swap_fee_percentage(pool.address).block(block).call();
+        let fetch_swap_fee = self
+            .vault
+            .get_static_swap_fee_percentage(pool.address)
+            .block(block)
+            .call();
 
         // Use V3 Vault getPoolData to get the pool data
         let fetch_pool_data = self.vault.get_pool_data(pool.address).block(block).call();
 
-        let fetch_token_rates = self.vault.get_pool_token_rates(pool.address).block(block).call();
-        
+        let fetch_token_rates = self
+            .vault
+            .get_pool_token_rates(pool.address)
+            .block(block)
+            .call();
+
         // Because of a `mockall` limitation, we **need** the future returned
         // here to be `'static`. This requires us to clone and move `pool` into
         // the async closure - otherwise it would only live for as long as
@@ -128,17 +138,22 @@ impl<Factory> PoolInfoFetcher<Factory> {
 
         async move {
             // Get the paused status, swap fee, and pool data
-            let (paused, swap_fee, pool_data, token_rates) = 
-                futures::try_join!(fetch_paused, fetch_swap_fee, fetch_pool_data, fetch_token_rates)?;
-            
+            let (paused, swap_fee, pool_data, token_rates) = futures::try_join!(
+                fetch_paused,
+                fetch_swap_fee,
+                fetch_pool_data,
+                fetch_token_rates
+            )?;
+
             // Convert the swap fee to a Bfp
             let swap_fee = Bfp::from_wei(swap_fee);
 
-            // Pool Data: (pool_config_bits, tokens, token_infos, balances_raw, balances_live_scaled18, token_rates, decimal_scaling_factors)
+            // Pool Data: (pool_config_bits, tokens, token_infos, balances_raw,
+            // balances_live_scaled18, token_rates, decimal_scaling_factors)
             let (_, tokens, _, balances, _, _, _) = pool_data;
 
             let (_, token_rates) = token_rates;
-    
+
             // Ensure the number of balances matches the number of tokens
             ensure!(
                 pool.tokens.len() == tokens.len(),
@@ -371,8 +386,8 @@ mod tests {
             },
             token_info::{MockTokenInfoFetching, TokenInfo},
         },
-        ethcontract::{U256, Bytes},
         contracts::BalancerV3WeightedPool,
+        ethcontract::{Bytes, U256},
         ethcontract_mock::Mock,
         futures::future,
         maplit::{btreemap, hashmap},
@@ -393,8 +408,9 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_token_info())
             .predicate((predicate::eq(pool.address()),))
             .returns((
-                tokens.to_vec(), // tokens
-                vec![(0u8, H160::zero(), false); 3], // token_infos: (tokenType, rateProvider, paysYieldFees)
+                tokens.to_vec(),                                // tokens
+                vec![(0u8, H160::zero(), false); 3], /* token_infos: (tokenType, rateProvider,
+                                                      * paysYieldFees) */
                 vec![U256::zero(), U256::zero(), U256::zero()], // balances_raw
                 vec![U256::zero(), U256::zero(), U256::zero()], // last_balances_live_scaled18
             ));
@@ -458,10 +474,11 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_data())
             .predicate((predicate::eq(mock_pool.address()),))
             .returns((
-                Bytes([0u8; 32]), // pool_config_bits
-                tokens.to_vec(), // tokens
-                vec![(0u8, H160::zero(), false); 3], // token_infos: (tokenType, rateProvider, paysYieldFees)
-                balances.to_vec(), // balances_raw
+                Bytes([0u8; 32]),                               // pool_config_bits
+                tokens.to_vec(),                                // tokens
+                vec![(0u8, H160::zero(), false); 3], /* token_infos: (tokenType, rateProvider,
+                                                      * paysYieldFees) */
+                balances.to_vec(),                              // balances_raw
                 vec![U256::zero(), U256::zero(), U256::zero()], // balances_live_scaled18
                 vec![U256::zero(), U256::zero(), U256::zero()], // token_rates
                 vec![U256::zero(), U256::zero(), U256::zero()], // decimal_scaling_factors
@@ -546,19 +563,19 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_data())
             .predicate((predicate::eq(mock_pool.address()),))
             .returns((
-                Bytes([0u8; 32]), // pool_config_bits
-                vec![H160([1; 20]), H160([2; 20])], // Only 2 tokens instead of 3
+                Bytes([0u8; 32]),                    // pool_config_bits
+                vec![H160([1; 20]), H160([2; 20])],  // Only 2 tokens instead of 3
                 vec![(0u8, H160::zero(), false); 2], // token_infos
-                vec![U256::zero(), U256::zero()], // balances_raw
-                vec![U256::zero(), U256::zero()], // balances_live_scaled18
-                vec![U256::zero(), U256::zero()], // token_rates
-                vec![U256::zero(), U256::zero()], // decimal_scaling_factors
+                vec![U256::zero(), U256::zero()],    // balances_raw
+                vec![U256::zero(), U256::zero()],    // balances_live_scaled18
+                vec![U256::zero(), U256::zero()],    // token_rates
+                vec![U256::zero(), U256::zero()],    // decimal_scaling_factors
             ));
         vault
             .expect_call(BalancerV3Vault::signatures().get_pool_token_rates())
             .predicate((predicate::eq(mock_pool.address()),))
             .returns((
-                vec![U256::zero(), U256::zero()], // decimal_scaling_factors
+                vec![U256::zero(), U256::zero()],       // decimal_scaling_factors
                 vec![U256::exp10(18), U256::exp10(18)], // token_rates
             ));
 
@@ -610,19 +627,19 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_data())
             .predicate((predicate::eq(mock_pool.address()),))
             .returns((
-                Bytes([0u8; 32]), // pool_config_bits
-                tokens.to_vec(), // tokens
+                Bytes([0u8; 32]),                    // pool_config_bits
+                tokens.to_vec(),                     // tokens
                 vec![(0u8, H160::zero(), false); 2], // token_infos
-                balances.to_vec(), // balances_raw
-                vec![U256::zero(), U256::zero()], // balances_live_scaled18
-                vec![U256::zero(), U256::zero()], // token_rates
-                vec![U256::zero(), U256::zero()], // decimal_scaling_factors
+                balances.to_vec(),                   // balances_raw
+                vec![U256::zero(), U256::zero()],    // balances_live_scaled18
+                vec![U256::zero(), U256::zero()],    // token_rates
+                vec![U256::zero(), U256::zero()],    // decimal_scaling_factors
             ));
         vault
             .expect_call(BalancerV3Vault::signatures().get_pool_token_rates())
             .predicate((predicate::eq(mock_pool.address()),))
             .returns((
-                vec![U256::zero(), U256::zero()], // decimal_scaling_factors
+                vec![U256::zero(), U256::zero()],       // decimal_scaling_factors
                 vec![U256::exp10(18), U256::exp10(18)], // token_rates
             ));
 
@@ -722,19 +739,19 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_data())
             .predicate((predicate::eq(mock_pool.address()),))
             .returns((
-                Bytes([0u8; 32]), // pool_config_bits
-                vec![H160([1; 20]), H160([2; 20])], // tokens
+                Bytes([0u8; 32]),                    // pool_config_bits
+                vec![H160([1; 20]), H160([2; 20])],  // tokens
                 vec![(0u8, H160::zero(), false); 2], // token_infos
-                vec![U256::zero(), U256::zero()], // balances_raw
-                vec![U256::zero(), U256::zero()], // balances_live_scaled18
-                vec![U256::zero(), U256::zero()], // token_rates
-                vec![U256::zero(), U256::zero()], // decimal_scaling_factors
+                vec![U256::zero(), U256::zero()],    // balances_raw
+                vec![U256::zero(), U256::zero()],    // balances_live_scaled18
+                vec![U256::zero(), U256::zero()],    // token_rates
+                vec![U256::zero(), U256::zero()],    // decimal_scaling_factors
             ));
         vault
             .expect_call(BalancerV3Vault::signatures().get_pool_token_rates())
             .predicate((predicate::eq(mock_pool.address()),))
             .returns((
-                vec![U256::zero(), U256::zero()], // decimal_scaling_factors
+                vec![U256::zero(), U256::zero()],       // decimal_scaling_factors
                 vec![U256::exp10(18), U256::exp10(18)], // token_rates
             ));
 
@@ -803,19 +820,19 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_data())
             .predicate((predicate::eq(mock_pool.address()),))
             .returns((
-                Bytes([0u8; 32]), // pool_config_bits
-                tokens.to_vec(), // tokens
+                Bytes([0u8; 32]),                    // pool_config_bits
+                tokens.to_vec(),                     // tokens
                 vec![(0u8, H160::zero(), false); 2], // token_infos
-                balances.to_vec(), // balances_raw
-                vec![U256::zero(), U256::zero()], // balances_live_scaled18
-                vec![U256::zero(), U256::zero()], // token_rates
-                vec![U256::zero(), U256::zero()], // decimal_scaling_factors
+                balances.to_vec(),                   // balances_raw
+                vec![U256::zero(), U256::zero()],    // balances_live_scaled18
+                vec![U256::zero(), U256::zero()],    // token_rates
+                vec![U256::zero(), U256::zero()],    // decimal_scaling_factors
             ));
         vault
             .expect_call(BalancerV3Vault::signatures().get_pool_token_rates())
             .predicate((predicate::eq(mock_pool.address()),))
             .returns((
-                vec![U256::zero(), U256::zero()], // decimal_scaling_factors
+                vec![U256::zero(), U256::zero()],       // decimal_scaling_factors
                 vec![U256::exp10(18), U256::exp10(18)], // token_rates
             ));
 
@@ -871,8 +888,9 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_token_info())
             .predicate((predicate::eq(pool.address()),))
             .returns((
-                tokens.to_vec(), // tokens
-                vec![(0u8, H160::zero(), false); 2], // token_infos: (tokenType, rateProvider, paysYieldFees)
+                tokens.to_vec(),                     // tokens
+                vec![(0u8, H160::zero(), false); 2], /* token_infos: (tokenType, rateProvider,
+                                                      * paysYieldFees) */
                 vec![U256::zero(), U256::zero()], // balances_raw
                 vec![U256::zero(), U256::zero()], // last_balances_live_scaled18
             ));
@@ -908,8 +926,9 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_token_info())
             .predicate((predicate::eq(pool.address()),))
             .returns((
-                tokens.to_vec(), // tokens
-                vec![(0u8, H160::zero(), false); 2], // token_infos: (tokenType, rateProvider, paysYieldFees)
+                tokens.to_vec(),                     // tokens
+                vec![(0u8, H160::zero(), false); 2], /* token_infos: (tokenType, rateProvider,
+                                                      * paysYieldFees) */
                 vec![U256::zero(), U256::zero()], // balances_raw
                 vec![U256::zero(), U256::zero()], // last_balances_live_scaled18
             ));

@@ -44,21 +44,21 @@ fn subtract_swap_fee_amount(amount: U256, swap_fee: Bfp) -> Result<U256, Error> 
 
 // Apply scaling factor and rate with rounding down
 fn to_scaled_18_apply_rate_round_down_bfp(
-    amount: Bfp, 
-    scaling_factor: Bfp, 
-    rate: Bfp
+    amount: Bfp,
+    scaling_factor: Bfp,
+    rate: Bfp,
 ) -> Result<Bfp, Error> {
     // Apply scaling factor first, then rate, both with rounding down
     let scaled = amount.mul_down(scaling_factor)?;
     scaled.mul_down(rate)
 }
 
-// Apply scaling factor and rate with rounding up  
+// Apply scaling factor and rate with rounding up
 #[allow(dead_code)]
 fn to_scaled_18_apply_rate_round_up_bfp(
-    amount: Bfp, 
-    scaling_factor: Bfp, 
-    rate: Bfp
+    amount: Bfp,
+    scaling_factor: Bfp,
+    rate: Bfp,
 ) -> Result<Bfp, Error> {
     // Apply scaling factor first, then rate, both with rounding up
     let scaled = amount.mul_up(scaling_factor)?;
@@ -67,9 +67,9 @@ fn to_scaled_18_apply_rate_round_up_bfp(
 
 // Undo scaling factor and rate with rounding down
 fn to_raw_undo_rate_round_down_bfp(
-    amount: Bfp, 
-    scaling_factor: Bfp, 
-    rate: Bfp
+    amount: Bfp,
+    scaling_factor: Bfp,
+    rate: Bfp,
 ) -> Result<Bfp, Error> {
     // Multiply scaling factor and rate first, then divide amount by the product
     let denominator = scaling_factor.mul_up(rate)?;
@@ -78,9 +78,9 @@ fn to_raw_undo_rate_round_down_bfp(
 
 // Undo scaling factor and rate with rounding up
 fn to_raw_undo_rate_round_up_bfp(
-    amount: Bfp, 
-    scaling_factor: Bfp, 
-    rate: Bfp
+    amount: Bfp,
+    scaling_factor: Bfp,
+    rate: Bfp,
 ) -> Result<Bfp, Error> {
     // Multiply scaling factor and rate first, then divide amount by the product
     let denominator = scaling_factor.mul_up(rate)?;
@@ -91,11 +91,7 @@ fn to_raw_undo_rate_round_up_bfp(
 #[allow(dead_code)]
 fn compute_rate_round_up(rate: U256) -> U256 {
     let rounded_rate = (rate / U256::exp10(18)) * U256::exp10(18);
-    if rounded_rate == rate {
-        rate
-    } else {
-        rate + 1
-    }
+    if rounded_rate == rate { rate } else { rate + 1 }
 }
 
 impl TokenState {
@@ -109,7 +105,7 @@ impl TokenState {
     /// contract to execute math operations, applying rate provider if present.
     fn upscale(&self, amount: U256) -> Result<Bfp, Error> {
         let amount_bfp = Bfp::from_wei(amount);
-        
+
         if self.rate != U256::exp10(18) {
             let rate_bfp = Bfp::from_wei(self.rate);
             to_scaled_18_apply_rate_round_down_bfp(amount_bfp, self.scaling_factor, rate_bfp)

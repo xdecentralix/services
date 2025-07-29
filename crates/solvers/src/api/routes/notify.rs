@@ -1,5 +1,5 @@
 use {
-    axum::{http::StatusCode, response::IntoResponse, Json},
+    axum::{Json, http::StatusCode, response::IntoResponse},
     solvers_dto::notification::Notification,
     tracing::debug,
 };
@@ -7,4 +7,4 @@ use {
 pub async fn notify(Json(notification): Json<Notification>) -> impl IntoResponse {
     debug!(?notification, "received notification");
     StatusCode::OK
-} 
+}

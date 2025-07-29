@@ -8,10 +8,10 @@ use {
         },
         liquidity::{
             AmmOrderExecution,
+            BalancerV3StablePoolOrder,
+            BalancerV3WeightedProductOrder,
             Liquidity,
             SettlementHandling,
-            BalancerV3WeightedProductOrder,
-            BalancerV3StablePoolOrder,
         },
         liquidity_collector::LiquidityCollecting,
         settlement::SettlementEncoder,
@@ -57,7 +57,10 @@ impl BalancerV3Liquidity {
         &self,
         pairs: HashSet<TokenPair>,
         block: Block,
-    ) -> Result<(Vec<BalancerV3StablePoolOrder>, Vec<BalancerV3WeightedProductOrder>)> {
+    ) -> Result<(
+        Vec<BalancerV3StablePoolOrder>,
+        Vec<BalancerV3WeightedProductOrder>,
+    )> {
         let pools = self.pool_fetcher.fetch(pairs, block).await?;
 
         let tokens = pools.relevant_tokens();
