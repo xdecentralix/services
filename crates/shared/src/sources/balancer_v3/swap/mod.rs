@@ -42,6 +42,62 @@ fn subtract_swap_fee_amount(amount: U256, swap_fee: Bfp) -> Result<U256, Error> 
     Ok(amount_without_fees.as_uint256())
 }
 
+// Apply scaling factor and rate with rounding down
+fn to_scaled_18_apply_rate_round_down_bfp(
+    amount: Bfp, 
+    scaling_factor: Bfp, 
+    rate: Bfp
+) -> Result<Bfp, Error> {
+    // Apply scaling factor first, then rate, both with rounding down
+    let scaled = amount.mul_down(scaling_factor)?;
+    scaled.mul_down(rate)
+}
+
+// Apply scaling factor and rate with rounding up  
+#[allow(dead_code)]
+fn to_scaled_18_apply_rate_round_up_bfp(
+    amount: Bfp, 
+    scaling_factor: Bfp, 
+    rate: Bfp
+) -> Result<Bfp, Error> {
+    // Apply scaling factor first, then rate, both with rounding up
+    let scaled = amount.mul_up(scaling_factor)?;
+    scaled.mul_up(rate)
+}
+
+// Undo scaling factor and rate with rounding down
+fn to_raw_undo_rate_round_down_bfp(
+    amount: Bfp, 
+    scaling_factor: Bfp, 
+    rate: Bfp
+) -> Result<Bfp, Error> {
+    // Multiply scaling factor and rate first, then divide amount by the product
+    let denominator = scaling_factor.mul_up(rate)?;
+    amount.div_down(denominator)
+}
+
+// Undo scaling factor and rate with rounding up
+fn to_raw_undo_rate_round_up_bfp(
+    amount: Bfp, 
+    scaling_factor: Bfp, 
+    rate: Bfp
+) -> Result<Bfp, Error> {
+    // Multiply scaling factor and rate first, then divide amount by the product
+    let denominator = scaling_factor.mul_up(rate)?;
+    amount.div_up(denominator)
+}
+
+// Rate rounding function from Balancer math library
+#[allow(dead_code)]
+fn compute_rate_round_up(rate: U256) -> U256 {
+    let rounded_rate = (rate / U256::exp10(18)) * U256::exp10(18);
+    if rounded_rate == rate {
+        rate
+    } else {
+        rate + 1
+    }
+}
+
 impl TokenState {
     /// Converts the stored balance into its internal representation as a
     /// Balancer fixed point number.
@@ -50,23 +106,45 @@ impl TokenState {
     }
 
     /// Scales the input token amount to the value that is used by the Balancer
-    /// contract to execute math operations.
+    /// contract to execute math operations, applying rate provider if present.
     fn upscale(&self, amount: U256) -> Result<Bfp, Error> {
-        Bfp::from_wei(amount).mul_down(self.scaling_factor)
+        let amount_bfp = Bfp::from_wei(amount);
+        
+        if self.rate != U256::exp10(18) {
+            let rate_bfp = Bfp::from_wei(self.rate);
+            to_scaled_18_apply_rate_round_down_bfp(amount_bfp, self.scaling_factor, rate_bfp)
+        } else {
+            // If no rate provider, just apply scaling factor using Bfp
+            amount_bfp.mul_down(self.scaling_factor)
+        }
     }
 
     /// Returns the token amount corresponding to the internal Balancer
-    /// representation for the same amount.
+    /// representation for the same amount, undoing rate provider if present.
     /// Based on contract code here:
     /// https://github.com/balancer-labs/balancer-v2-monorepo/blob/c18ff2686c61a8cbad72cdcfc65e9b11476fdbc3/pkg/pool-utils/contracts/BasePool.sol#L560-L562
     fn downscale_up(&self, amount: Bfp) -> Result<U256, Error> {
-        Ok(amount.div_up(self.scaling_factor)?.as_uint256())
+        if self.rate != U256::exp10(18) {
+            let rate_bfp = Bfp::from_wei(self.rate);
+            let result = to_raw_undo_rate_round_up_bfp(amount, self.scaling_factor, rate_bfp)?;
+            Ok(result.as_uint256())
+        } else {
+            // If no rate provider, just apply scaling factor using Bfp
+            Ok(amount.div_up(self.scaling_factor)?.as_uint256())
+        }
     }
 
     /// Similar to downscale up above, but rounded down, this is just checked
     /// div. https://github.com/balancer-labs/balancer-v2-monorepo/blob/c18ff2686c61a8cbad72cdcfc65e9b11476fdbc3/pkg/pool-utils/contracts/BasePool.sol#L542-L544
-    pub fn downscale_down(&self, amount: Bfp) -> Result<U256, Error> {
-        Ok(amount.div_down(self.scaling_factor)?.as_uint256())
+    fn downscale_down(&self, amount: Bfp) -> Result<U256, Error> {
+        if self.rate != U256::exp10(18) {
+            let rate_bfp = Bfp::from_wei(self.rate);
+            let result = to_raw_undo_rate_round_down_bfp(amount, self.scaling_factor, rate_bfp)?;
+            Ok(result.as_uint256())
+        } else {
+            // If no rate provider, just apply scaling factor using Bfp
+            Ok(amount.div_down(self.scaling_factor)?.as_uint256())
+        }
     }
 }
 
@@ -429,6 +507,7 @@ mod tests {
                     common: TokenState {
                         balance,
                         scaling_factor,
+                        rate: U256::exp10(18),
                     },
                     weight,
                 },
@@ -461,6 +540,7 @@ mod tests {
                 TokenState {
                     balance,
                     scaling_factor,
+                    rate: U256::exp10(18),
                 },
             );
         }
@@ -482,6 +562,7 @@ mod tests {
         let token_state = TokenState {
             balance: Default::default(),
             scaling_factor: Bfp::exp10(12),
+            rate: U256::exp10(18),
         };
         let input = Bfp::from_wei(900_546_079_866_630_330_575_i128.into());
         assert_eq!(

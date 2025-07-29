@@ -236,7 +236,7 @@ mod tests {
         maplit::{btreemap, hashmap, hashset},
         mockall::predicate::*,
         model::TokenPair,
-        primitive_types::H160,
+        primitive_types::{H160, U256},
         shared::{
             baseline_solver::BaseTokens,
             http_solver::model::{InternalizationStrategy, TokenAmount},
@@ -284,6 +284,7 @@ mod tests {
                         common: shared::sources::balancer_v3::pool_fetching::TokenState {
                             balance: 100.into(),
                             scaling_factor: V3Bfp::exp10(16),
+                            rate: U256::exp10(18),
                         },
                         weight: "0.25".parse().unwrap(),
                     },
@@ -291,6 +292,7 @@ mod tests {
                         common: shared::sources::balancer_v3::pool_fetching::TokenState {
                             balance: 1_000_000.into(),
                             scaling_factor: V3Bfp::exp10(12),
+                            rate: U256::exp10(18),
                         },
                         weight: "0.25".parse().unwrap(),
                     },
@@ -298,6 +300,7 @@ mod tests {
                         common: shared::sources::balancer_v3::pool_fetching::TokenState {
                             balance: 1_000_000_000_000_000_000u128.into(),
                             scaling_factor: V3Bfp::exp10(0),
+                            rate: U256::exp10(18),
                         },
                         weight: "0.5".parse().unwrap(),
                     },
@@ -316,6 +319,7 @@ mod tests {
                         common: shared::sources::balancer_v3::pool_fetching::TokenState {
                             balance: 1_000_000_000_000_000_000u128.into(),
                             scaling_factor: V3Bfp::exp10(0),
+                            rate: U256::exp10(18),
                         },
                         weight: "0.5".parse().unwrap(),
                     },
@@ -323,6 +327,7 @@ mod tests {
                         common: shared::sources::balancer_v3::pool_fetching::TokenState {
                             balance: 1_000_000_000_000_000_000u128.into(),
                             scaling_factor: V3Bfp::exp10(0),
+                            rate: U256::exp10(18),
                         },
                         weight: "0.5".parse().unwrap(),
                     },
@@ -385,7 +390,7 @@ mod tests {
             pool_fetcher: Arc::new(pool_fetcher),
             allowance_manager: Box::new(allowance_manager),
         };
-        let (stable_orders, weighted_orders) = liquidity_provider
+        let (_stable_orders, weighted_orders) = liquidity_provider
             .get_orders(pairs, Block::Recent)
             .await
             .unwrap();

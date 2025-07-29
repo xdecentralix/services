@@ -18,7 +18,7 @@ use {
     },
     anyhow::Result,
     contracts::{BalancerV2Vault, GPv2Settlement},
-    ethcontract::H256,
+    ethcontract::{H256},
     model::TokenPair,
     shared::{
         ethrpc::Web3,
@@ -235,6 +235,7 @@ mod tests {
         mockall::predicate::*,
         model::TokenPair,
         primitive_types::H160,
+        ethcontract::U256,
         shared::{
             baseline_solver::BaseTokens,
             http_solver::model::{InternalizationStrategy, TokenAmount},
@@ -285,6 +286,7 @@ mod tests {
                         common: TokenState {
                             balance: 100.into(),
                             scaling_factor: Bfp::exp10(16),
+                            rate: U256::exp10(18),
                         },
                         weight: "0.25".parse().unwrap(),
                     },
@@ -292,6 +294,7 @@ mod tests {
                         common: TokenState {
                             balance: 1_000_000.into(),
                             scaling_factor: Bfp::exp10(12),
+                            rate: U256::exp10(18),
                         },
                         weight: "0.25".parse().unwrap(),
                     },
@@ -299,6 +302,7 @@ mod tests {
                         common: TokenState {
                             balance: 1_000_000_000_000_000_000u128.into(),
                             scaling_factor: Bfp::exp10(0),
+                            rate: U256::exp10(18),
                         },
                         weight: "0.5".parse().unwrap(),
                     },
@@ -317,6 +321,7 @@ mod tests {
                         common: TokenState {
                             balance: 1_000_000_000_000_000_000u128.into(),
                             scaling_factor: Bfp::exp10(0),
+                            rate: U256::exp10(18),
                         },
                         weight: "0.5".parse().unwrap(),
                     },
@@ -324,6 +329,7 @@ mod tests {
                         common: TokenState {
                             balance: 1_000_000_000_000_000_000u128.into(),
                             scaling_factor: Bfp::exp10(0),
+                            rate: U256::exp10(18),
                         },
                         weight: "0.5".parse().unwrap(),
                     },
@@ -344,10 +350,12 @@ mod tests {
                 H160([0x73; 20]) => TokenState {
                         balance: 1_000_000_000_000_000_000u128.into(),
                         scaling_factor: Bfp::exp10(0),
+                        rate: U256::exp10(18),
                     },
                 H160([0xb0; 20]) => TokenState {
                         balance: 1_000_000_000_000_000_000u128.into(),
                         scaling_factor: Bfp::exp10(0),
+                        rate: U256::exp10(18),
                     }
             },
         }];

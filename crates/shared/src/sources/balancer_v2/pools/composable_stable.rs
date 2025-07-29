@@ -114,11 +114,13 @@ mod tests {
                     address: H160([0x11; 20]),
                     decimals: 1,
                     weight: None,
+                    price_rate_provider: None,
                 },
                 Token {
                     address: H160([0x22; 20]),
                     decimals: 2,
                     weight: None,
+                    price_rate_provider: None,
                 },
             ],
             dynamic_data: DynamicData { swap_enabled: true },

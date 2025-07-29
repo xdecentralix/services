@@ -169,6 +169,8 @@ pub struct Token {
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[serde(default)]
     pub weight: Option<Bfp>,
+    #[serde(rename = "priceRateProvider")]
+    pub price_rate_provider: Option<H160>,
 }
 
 /// Supported pool kinds.
@@ -256,6 +258,7 @@ mod pools_query {
                     address
                     decimals
                     weight
+                    priceRateProvider
                 }
                 dynamicData {
                     swapEnabled
@@ -393,11 +396,13 @@ mod tests {
                                 address: H160([0x33; 20]),
                                 decimals: 3,
                                 weight: Some(Bfp::from_wei(500_000_000_000_000_000u128.into())),
+                                price_rate_provider: None,
                             },
                             Token {
                                 address: H160([0x44; 20]),
                                 decimals: 4,
                                 weight: Some(Bfp::from_wei(500_000_000_000_000_000u128.into())),
+                                price_rate_provider: None,
                             },
                         ],
                         dynamic_data: DynamicData { swap_enabled: true },
@@ -416,11 +421,13 @@ mod tests {
                                 address: H160([0x33; 20]),
                                 decimals: 3,
                                 weight: None,
+                                price_rate_provider: None,
                             },
                             Token {
                                 address: H160([0x44; 20]),
                                 decimals: 4,
                                 weight: None,
+                                price_rate_provider: None,
                             },
                         ],
                         dynamic_data: DynamicData { swap_enabled: true },
@@ -439,11 +446,13 @@ mod tests {
                                 address: H160([0x33; 20]),
                                 decimals: 3,
                                 weight: Some(Bfp::from_wei(500_000_000_000_000_000u128.into())),
+                                price_rate_provider: None,
                             },
                             Token {
                                 address: H160([0x44; 20]),
                                 decimals: 4,
                                 weight: Some(Bfp::from_wei(500_000_000_000_000_000u128.into())),
+                                price_rate_provider: None,
                             },
                         ],
                         dynamic_data: DynamicData { swap_enabled: true },
@@ -462,11 +471,13 @@ mod tests {
                                 address: H160([0x33; 20]),
                                 decimals: 3,
                                 weight: None,
+                                price_rate_provider: None,
                             },
                             Token {
                                 address: H160([0x44; 20]),
                                 decimals: 4,
                                 weight: None,
+                                price_rate_provider: None,
                             },
                         ],
                         dynamic_data: DynamicData { swap_enabled: true },
