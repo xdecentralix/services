@@ -408,9 +408,9 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_token_info())
             .predicate((predicate::eq(pool.address()),))
             .returns((
-                tokens.to_vec(),                                // tokens
+                tokens.to_vec(), // tokens
                 vec![(0u8, H160::zero(), false); 3], /* token_infos: (tokenType, rateProvider,
-                                                      * paysYieldFees) */
+                                  * paysYieldFees) */
                 vec![U256::zero(), U256::zero(), U256::zero()], // balances_raw
                 vec![U256::zero(), U256::zero(), U256::zero()], // last_balances_live_scaled18
             ));
@@ -474,10 +474,10 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_data())
             .predicate((predicate::eq(mock_pool.address()),))
             .returns((
-                Bytes([0u8; 32]),                               // pool_config_bits
-                tokens.to_vec(),                                // tokens
+                Bytes([0u8; 32]), // pool_config_bits
+                tokens.to_vec(),  // tokens
                 vec![(0u8, H160::zero(), false); 3], /* token_infos: (tokenType, rateProvider,
-                                                      * paysYieldFees) */
+                                   * paysYieldFees) */
                 balances.to_vec(),                              // balances_raw
                 vec![U256::zero(), U256::zero(), U256::zero()], // balances_live_scaled18
                 vec![U256::zero(), U256::zero(), U256::zero()], // token_rates
@@ -888,9 +888,9 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_token_info())
             .predicate((predicate::eq(pool.address()),))
             .returns((
-                tokens.to_vec(),                     // tokens
+                tokens.to_vec(), // tokens
                 vec![(0u8, H160::zero(), false); 2], /* token_infos: (tokenType, rateProvider,
-                                                      * paysYieldFees) */
+                                  * paysYieldFees) */
                 vec![U256::zero(), U256::zero()], // balances_raw
                 vec![U256::zero(), U256::zero()], // last_balances_live_scaled18
             ));
@@ -926,9 +926,9 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_token_info())
             .predicate((predicate::eq(pool.address()),))
             .returns((
-                tokens.to_vec(),                     // tokens
+                tokens.to_vec(), // tokens
                 vec![(0u8, H160::zero(), false); 2], /* token_infos: (tokenType, rateProvider,
-                                                      * paysYieldFees) */
+                                  * paysYieldFees) */
                 vec![U256::zero(), U256::zero()], // balances_raw
                 vec![U256::zero(), U256::zero()], // last_balances_live_scaled18
             ));
