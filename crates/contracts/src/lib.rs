@@ -59,6 +59,8 @@ include_contracts! {
     BalancerV2ComposableStablePoolFactoryV4;
     BalancerV2ComposableStablePoolFactoryV5;
     BalancerV2ComposableStablePoolFactoryV6;
+    BalancerV2GyroECLPPool;
+    BalancerV2GyroECLPPoolFactory;
     BalancerV2LiquidityBootstrappingPool;
     BalancerV2LiquidityBootstrappingPoolFactory;
     BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory;
