@@ -79,7 +79,7 @@ impl BalancerApiClient {
                     }),
                 )
                 .await?
-                .pool_get_pools;
+                .aggregator_pools;
 
             let no_more_pages = page.len() != QUERY_PAGE_SIZE;
             pools.extend(page);
@@ -226,14 +226,14 @@ mod pools_query {
     use serde::Deserialize;
 
     pub const QUERY: &str = r#"
-        query PoolGetPools(
+        query aggregatorPools(
             $first: Int,
             $skip: Int,
             $orderBy: GqlPoolOrderBy,
             $orderDirection: GqlPoolOrderDirection,
-            $where: GqlPoolFilter
+            $where: GqlAggregatorPoolFilter
         ) {
-            poolGetPools(
+            aggregatorPools(
                 first: $first
                 skip: $skip
                 orderBy: $orderBy
@@ -262,8 +262,8 @@ mod pools_query {
 
     #[derive(Debug, Deserialize)]
     pub struct Data {
-        #[serde(rename = "poolGetPools")]
-        pub pool_get_pools: Vec<super::PoolData>,
+        #[serde(rename = "aggregatorPools")]
+        pub aggregator_pools: Vec<super::PoolData>,
     }
 }
 
@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn decode_pools_data() {
         let json = r#"{
-            "poolGetPools": [
+            "aggregatorPools": [
                 {
                     "id": "0x1111111111111111111111111111111111111111",
                     "address": "0x1111111111111111111111111111111111111111",
@@ -298,8 +298,8 @@ mod tests {
         }"#;
 
         let data: pools_query::Data = serde_json::from_str(json).unwrap();
-        assert_eq!(data.pool_get_pools.len(), 1);
-        let pool = &data.pool_get_pools[0];
+        assert_eq!(data.aggregator_pools.len(), 1);
+        let pool = &data.aggregator_pools[0];
         assert_eq!(pool.id, "0x1111111111111111111111111111111111111111");
         assert_eq!(pool.address, H160([0x11; 20]));
         assert_eq!(pool.pool_type_enum(), PoolType::Weighted);
