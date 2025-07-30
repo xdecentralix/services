@@ -22,6 +22,7 @@ use {
             common::{self, PoolInfoFetcher},
             stable,
             weighted,
+            gyro_e,
         },
         swap::fixed_point::Bfp,
     },
@@ -46,6 +47,7 @@ use {
         BalancerV2WeightedPoolFactory,
         BalancerV2WeightedPoolFactoryV3,
         BalancerV2WeightedPoolFactoryV4,
+        BalancerV2GyroECLPPoolFactory,
     },
     ethcontract::{BlockId, H160, H256, Instance, dyns::DynInstance},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
@@ -61,6 +63,7 @@ pub use {
     common::TokenState,
     stable::AmplificationParameter,
     weighted::{TokenState as WeightedTokenState, Version as WeightedPoolVersion},
+    gyro_e::{Version as GyroEPoolVersion},
 };
 
 mod aggregate;
@@ -125,10 +128,33 @@ impl StablePool {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct GyroEPool {
+    pub common: CommonPoolState,
+    pub reserves: BTreeMap<H160, TokenState>,
+    pub version: GyroEPoolVersion,
+}
+
+impl GyroEPool {
+    pub fn new_unpaused(pool_id: H256, gyro_e_state: gyro_e::PoolState) -> Self {
+        GyroEPool {
+            common: CommonPoolState {
+                id: pool_id,
+                address: pool_address_from_id(pool_id),
+                swap_fee: gyro_e_state.swap_fee,
+                paused: false,
+            },
+            reserves: gyro_e_state.tokens.into_iter().collect(),
+            version: gyro_e_state.version,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct FetchedBalancerPools {
     pub stable_pools: Vec<StablePool>,
     pub weighted_pools: Vec<WeightedPool>,
+    pub gyro_e_pools: Vec<GyroEPool>,
 }
 
 impl FetchedBalancerPools {
@@ -141,6 +167,11 @@ impl FetchedBalancerPools {
         );
         tokens.extend(
             self.weighted_pools
+                .iter()
+                .flat_map(|pool| pool.reserves.keys().copied()),
+        );
+        tokens.extend(
+            self.gyro_e_pools
                 .iter()
                 .flat_map(|pool| pool.reserves.keys().copied()),
         );
@@ -183,6 +214,7 @@ pub enum BalancerFactoryKind {
     ComposableStableV4,
     ComposableStableV5,
     ComposableStableV6,
+    GyroE,
 }
 
 impl BalancerFactoryKind {
@@ -203,6 +235,7 @@ impl BalancerFactoryKind {
                 Self::ComposableStableV4,
                 Self::ComposableStableV5,
                 Self::ComposableStableV6,
+                Self::GyroE,
             ],
             10 => vec![
                 // Optimism
@@ -217,6 +250,7 @@ impl BalancerFactoryKind {
                 Self::ComposableStableV4,
                 Self::ComposableStableV5,
                 Self::ComposableStableV6,
+                Self::GyroE,
             ],
             56 => vec![
                 // BNB
@@ -239,6 +273,7 @@ impl BalancerFactoryKind {
                 Self::ComposableStableV4,
                 Self::ComposableStableV5,
                 Self::ComposableStableV6,
+                Self::GyroE,
             ],
             137 => vec![
                 // Polygon
@@ -254,6 +289,7 @@ impl BalancerFactoryKind {
                 Self::ComposableStableV4,
                 Self::ComposableStableV5,
                 Self::ComposableStableV6,
+                Self::GyroE,
             ],
             8453 => vec![
                 // Base
@@ -261,6 +297,7 @@ impl BalancerFactoryKind {
                 Self::NoProtocolFeeLiquidityBootstrapping,
                 Self::ComposableStableV5,
                 Self::ComposableStableV6,
+                Self::GyroE,
             ],
             42161 => vec![
                 // Arbitrum One
@@ -276,6 +313,7 @@ impl BalancerFactoryKind {
                 Self::ComposableStableV4,
                 Self::ComposableStableV5,
                 Self::ComposableStableV6,
+                Self::GyroE,
             ],
             43114 => vec![
                 // Avalanche
@@ -285,6 +323,7 @@ impl BalancerFactoryKind {
                 Self::ComposableStableV4,
                 Self::ComposableStableV5,
                 Self::ComposableStableV6,
+                Self::GyroE,
             ],
             11155111 => vec![
                 // Sepolia
@@ -355,6 +394,9 @@ impl BalancerContracts {
                 }
                 BalancerFactoryKind::ComposableStableV6 => {
                     instance!(BalancerV2ComposableStablePoolFactoryV6)
+                }
+                BalancerFactoryKind::GyroE => {
+                    instance!(BalancerV2GyroECLPPoolFactory)
                 }
             };
 
@@ -442,6 +484,9 @@ impl BalancerPoolFetching for BalancerPoolFetcher {
                     PoolKind::Stable(state) => fetched_pools
                         .stable_pools
                         .push(StablePool::new_unpaused(pool.id, state)),
+                    PoolKind::GyroE(state) => fetched_pools
+                        .gyro_e_pools
+                        .push(GyroEPool::new_unpaused(pool.id, state)),
                 }
                 fetched_pools
             },
@@ -512,6 +557,9 @@ async fn create_aggregate_pool_fetcher(
             | BalancerFactoryKind::ComposableStableV5
             | BalancerFactoryKind::ComposableStableV6 => {
                 registry!(BalancerV2ComposableStablePoolFactory, instance)
+            }
+            BalancerFactoryKind::GyroE => {
+                registry!(BalancerV2GyroECLPPoolFactory, instance)
             }
         };
         fetchers.push(registry);

@@ -384,6 +384,7 @@ mod tests {
                     Ok(FetchedBalancerPools {
                         stable_pools: stable_pools.clone(),
                         weighted_pools: weighted_pools.clone(),
+                        gyro_e_pools: vec![],
                     })
                 }
             });

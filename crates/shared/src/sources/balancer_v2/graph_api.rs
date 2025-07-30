@@ -12,7 +12,7 @@ use {
     super::swap::fixed_point::Bfp,
     crate::subgraph::SubgraphClient,
     anyhow::{Context, Result},
-    ethcontract::{H160, H256},
+    ethcontract::{H160, H256, I256},
     reqwest::{Client, Url},
     serde::{Deserialize, Serialize},
     serde_json::json,
@@ -73,7 +73,7 @@ impl BalancerApiClient {
                         "orderDirection" => "desc",
                         "where" => json!({
                             "chainIn": [self.chain],
-                            "poolTypeIn": ["WEIGHTED", "STABLE", "LIQUIDITY_BOOTSTRAPPING", "COMPOSABLE_STABLE"],
+                            "poolTypeIn": ["WEIGHTED", "STABLE", "LIQUIDITY_BOOTSTRAPPING", "COMPOSABLE_STABLE", "GYROE"],
                             "protocolVersionIn": [2]
                         }),
                     }),
@@ -138,6 +138,7 @@ impl RegisteredPools {
 }
 
 /// Pool data from the Balancer API v3.
+#[serde_as]
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PoolData {
@@ -151,6 +152,48 @@ pub struct PoolData {
     pub pool_tokens: Vec<Token>,
     pub dynamic_data: DynamicData,
     pub create_time: u64,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub alpha: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub beta: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub c: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub s: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub lambda: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub tau_alpha_x: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub tau_alpha_y: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub tau_beta_x: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub tau_beta_y: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub u: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub v: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub w: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub z: Option<I256>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub d_sq: Option<I256>,
 }
 
 /// Dynamic data for pools from Balancer API v3.
@@ -180,6 +223,7 @@ pub enum PoolType {
     Weighted,
     LiquidityBootstrapping,
     ComposableStable,
+    GyroE,
 }
 
 impl PoolData {
@@ -190,6 +234,7 @@ impl PoolData {
             "STABLE" => PoolType::Stable,
             "LIQUIDITY_BOOTSTRAPPING" => PoolType::LiquidityBootstrapping,
             "COMPOSABLE_STABLE" => PoolType::ComposableStable,
+            "GYROE" => PoolType::GyroE,
             _ => panic!("Unknown pool type: {}", self.pool_type),
         }
     }
@@ -264,6 +309,20 @@ mod pools_query {
                     swapEnabled
                 }
                 createTime
+                alpha
+                beta
+                c
+                s
+                lambda
+                tauAlphaX
+                tauAlphaY
+                tauBetaX
+                tauBetaY
+                u
+                v
+                w
+                z
+                dSq
             }
         }
     "#;
@@ -407,6 +466,20 @@ mod tests {
                         ],
                         dynamic_data: DynamicData { swap_enabled: true },
                         create_time: 1234567890,
+                        alpha: None,
+                        beta: None,
+                        c: None,
+                        s: None,
+                        lambda: None,
+                        tau_alpha_x: None,
+                        tau_alpha_y: None,
+                        tau_beta_x: None,
+                        tau_beta_y: None,
+                        u: None,
+                        v: None,
+                        w: None,
+                        z: None,
+                        d_sq: None,
                     },
                     PoolData {
                         id: "0x1111111111111111111111111111111111111111111111111111111111111111"
@@ -432,6 +505,20 @@ mod tests {
                         ],
                         dynamic_data: DynamicData { swap_enabled: true },
                         create_time: 1234567890,
+                        alpha: None,
+                        beta: None,
+                        c: None,
+                        s: None,
+                        lambda: None,
+                        tau_alpha_x: None,
+                        tau_alpha_y: None,
+                        tau_beta_x: None,
+                        tau_beta_y: None,
+                        u: None,
+                        v: None,
+                        w: None,
+                        z: None,
+                        d_sq: None,
                     },
                     PoolData {
                         id: "0x1111111111111111111111111111111111111111111111111111111111111111"
@@ -457,6 +544,20 @@ mod tests {
                         ],
                         dynamic_data: DynamicData { swap_enabled: true },
                         create_time: 1234567890,
+                        alpha: None,
+                        beta: None,
+                        c: None,
+                        s: None,
+                        lambda: None,
+                        tau_alpha_x: None,
+                        tau_alpha_y: None,
+                        tau_beta_x: None,
+                        tau_beta_y: None,
+                        u: None,
+                        v: None,
+                        w: None,
+                        z: None,
+                        d_sq: None,
                     },
                     PoolData {
                         id: "0x1111111111111111111111111111111111111111111111111111111111111111"
@@ -482,6 +583,20 @@ mod tests {
                         ],
                         dynamic_data: DynamicData { swap_enabled: true },
                         create_time: 1234567890,
+                        alpha: None,
+                        beta: None,
+                        c: None,
+                        s: None,
+                        lambda: None,
+                        tau_alpha_x: None,
+                        tau_alpha_y: None,
+                        tau_beta_x: None,
+                        tau_beta_y: None,
+                        u: None,
+                        v: None,
+                        w: None,
+                        z: None,
+                        d_sq: None,
                     },
                 ],
             }
@@ -504,6 +619,20 @@ mod tests {
                     pool_tokens: vec![],
                     dynamic_data: DynamicData { swap_enabled: true },
                     create_time: 0,
+                    alpha: None,
+                    beta: None,
+                    c: None,
+                    s: None,
+                    lambda: None,
+                    tau_alpha_x: None,
+                    tau_alpha_y: None,
+                    tau_beta_x: None,
+                    tau_beta_y: None,
+                    u: None,
+                    v: None,
+                    w: None,
+                    z: None,
+                    d_sq: None,
                 },
                 PoolData {
                     id: "0x2222222222222222222222222222222222222222222222222222222222222222"
@@ -516,6 +645,20 @@ mod tests {
                     pool_tokens: vec![],
                     dynamic_data: DynamicData { swap_enabled: true },
                     create_time: 0,
+                    alpha: None,
+                    beta: None,
+                    c: None,
+                    s: None,
+                    lambda: None,
+                    tau_alpha_x: None,
+                    tau_alpha_y: None,
+                    tau_beta_x: None,
+                    tau_beta_y: None,
+                    u: None,
+                    v: None,
+                    w: None,
+                    z: None,
+                    d_sq: None,
                 },
                 PoolData {
                     id: "0x3333333333333333333333333333333333333333333333333333333333333333"
@@ -528,6 +671,20 @@ mod tests {
                     pool_tokens: vec![],
                     dynamic_data: DynamicData { swap_enabled: true },
                     create_time: 0,
+                    alpha: None,
+                    beta: None,
+                    c: None,
+                    s: None,
+                    lambda: None,
+                    tau_alpha_x: None,
+                    tau_alpha_y: None,
+                    tau_beta_x: None,
+                    tau_beta_y: None,
+                    u: None,
+                    v: None,
+                    w: None,
+                    z: None,
+                    d_sq: None,
                 },
             ],
         };
