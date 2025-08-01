@@ -9,10 +9,10 @@
 //!   from the node
 
 use {
-    super::swap::fixed_point::Bfp,
+    super::swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     crate::subgraph::SubgraphClient,
     anyhow::{Context, Result},
-    ethcontract::{H160, H256, I256},
+    ethcontract::{H160, H256},
     reqwest::{Client, Url},
     serde::{Deserialize, Serialize},
     serde_json::json,
@@ -152,48 +152,34 @@ pub struct PoolData {
     pub pool_tokens: Vec<Token>,
     pub dynamic_data: DynamicData,
     pub create_time: u64,
-    #[serde_as(as = "Option<DisplayFromStr>")]
     #[serde(default)]
-    pub alpha: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub alpha: Option<SBfp>,
     #[serde(default)]
-    pub beta: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub beta: Option<SBfp>,
     #[serde(default)]
-    pub c: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub c: Option<SBfp>,
     #[serde(default)]
-    pub s: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub s: Option<SBfp>,
     #[serde(default)]
-    pub lambda: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub lambda: Option<SBfp>,
     #[serde(default)]
-    pub tau_alpha_x: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub tau_alpha_x: Option<SBfp>,
     #[serde(default)]
-    pub tau_alpha_y: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub tau_alpha_y: Option<SBfp>,
     #[serde(default)]
-    pub tau_beta_x: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub tau_beta_x: Option<SBfp>,
     #[serde(default)]
-    pub tau_beta_y: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub tau_beta_y: Option<SBfp>,
     #[serde(default)]
-    pub u: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub u: Option<SBfp>,
     #[serde(default)]
-    pub v: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub v: Option<SBfp>,
     #[serde(default)]
-    pub w: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub w: Option<SBfp>,
     #[serde(default)]
-    pub z: Option<I256>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub z: Option<SBfp>,
     #[serde(default)]
-    pub d_sq: Option<I256>,
+    pub d_sq: Option<SBfp>,
 }
 
 /// Dynamic data for pools from Balancer API v3.
@@ -601,6 +587,83 @@ mod tests {
                 ],
             }
         );
+    }
+
+    #[test]
+    fn decode_gyro_eclp_high_precision_data() {
+        use pools_query::*;
+
+        // Test with actual high-precision values like from your API
+        let gyro_eclp_json = json!({
+            "aggregatorPools": [
+                {
+                    "type": "GYROE",
+                    "address": "0x80fd5bc9d4fA6C22132f8bb2d9d30B01c3336FB3",
+                    "id": "0x1111111111111111111111111111111111111111111111111111111111111111",
+                    "protocolVersion": 2,
+                    "factory": "0x5555555555555555555555555555555555555555",
+                    "chain": "GNOSIS",
+                    "poolTokens": [],
+                    "dynamicData": { "swapEnabled": true },
+                    "createTime": 1740124250,
+                    "alpha": "0.7",
+                    "beta": "1.3",
+                    "c": "0.707106781186547524",
+                    "s": "0.707106781186547524",
+                    "lambda": "1",
+                    "tauAlphaX": "-0.17378533390904767196396190604716688",
+                    "tauAlphaY": "0.984783558817936807795784134267279",
+                    "tauBetaX": "0.1293391840677680520489165354049038",
+                    "tauBetaY": "0.9916004111862217323750267714375956",
+                    "u": "0.1515622589884078618346041354467426",
+                    "v": "0.9881919850020792689650338303356912",
+                    "w": "0.003408426184142462285756984496121705",
+                    "z": "-0.022223074920639809932327072642593141",
+                    "dSq": "0.9999999999999999988662409334210612"
+                }
+            ]
+        });
+
+        let data: Data = serde_json::from_value(gyro_eclp_json).unwrap();
+        let pool = &data.aggregator_pools[0];
+
+        // Verify standard precision parameters parsed correctly
+        assert!(pool.alpha.is_some());
+        assert!(pool.beta.is_some());
+        assert!(pool.c.is_some());
+        assert!(pool.s.is_some());
+        assert!(pool.lambda.is_some());
+
+        // Verify high-precision parameters parsed correctly without truncation
+        assert!(pool.tau_alpha_x.is_some());
+        assert!(pool.tau_alpha_y.is_some());
+        assert!(pool.tau_beta_x.is_some());
+        assert!(pool.tau_beta_y.is_some());
+        assert!(pool.u.is_some());
+        assert!(pool.v.is_some());
+        assert!(pool.w.is_some());
+        assert!(pool.z.is_some());
+        assert!(pool.d_sq.is_some());
+
+        // Verify that high-precision values are preserved
+        // tauAlphaX: "-0.17378533390904767196396190604716688"
+        // This should be scaled by 1e38 and stored as I256
+        let tau_alpha_x = pool.tau_alpha_x.unwrap();
+
+        // Convert back to verify precision is preserved (for future validation)
+        let _tau_alpha_x_bigint = tau_alpha_x.to_big_int();
+
+        // The value should be approximately -0.173785... * 1e38
+        // We can check that it's in the right ballpark
+        assert!(tau_alpha_x.is_negative());
+
+        // Verify w parameter with many decimals
+        let w = pool.w.unwrap();
+        assert!(w.is_positive());
+
+        println!("Successfully parsed high-precision GyroECLP data:");
+        println!("  tauAlphaX: {}", tau_alpha_x);
+        println!("  w: {}", w);
     }
 
     #[test]

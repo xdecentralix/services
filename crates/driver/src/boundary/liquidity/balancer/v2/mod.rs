@@ -11,6 +11,7 @@ use {
     chain::Chain,
     contracts::{
         BalancerV2ComposableStablePoolFactory,
+        BalancerV2GyroECLPPoolFactory,
         BalancerV2LiquidityBootstrappingPoolFactory,
         BalancerV2StablePoolFactoryV2,
         BalancerV2Vault,
@@ -183,6 +184,18 @@ async fn init_liquidity(
                     (
                         BalancerFactoryKind::ComposableStable,
                         BalancerV2ComposableStablePoolFactory::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            config
+                .gyro_e
+                .iter()
+                .map(|&factory| {
+                    (
+                        BalancerFactoryKind::GyroE,
+                        BalancerV2GyroECLPPoolFactory::at(&web3, factory.into())
                             .raw_instance()
                             .clone(),
                     )

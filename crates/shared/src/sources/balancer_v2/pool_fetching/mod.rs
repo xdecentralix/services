@@ -20,9 +20,9 @@ use {
             PoolIndexing,
             PoolKind,
             common::{self, PoolInfoFetcher},
+            gyro_e,
             stable,
             weighted,
-            gyro_e,
         },
         swap::fixed_point::Bfp,
     },
@@ -39,6 +39,7 @@ use {
         BalancerV2ComposableStablePoolFactoryV4,
         BalancerV2ComposableStablePoolFactoryV5,
         BalancerV2ComposableStablePoolFactoryV6,
+        BalancerV2GyroECLPPoolFactory,
         BalancerV2LiquidityBootstrappingPoolFactory,
         BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory,
         BalancerV2StablePoolFactoryV2,
@@ -47,7 +48,6 @@ use {
         BalancerV2WeightedPoolFactory,
         BalancerV2WeightedPoolFactoryV3,
         BalancerV2WeightedPoolFactoryV4,
-        BalancerV2GyroECLPPoolFactory,
     },
     ethcontract::{BlockId, H160, H256, Instance, dyns::DynInstance},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
@@ -61,9 +61,9 @@ use {
 };
 pub use {
     common::TokenState,
+    gyro_e::Version as GyroEPoolVersion,
     stable::AmplificationParameter,
     weighted::{TokenState as WeightedTokenState, Version as WeightedPoolVersion},
-    gyro_e::{Version as GyroEPoolVersion},
 };
 
 mod aggregate;

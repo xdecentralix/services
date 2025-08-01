@@ -9,10 +9,10 @@
 
 pub mod common;
 pub mod composable_stable;
+pub mod gyro_e;
 pub mod liquidity_bootstrapping;
 pub mod stable;
 pub mod weighted;
-pub mod gyro_e;
 
 use {
     super::graph_api::PoolData,

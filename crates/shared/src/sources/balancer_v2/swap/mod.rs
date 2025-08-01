@@ -21,8 +21,8 @@ use {
 
 mod error;
 pub mod fixed_point;
-pub mod signed_fixed_point;
 mod math;
+pub mod signed_fixed_point;
 mod stable_math;
 mod weighted_math;
 
