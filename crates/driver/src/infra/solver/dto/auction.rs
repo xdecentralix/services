@@ -514,7 +514,8 @@ fn scaling_factor_to_decimal_v3(
 fn signed_fixed_point_to_decimal(
     sfp: liquidity::balancer::v2::gyro_e::SignedFixedPoint,
 ) -> bigdecimal::BigDecimal {
-    // Convert I256 to BigInt via string representation to handle signed values correctly
+    // Convert I256 to BigInt via string representation to handle signed values
+    // correctly
     let i256_str = sfp.as_raw().to_string();
     let big_int = num::BigInt::parse_bytes(i256_str.as_bytes(), 10)
         .expect("valid I256 should parse to BigInt");

@@ -2945,7 +2945,7 @@ mod tests {
                 BigInt::parse_bytes(b"1000000000000000000", 10).unwrap(), // 1.0 ETH in
                 false, // token_in_is_token0=false (token1->token0)
                 BigInt::parse_bytes(b"989980003877180195", 10).unwrap(), /* Expected: 0.989980
-                                                                          * ETH out */
+                        * ETH out */
                 true, // is_exact_in
             ),
             // Test 2: SwapKind 1 (EXACT_OUT) - want 0.00001 ETH token0 out
@@ -2964,7 +2964,7 @@ mod tests {
                 BigInt::parse_bytes(b"1000000000000000000", 10).unwrap(), // 1.0 ETH in
                 true, // token_in_is_token0=true (token0->token1)
                 BigInt::parse_bytes(b"989529488258373725", 10).unwrap(), /* Expected: 0.989529
-                                                                          * ETH out */
+                       * ETH out */
                 true, // is_exact_in
             ),
             // Test 4: SwapKind 1 (EXACT_OUT) - want 0.00001 ETH token1 out

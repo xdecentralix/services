@@ -496,7 +496,8 @@ impl BaselineSolvable for StablePool {
     }
 }
 
-/// Gyroscope E-CLP pool data as a reference used for computing input and output amounts.
+/// Gyroscope E-CLP pool data as a reference used for computing input and output
+/// amounts.
 #[derive(Debug)]
 pub struct GyroEPoolRef<'a> {
     pub reserves: &'a BTreeMap<H160, TokenState>,
@@ -534,17 +535,33 @@ impl GyroEPoolRef<'_> {
 
         // Determine token order (token0 vs token1)
         let token_in_is_token0 = in_token < out_token;
-        
+
         // Convert reserves to the format expected by gyro_e_math
         let _balances = if token_in_is_token0 {
             vec![
-                in_reserves.upscaled_balance().ok()?.as_uint256().to_big_int(),
-                out_reserves.upscaled_balance().ok()?.as_uint256().to_big_int(),
+                in_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+                out_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
             ]
         } else {
             vec![
-                out_reserves.upscaled_balance().ok()?.as_uint256().to_big_int(),
-                in_reserves.upscaled_balance().ok()?.as_uint256().to_big_int(),
+                out_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+                in_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
             ]
         };
 
@@ -578,16 +595,14 @@ impl GyroEPoolRef<'_> {
         };
 
         // Calculate the current invariant from pool balances using gyro_e_math
-        let (current_invariant, inv_err) = gyro_e_math::calculate_invariant_with_error(
-            &_balances,
-            &params,
-            &derived,
-        ).ok()?;
-        
-        // Convert to Vector2 format with error bounds (as used in tests and Python reference)
+        let (current_invariant, inv_err) =
+            gyro_e_math::calculate_invariant_with_error(&_balances, &params, &derived).ok()?;
+
+        // Convert to Vector2 format with error bounds (as used in tests and Python
+        // reference)
         let invariant = gyro_e_math::Vector2::new(
-            &current_invariant + BigInt::from(2) * &inv_err,  // x: upper bound
-            current_invariant,  // y: actual invariant
+            &current_invariant + BigInt::from(2) * &inv_err, // x: upper bound
+            current_invariant,                               // y: actual invariant
         );
 
         // Call the gyro_e_math function
@@ -598,7 +613,8 @@ impl GyroEPoolRef<'_> {
             &params,
             &derived,
             &invariant,
-        ).ok()?;
+        )
+        .ok()?;
 
         // Convert BigInt result back to U256 and apply downscaling
         let out_amount_sbfp = signed_fixed_point::SBfp::from_big_int(&out_amount_big_int).ok()?;
@@ -636,17 +652,33 @@ impl BaselineSolvable for GyroEPoolRef<'_> {
 
         // Determine token order
         let token_in_is_token0 = in_token < out_token;
-        
+
         // Convert reserves to BigInt format
         let balances = if token_in_is_token0 {
             vec![
-                in_reserves.upscaled_balance().ok()?.as_uint256().to_big_int(),
-                out_reserves.upscaled_balance().ok()?.as_uint256().to_big_int(),
+                in_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+                out_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
             ]
         } else {
             vec![
-                out_reserves.upscaled_balance().ok()?.as_uint256().to_big_int(),
-                in_reserves.upscaled_balance().ok()?.as_uint256().to_big_int(),
+                out_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+                in_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
             ]
         };
 
@@ -680,16 +712,14 @@ impl BaselineSolvable for GyroEPoolRef<'_> {
         };
 
         // Calculate the current invariant from pool balances using gyro_e_math
-        let (current_invariant, inv_err) = gyro_e_math::calculate_invariant_with_error(
-            &balances,
-            &params,
-            &derived,
-        ).ok()?;
-        
-        // Convert to Vector2 format with error bounds (as used in tests and Python reference)
+        let (current_invariant, inv_err) =
+            gyro_e_math::calculate_invariant_with_error(&balances, &params, &derived).ok()?;
+
+        // Convert to Vector2 format with error bounds (as used in tests and Python
+        // reference)
         let invariant = gyro_e_math::Vector2::new(
-            &current_invariant + BigInt::from(2) * &inv_err,  // x: upper bound
-            current_invariant,  // y: actual invariant
+            &current_invariant + BigInt::from(2) * &inv_err, // x: upper bound
+            current_invariant,                               // y: actual invariant
         );
 
         // Call the gyro_e_math function
@@ -700,7 +730,8 @@ impl BaselineSolvable for GyroEPoolRef<'_> {
             &params,
             &derived,
             &invariant,
-        ).ok()?;
+        )
+        .ok()?;
 
         // Convert result back and apply fee
         let in_amount_sbfp = signed_fixed_point::SBfp::from_big_int(&in_amount_big_int).ok()?;
@@ -713,7 +744,7 @@ impl BaselineSolvable for GyroEPoolRef<'_> {
         let in_amount_u256 = U256::from_big_endian(&bytes);
         let in_amount_bfp = Bfp::from_wei(in_amount_u256);
         let in_amount_downscaled = in_reserves.downscale_up(in_amount_bfp).ok()?;
-        
+
         // Apply swap fee to get final amount
         add_swap_fee_amount(in_amount_downscaled, self.swap_fee).ok()
     }

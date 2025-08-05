@@ -1,5 +1,5 @@
 pub use ethereum_types::{H160, H256, U256};
-use {crate::util::bytes::Bytes, derive_more::From, web3::types::AccessList, ethcontract::I256};
+use {crate::util::bytes::Bytes, derive_more::From, ethcontract::I256, web3::types::AccessList};
 
 /// A contract address.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

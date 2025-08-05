@@ -59,7 +59,11 @@ impl BalancerV2Liquidity {
         &self,
         pairs: HashSet<TokenPair>,
         block: Block,
-    ) -> Result<(Vec<StablePoolOrder>, Vec<WeightedProductOrder>, Vec<GyroEPoolOrder>)> {
+    ) -> Result<(
+        Vec<StablePoolOrder>,
+        Vec<WeightedProductOrder>,
+        Vec<GyroEPoolOrder>,
+    )> {
         let pools = self.pool_fetcher.fetch(pairs, block).await?;
 
         let tokens = pools.relevant_tokens();
@@ -134,7 +138,11 @@ impl BalancerV2Liquidity {
             })
             .collect();
 
-        Ok((stable_pool_orders, weighted_product_orders, gyro_e_pool_orders))
+        Ok((
+            stable_pool_orders,
+            weighted_product_orders,
+            gyro_e_pool_orders,
+        ))
     }
 }
 

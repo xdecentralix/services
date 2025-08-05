@@ -48,12 +48,8 @@ pub fn to_domain(id: liquidity::Id, pool: GyroEPoolOrder) -> Result<liquidity::L
             params_beta: balancer::v2::gyro_e::SignedFixedPoint::from_raw(
                 pool.params_beta.as_i256(),
             ),
-            params_c: balancer::v2::gyro_e::SignedFixedPoint::from_raw(
-                pool.params_c.as_i256(),
-            ),
-            params_s: balancer::v2::gyro_e::SignedFixedPoint::from_raw(
-                pool.params_s.as_i256(),
-            ),
+            params_c: balancer::v2::gyro_e::SignedFixedPoint::from_raw(pool.params_c.as_i256()),
+            params_s: balancer::v2::gyro_e::SignedFixedPoint::from_raw(pool.params_s.as_i256()),
             params_lambda: balancer::v2::gyro_e::SignedFixedPoint::from_raw(
                 pool.params_lambda.as_i256(),
             ),
@@ -63,12 +59,8 @@ pub fn to_domain(id: liquidity::Id, pool: GyroEPoolOrder) -> Result<liquidity::L
             tau_alpha_y: balancer::v2::gyro_e::SignedFixedPoint::from_raw(
                 pool.tau_alpha_y.as_i256(),
             ),
-            tau_beta_x: balancer::v2::gyro_e::SignedFixedPoint::from_raw(
-                pool.tau_beta_x.as_i256(),
-            ),
-            tau_beta_y: balancer::v2::gyro_e::SignedFixedPoint::from_raw(
-                pool.tau_beta_y.as_i256(),
-            ),
+            tau_beta_x: balancer::v2::gyro_e::SignedFixedPoint::from_raw(pool.tau_beta_x.as_i256()),
+            tau_beta_y: balancer::v2::gyro_e::SignedFixedPoint::from_raw(pool.tau_beta_y.as_i256()),
             u: balancer::v2::gyro_e::SignedFixedPoint::from_raw(pool.u.as_i256()),
             v: balancer::v2::gyro_e::SignedFixedPoint::from_raw(pool.v.as_i256()),
             w: balancer::v2::gyro_e::SignedFixedPoint::from_raw(pool.w.as_i256()),

@@ -8,8 +8,8 @@ use {
     },
 };
 
-/// Converts a domain pool into a [`shared`] Balancer V2 Gyroscope E-CLP pool. Returns
-/// `None` if the domain pool cannot be represented as a boundary pool.
+/// Converts a domain pool into a [`shared`] Balancer V2 Gyroscope E-CLP pool.
+/// Returns `None` if the domain pool cannot be represented as a boundary pool.
 pub fn to_boundary_pool(address: H160, pool: &liquidity::gyro_e::Pool) -> Option<Pool> {
     // NOTE: this is only used for encoding and not for solving, so it's OK to
     // use this an approximate value for now. In fact, Balancer V2 pool IDs
@@ -80,16 +80,16 @@ fn to_fixed_point(ratio: &eth::Rational) -> Option<Bfp> {
 fn to_signed_fixed_point(ratio: &eth::SignedRational) -> Option<SBfp> {
     // For SignedRational (based on I256), we can work directly with signed values
     let base = ethcontract::I256::from(10u64.pow(18));
-    
+
     // Convert I256 to ethcontract::I256 for calculation
     let numer_str = ratio.numer().to_string();
     let denom_str = ratio.denom().to_string();
-    
+
     let numer_i256 = ethcontract::I256::from_dec_str(&numer_str).ok()?;
     let denom_i256 = ethcontract::I256::from_dec_str(&denom_str).ok()?;
-    
+
     // Calculate wei value: (numer * base) / denom
     let wei_i256 = numer_i256.checked_mul(base)?.checked_div(denom_i256)?;
-    
+
     Some(SBfp::from_wei(wei_i256))
 }

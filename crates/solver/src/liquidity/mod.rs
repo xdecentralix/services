@@ -370,7 +370,8 @@ pub struct BalancerV3StablePoolOrder {
 }
 
 /// Gyroscope E-CLP (Elliptic Constant Liquidity Pool) automated market maker
-/// with elliptic invariant curve and configurable parameters for improved capital efficiency
+/// with elliptic invariant curve and configurable parameters for improved
+/// capital efficiency
 #[derive(Clone)]
 #[cfg_attr(test, derive(Derivative))]
 #[cfg_attr(test, derivative(PartialEq))]

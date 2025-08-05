@@ -10,10 +10,10 @@ use {
 
 /// Liquidity data tied to a Balancer V2 Gyroscope E-CLP pool.
 ///
-/// Gyroscope E-CLP (Elliptic Constant Liquidity Pool) is an advanced AMM that uses
-/// an elliptical invariant curve for improved capital efficiency and customizable
-/// price curves. The pool's shape is defined by static parameters that are immutable
-/// after pool creation.
+/// Gyroscope E-CLP (Elliptic Constant Liquidity Pool) is an advanced AMM that
+/// uses an elliptical invariant curve for improved capital efficiency and
+/// customizable price curves. The pool's shape is defined by static parameters
+/// that are immutable after pool creation.
 ///
 /// References:
 /// - [Gyroscope E-CLP Whitepaper](https://docs.gyro.finance/pools/e-clps.html)

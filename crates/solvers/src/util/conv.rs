@@ -3,8 +3,8 @@
 use {
     crate::domain::eth,
     bigdecimal::BigDecimal,
-    ethereum_types::U256,
     ethcontract::I256,
+    ethereum_types::U256,
     num::{BigInt, BigUint, One, Signed, rational::Ratio},
 };
 
@@ -32,26 +32,27 @@ pub fn decimal_to_rational(d: &BigDecimal) -> Option<eth::Rational> {
     Some(eth::Rational::new_raw(numer, denom))
 }
 
-/// Converts a `BigDecimal` value to a `eth::SignedRational` value. Returns `None` if
-/// the specified decimal value cannot be represented as a rational of `I256`
-/// integers. Unlike `decimal_to_rational`, this function supports negative values.
+/// Converts a `BigDecimal` value to a `eth::SignedRational` value. Returns
+/// `None` if the specified decimal value cannot be represented as a rational of
+/// `I256` integers. Unlike `decimal_to_rational`, this function supports
+/// negative values.
 pub fn decimal_to_signed_rational(d: &BigDecimal) -> Option<eth::SignedRational> {
     let (int, exp) = d.as_bigint_and_exponent();
 
     // For signed conversion, we need to preserve the sign
     let is_negative = int.is_negative();
     let abs_int = int.abs();
-    
+
     // Convert to BigUint for processing (we'll apply sign later)
     let uint = abs_int.to_biguint()?;
     let factor = BigUint::from(10_u8).pow(exp.unsigned_abs().try_into().ok()?);
-    
+
     // Same logic as decimal_to_rational but adapted for signed values
     // BigDecimal represents value as (int * 10^(-exp))
     let ratio = if exp >= 0 {
-        Ratio::new(uint, factor)  // int / 10^exp when exp >= 0
+        Ratio::new(uint, factor) // int / 10^exp when exp >= 0
     } else {
-        Ratio::new(uint * factor, num::one())  // int * 10^|exp| when exp < 0
+        Ratio::new(uint * factor, num::one()) // int * 10^|exp| when exp < 0
     };
 
     // Convert to I256 components, preserving sign
@@ -81,20 +82,20 @@ pub fn biguint_to_i256(i: &BigUint, is_negative: bool) -> Option<I256> {
     if bytes.len() > 32 {
         return None;
     }
-    
+
     // Pad to 32 bytes
     let mut padded = [0u8; 32];
     padded[32 - bytes.len()..].copy_from_slice(&bytes);
-    
+
     // Convert to I256 using the string representation approach
     let u256_val = U256::from_big_endian(&padded);
     let u256_str = u256_val.to_string();
     let mut i256 = I256::from_dec_str(&u256_str).ok()?;
-    
+
     if is_negative {
         i256 = -i256;
     }
-    
+
     Some(i256)
 }
 
@@ -162,7 +163,11 @@ mod tests {
             // Check the sign and absolute value by string manipulation
             let numer_str = result.numer().to_string();
             if is_negative {
-                assert!(numer_str.starts_with('-'), "Expected negative value for {}", value);
+                assert!(
+                    numer_str.starts_with('-'),
+                    "Expected negative value for {}",
+                    value
+                );
                 let abs_str = numer_str.trim_start_matches('-');
                 assert_eq!(abs_str, numer_abs.to_string());
             } else {
