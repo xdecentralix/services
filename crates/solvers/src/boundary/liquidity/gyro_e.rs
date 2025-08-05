@@ -76,30 +76,20 @@ fn to_fixed_point(ratio: &eth::Rational) -> Option<Bfp> {
     Some(Bfp::from_wei(wei))
 }
 
-/// Converts a rational to a Balancer signed fixed point number.
-fn to_signed_fixed_point(ratio: &eth::Rational) -> Option<SBfp> {
-    // Convert rational to I256 wei representation for signed fixed point
-    let base = num::BigInt::from(10u64.pow(18));
+/// Converts a signed rational to a Balancer signed fixed point number.
+fn to_signed_fixed_point(ratio: &eth::SignedRational) -> Option<SBfp> {
+    // For SignedRational (based on I256), we can work directly with signed values
+    let base = ethcontract::I256::from(10u64.pow(18));
     
-    // Convert U256 to BigInt first
-    let mut numer_bytes = [0u8; 32];
-    ratio.numer().to_big_endian(&mut numer_bytes);
-    let numer_big_int = num::BigInt::from_bytes_be(
-        num::bigint::Sign::Plus,
-        &numer_bytes,
-    );
+    // Convert I256 to ethcontract::I256 for calculation
+    let numer_str = ratio.numer().to_string();
+    let denom_str = ratio.denom().to_string();
     
-    let mut denom_bytes = [0u8; 32];
-    ratio.denom().to_big_endian(&mut denom_bytes);
-    let denom_big_int = num::BigInt::from_bytes_be(
-        num::bigint::Sign::Plus,
-        &denom_bytes,
-    );
+    let numer_i256 = ethcontract::I256::from_dec_str(&numer_str).ok()?;
+    let denom_i256 = ethcontract::I256::from_dec_str(&denom_str).ok()?;
     
-    let wei_big_int = &numer_big_int * &base / &denom_big_int;
+    // Calculate wei value: (numer * base) / denom
+    let wei_i256 = numer_i256.checked_mul(base)?.checked_div(denom_i256)?;
     
-    // Convert BigInt to I256 string representation and parse
-    let wei_str = wei_big_int.to_string();
-    let wei_i256 = ethcontract::I256::from_dec_str(&wei_str).ok()?;
     Some(SBfp::from_wei(wei_i256))
 }

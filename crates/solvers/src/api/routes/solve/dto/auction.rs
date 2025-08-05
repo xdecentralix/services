@@ -309,30 +309,31 @@ mod gyro_e_pool {
                 version: match pool.version {
                     GyroEVersion::V1 => liquidity::gyro_e::Version::V1,
                 },
-                // Convert all Gyro E-CLP static parameters from BigDecimal to Rational
-                params_alpha: conv::decimal_to_rational(&pool.params_alpha)
+                // Convert all Gyro E-CLP static parameters from BigDecimal to SignedRational
+                // These parameters can be negative, so we use the new signed conversion function
+                params_alpha: conv::decimal_to_signed_rational(&pool.params_alpha)
                     .ok_or("invalid params_alpha")?,
-                params_beta: conv::decimal_to_rational(&pool.params_beta)
+                params_beta: conv::decimal_to_signed_rational(&pool.params_beta)
                     .ok_or("invalid params_beta")?,
-                params_c: conv::decimal_to_rational(&pool.params_c)
+                params_c: conv::decimal_to_signed_rational(&pool.params_c)
                     .ok_or("invalid params_c")?,
-                params_s: conv::decimal_to_rational(&pool.params_s)
+                params_s: conv::decimal_to_signed_rational(&pool.params_s)
                     .ok_or("invalid params_s")?,
-                params_lambda: conv::decimal_to_rational(&pool.params_lambda)
+                params_lambda: conv::decimal_to_signed_rational(&pool.params_lambda)
                     .ok_or("invalid params_lambda")?,
-                tau_alpha_x: conv::decimal_to_rational(&pool.tau_alpha_x)
+                tau_alpha_x: conv::decimal_to_signed_rational(&pool.tau_alpha_x)
                     .ok_or("invalid tau_alpha_x")?,
-                tau_alpha_y: conv::decimal_to_rational(&pool.tau_alpha_y)
+                tau_alpha_y: conv::decimal_to_signed_rational(&pool.tau_alpha_y)
                     .ok_or("invalid tau_alpha_y")?,
-                tau_beta_x: conv::decimal_to_rational(&pool.tau_beta_x)
+                tau_beta_x: conv::decimal_to_signed_rational(&pool.tau_beta_x)
                     .ok_or("invalid tau_beta_x")?,
-                tau_beta_y: conv::decimal_to_rational(&pool.tau_beta_y)
+                tau_beta_y: conv::decimal_to_signed_rational(&pool.tau_beta_y)
                     .ok_or("invalid tau_beta_y")?,
-                u: conv::decimal_to_rational(&pool.u).ok_or("invalid u")?,
-                v: conv::decimal_to_rational(&pool.v).ok_or("invalid v")?,
-                w: conv::decimal_to_rational(&pool.w).ok_or("invalid w")?,
-                z: conv::decimal_to_rational(&pool.z).ok_or("invalid z")?,
-                d_sq: conv::decimal_to_rational(&pool.d_sq).ok_or("invalid d_sq")?,
+                u: conv::decimal_to_signed_rational(&pool.u).ok_or("invalid u")?,
+                v: conv::decimal_to_signed_rational(&pool.v).ok_or("invalid v")?,
+                w: conv::decimal_to_signed_rational(&pool.w).ok_or("invalid w")?,
+                z: conv::decimal_to_signed_rational(&pool.z).ok_or("invalid z")?,
+                d_sq: conv::decimal_to_signed_rational(&pool.d_sq).ok_or("invalid d_sq")?,
             }),
         })
     }
