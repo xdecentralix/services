@@ -24,7 +24,7 @@ use {
             stable,
             weighted,
         },
-        swap::fixed_point::Bfp,
+        swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     },
     crate::{
         ethrpc::{Web3, Web3Transport},
@@ -133,6 +133,21 @@ pub struct GyroEPool {
     pub common: CommonPoolState,
     pub reserves: BTreeMap<H160, TokenState>,
     pub version: GyroEPoolVersion,
+    // Gyro E-CLP static parameters (immutable after pool creation)
+    pub params_alpha: SBfp,
+    pub params_beta: SBfp,
+    pub params_c: SBfp,
+    pub params_s: SBfp,
+    pub params_lambda: SBfp,
+    pub tau_alpha_x: SBfp,
+    pub tau_alpha_y: SBfp,
+    pub tau_beta_x: SBfp,
+    pub tau_beta_y: SBfp,
+    pub u: SBfp,
+    pub v: SBfp,
+    pub w: SBfp,
+    pub z: SBfp,
+    pub d_sq: SBfp,
 }
 
 impl GyroEPool {
@@ -146,6 +161,21 @@ impl GyroEPool {
             },
             reserves: gyro_e_state.tokens.into_iter().collect(),
             version: gyro_e_state.version,
+            // Static parameters from PoolState
+            params_alpha: gyro_e_state.params_alpha,
+            params_beta: gyro_e_state.params_beta,
+            params_c: gyro_e_state.params_c,
+            params_s: gyro_e_state.params_s,
+            params_lambda: gyro_e_state.params_lambda,
+            tau_alpha_x: gyro_e_state.tau_alpha_x,
+            tau_alpha_y: gyro_e_state.tau_alpha_y,
+            tau_beta_x: gyro_e_state.tau_beta_x,
+            tau_beta_y: gyro_e_state.tau_beta_y,
+            u: gyro_e_state.u,
+            v: gyro_e_state.v,
+            w: gyro_e_state.w,
+            z: gyro_e_state.z,
+            d_sq: gyro_e_state.d_sq,
         }
     }
 }

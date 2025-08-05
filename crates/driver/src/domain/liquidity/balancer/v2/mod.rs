@@ -3,6 +3,7 @@ use {
     derive_more::{From, Into},
 };
 
+pub mod gyro_e;
 pub mod stable;
 pub mod weighted;
 

@@ -166,6 +166,7 @@ pub enum Liquidity {
     WeightedProduct(WeightedProductPool),
     Stable(StablePool),
     ConcentratedLiquidity(ConcentratedLiquidityPool),
+    GyroE(GyroEPool),
     LimitOrder(ForeignLimitOrder),
 }
 
@@ -282,6 +283,50 @@ pub struct ForeignLimitOrder {
     pub taker_amount: U256,
     #[serde_as(as = "HexOrDecimalU256")]
     pub taker_token_fee_amount: U256,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GyroEPool {
+    pub id: String,
+    pub address: H160,
+    pub balancer_pool_id: H256,
+    #[serde_as(as = "HexOrDecimalU256")]
+    pub gas_estimate: U256,
+    pub tokens: HashMap<H160, GyroEReserve>,
+    pub fee: BigDecimal,
+    pub version: GyroEVersion,
+    // Gyroscope E-CLP static parameters (immutable after pool creation)
+    pub params_alpha: BigDecimal,
+    pub params_beta: BigDecimal,
+    pub params_c: BigDecimal,
+    pub params_s: BigDecimal,
+    pub params_lambda: BigDecimal,
+    pub tau_alpha_x: BigDecimal,
+    pub tau_alpha_y: BigDecimal,
+    pub tau_beta_x: BigDecimal,
+    pub tau_beta_y: BigDecimal,
+    pub u: BigDecimal,
+    pub v: BigDecimal,
+    pub w: BigDecimal,
+    pub z: BigDecimal,
+    pub d_sq: BigDecimal,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GyroEReserve {
+    #[serde_as(as = "HexOrDecimalU256")]
+    pub balance: U256,
+    pub scaling_factor: BigDecimal,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GyroEVersion {
+    V1,
 }
 
 #[serde_as]

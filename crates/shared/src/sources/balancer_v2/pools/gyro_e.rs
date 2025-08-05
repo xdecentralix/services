@@ -37,6 +37,21 @@ pub struct PoolState {
     pub tokens: BTreeMap<H160, common::TokenState>,
     pub swap_fee: Bfp,
     pub version: Version,
+    // Gyro E-CLP static parameters (included in PoolState for easier access)
+    pub params_alpha: SBfp,
+    pub params_beta: SBfp,
+    pub params_c: SBfp,
+    pub params_s: SBfp,
+    pub params_lambda: SBfp,
+    pub tau_alpha_x: SBfp,
+    pub tau_alpha_y: SBfp,
+    pub tau_beta_x: SBfp,
+    pub tau_beta_y: SBfp,
+    pub u: SBfp,
+    pub v: SBfp,
+    pub w: SBfp,
+    pub z: SBfp,
+    pub d_sq: SBfp,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -146,16 +161,17 @@ impl FactoryIndexing for BalancerV2GyroECLPPoolFactory {
 
     fn fetch_pool_state(
         &self,
-        _: &Self::PoolInfo,
+        pool_info: &Self::PoolInfo,
         common_pool_state: BoxFuture<'static, common::PoolState>,
         _: BlockId,
     ) -> BoxFuture<'static, Result<Option<Self::PoolState>>> {
-        pool_state(Version::V1, common_pool_state)
+        pool_state(Version::V1, pool_info.clone(), common_pool_state)
     }
 }
 
 fn pool_state(
     version: Version,
+    pool_info: PoolInfo,
     common: BoxFuture<'static, common::PoolState>,
 ) -> BoxFuture<'static, Result<Option<PoolState>>> {
     async move {
@@ -170,6 +186,21 @@ fn pool_state(
             tokens,
             swap_fee: common.swap_fee,
             version,
+            // Pass through static parameters from PoolInfo
+            params_alpha: pool_info.params_alpha,
+            params_beta: pool_info.params_beta,
+            params_c: pool_info.params_c,
+            params_s: pool_info.params_s,
+            params_lambda: pool_info.params_lambda,
+            tau_alpha_x: pool_info.tau_alpha_x,
+            tau_alpha_y: pool_info.tau_alpha_y,
+            tau_beta_x: pool_info.tau_beta_x,
+            tau_beta_y: pool_info.tau_beta_y,
+            u: pool_info.u,
+            v: pool_info.v,
+            w: pool_info.w,
+            z: pool_info.z,
+            d_sq: pool_info.d_sq,
         }))
     }
     .boxed()

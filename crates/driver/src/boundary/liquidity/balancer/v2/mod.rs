@@ -38,6 +38,7 @@ use {
     std::sync::Arc,
 };
 
+pub mod gyro_e;
 pub mod stable;
 pub mod weighted;
 

@@ -23,11 +23,12 @@ use {
             balancer_v2::{
                 pool_fetching::{
                     AmplificationParameter,
+                    GyroEPoolVersion,
                     TokenState,
                     WeightedPoolVersion,
                     WeightedTokenState,
                 },
-                swap::fixed_point::Bfp,
+                swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
             },
             balancer_v3::{
                 pool_fetching::{
@@ -56,6 +57,7 @@ pub enum Liquidity {
     BalancerV3Weighted(BalancerV3WeightedProductOrder),
     BalancerStable(StablePoolOrder),
     BalancerV3Stable(BalancerV3StablePoolOrder),
+    BalancerGyroE(GyroEPoolOrder),
     LimitOrder(LimitOrder),
     Concentrated(ConcentratedLiquidity),
 }
@@ -367,6 +369,35 @@ pub struct BalancerV3StablePoolOrder {
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
 }
 
+/// Gyroscope E-CLP (Elliptic Constant Liquidity Pool) automated market maker
+/// with elliptic invariant curve and configurable parameters for improved capital efficiency
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
+pub struct GyroEPoolOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, TokenState>,
+    pub fee: Bfp,
+    pub version: GyroEPoolVersion,
+    // Gyro E-CLP static parameters (immutable after pool creation)
+    pub params_alpha: SBfp,
+    pub params_beta: SBfp,
+    pub params_c: SBfp,
+    pub params_s: SBfp,
+    pub params_lambda: SBfp,
+    pub tau_alpha_x: SBfp,
+    pub tau_alpha_y: SBfp,
+    pub tau_beta_x: SBfp,
+    pub tau_beta_y: SBfp,
+    pub u: SBfp,
+    pub v: SBfp,
+    pub w: SBfp,
+    pub z: SBfp,
+    pub d_sq: SBfp,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
 impl std::fmt::Debug for StablePoolOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Stable Pool AMM {:?}", self.reserves.keys())
@@ -376,6 +407,12 @@ impl std::fmt::Debug for StablePoolOrder {
 impl std::fmt::Debug for BalancerV3StablePoolOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Balancer V3 Stable Pool AMM {:?}", self.reserves.keys())
+    }
+}
+
+impl std::fmt::Debug for GyroEPoolOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Gyro E-CLP Pool AMM {:?}", self.reserves.keys())
     }
 }
 
@@ -431,6 +468,14 @@ impl Settleable for StablePoolOrder {
 }
 
 impl Settleable for BalancerV3StablePoolOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for GyroEPoolOrder {
     type Execution = AmmOrderExecution;
 
     fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {

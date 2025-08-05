@@ -52,6 +52,7 @@ pub fn new(
             liquidity::Kind::BalancerV3Stable(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV2Weighted(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3Weighted(pool) => pool.reserves.tokens().collect(),
+            liquidity::Kind::BalancerV2GyroE(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::Swapr(pool) => pool.base.reserves.iter().map(|r| r.token).collect(),
             liquidity::Kind::ZeroEx(limit_order) => {
                 vec![
@@ -336,6 +337,48 @@ pub fn new(
                         },
                     )
                 }
+                liquidity::Kind::BalancerV2GyroE(pool) => {
+                    solvers_dto::auction::Liquidity::GyroE(solvers_dto::auction::GyroEPool {
+                        id: liquidity.id.0.to_string(),
+                        address: pool.id.address().into(),
+                        balancer_pool_id: pool.id.into(),
+                        gas_estimate: liquidity.gas.into(),
+                        tokens: pool
+                            .reserves
+                            .iter()
+                            .map(|r| {
+                                (
+                                    r.asset.token.into(),
+                                    solvers_dto::auction::GyroEReserve {
+                                        balance: r.asset.amount.into(),
+                                        scaling_factor: scaling_factor_to_decimal(r.scale),
+                                    },
+                                )
+                            })
+                            .collect(),
+                        fee: fee_to_decimal(pool.fee),
+                        version: match pool.version {
+                            liquidity::balancer::v2::gyro_e::Version::V1 => {
+                                solvers_dto::auction::GyroEVersion::V1
+                            }
+                        },
+                        // Convert all Gyro E-CLP static parameters to BigDecimal
+                        params_alpha: signed_fixed_point_to_decimal(pool.params_alpha),
+                        params_beta: signed_fixed_point_to_decimal(pool.params_beta),
+                        params_c: signed_fixed_point_to_decimal(pool.params_c),
+                        params_s: signed_fixed_point_to_decimal(pool.params_s),
+                        params_lambda: signed_fixed_point_to_decimal(pool.params_lambda),
+                        tau_alpha_x: signed_fixed_point_to_decimal(pool.tau_alpha_x),
+                        tau_alpha_y: signed_fixed_point_to_decimal(pool.tau_alpha_y),
+                        tau_beta_x: signed_fixed_point_to_decimal(pool.tau_beta_x),
+                        tau_beta_y: signed_fixed_point_to_decimal(pool.tau_beta_y),
+                        u: signed_fixed_point_to_decimal(pool.u),
+                        v: signed_fixed_point_to_decimal(pool.v),
+                        w: signed_fixed_point_to_decimal(pool.w),
+                        z: signed_fixed_point_to_decimal(pool.z),
+                        d_sq: signed_fixed_point_to_decimal(pool.d_sq),
+                    })
+                }
                 liquidity::Kind::Swapr(pool) => solvers_dto::auction::Liquidity::ConstantProduct(
                     solvers_dto::auction::ConstantProductPool {
                         id: liquidity.id.0.to_string(),
@@ -466,4 +509,14 @@ fn scaling_factor_to_decimal_v3(
     scale: liquidity::balancer::v3::ScalingFactor,
 ) -> bigdecimal::BigDecimal {
     bigdecimal::BigDecimal::new(scale.as_raw().to_big_int(), 18)
+}
+
+fn signed_fixed_point_to_decimal(
+    sfp: liquidity::balancer::v2::gyro_e::SignedFixedPoint,
+) -> bigdecimal::BigDecimal {
+    // Convert I256 to BigInt via string representation to handle signed values correctly
+    let i256_str = sfp.as_raw().to_string();
+    let big_int = num::BigInt::parse_bytes(i256_str.as_bytes(), 10)
+        .expect("valid I256 should parse to BigInt");
+    bigdecimal::BigDecimal::new(big_int, 18)
 }

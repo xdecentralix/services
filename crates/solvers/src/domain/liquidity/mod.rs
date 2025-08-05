@@ -2,6 +2,7 @@
 
 pub mod concentrated;
 pub mod constant_product;
+pub mod gyro_e;
 pub mod limit_order;
 pub mod stable;
 pub mod weighted_product;
@@ -28,6 +29,7 @@ pub enum State {
     WeightedProduct(weighted_product::Pool),
     Stable(stable::Pool),
     Concentrated(concentrated::Pool),
+    GyroE(gyro_e::Pool),
     LimitOrder(limit_order::LimitOrder),
 }
 
