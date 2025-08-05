@@ -24,7 +24,7 @@ use {
 
 mod error;
 pub mod fixed_point;
-mod gyro_e_math;
+pub mod gyro_e_math;
 mod math;
 pub mod signed_fixed_point;
 mod stable_math;
