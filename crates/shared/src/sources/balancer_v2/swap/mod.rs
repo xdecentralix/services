@@ -443,7 +443,7 @@ fn converge_in_amount(
 }
 
 impl WeightedPool {
-    fn as_pool_ref(&self) -> WeightedPoolRef {
+    fn as_pool_ref(&self) -> WeightedPoolRef<'_> {
         WeightedPoolRef {
             reserves: &self.reserves,
             swap_fee: self.common.swap_fee,
@@ -467,7 +467,7 @@ impl BaselineSolvable for WeightedPool {
 }
 
 impl StablePool {
-    fn as_pool_ref(&self) -> StablePoolRef {
+    fn as_pool_ref(&self) -> StablePoolRef<'_> {
         StablePoolRef {
             address: self.common.address,
             reserves: &self.reserves,
@@ -755,7 +755,7 @@ impl BaselineSolvable for GyroEPoolRef<'_> {
 }
 
 impl GyroEPool {
-    fn as_pool_ref(&self) -> GyroEPoolRef {
+    fn as_pool_ref(&self) -> GyroEPoolRef<'_> {
         GyroEPoolRef {
             reserves: &self.reserves,
             swap_fee: self.common.swap_fee,
