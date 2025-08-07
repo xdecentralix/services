@@ -11,22 +11,28 @@ use {
             WeightedPool,
             WeightedPoolVersion,
             WeightedTokenState,
+            GyroEPool,
+            GyroEPoolVersion
         },
     },
     error::Error,
     ethcontract::{H160, U256},
+    num::BigInt,
     fixed_point::Bfp,
     std::collections::BTreeMap,
 };
 
 mod error;
 pub mod fixed_point;
+pub mod gyro_e_math;
+pub mod signed_fixed_point;
 mod math;
 mod stable_math;
 mod weighted_math;
 
 const WEIGHTED_SWAP_GAS_COST: usize = 100_000;
 const STABLE_SWAP_GAS_COST: usize = 183_520;
+const GYRO_E_SWAP_GAS_COST: usize = 100_000;
 
 fn add_swap_fee_amount(amount: U256, swap_fee: Bfp) -> Result<U256, Error> {
     // https://github.com/balancer-labs/balancer-v2-monorepo/blob/6c9e24e22d0c46cca6dd15861d3d33da61a60b98/pkg/core/contracts/pools/BasePool.sol#L454-L457
@@ -469,6 +475,300 @@ impl StablePool {
 }
 
 impl BaselineSolvable for StablePool {
+    async fn get_amount_out(&self, out_token: H160, input: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref().get_amount_out(out_token, input).await
+    }
+
+    async fn get_amount_in(&self, in_token: H160, output: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref().get_amount_in(in_token, output).await
+    }
+
+    async fn gas_cost(&self) -> usize {
+        self.as_pool_ref().gas_cost().await
+    }
+}
+
+#[derive(Debug)]
+pub struct GyroEPoolRef<'a> {
+    pub reserves: &'a BTreeMap<H160, TokenState>,
+    pub swap_fee: Bfp,
+    pub version: GyroEPoolVersion,
+    pub params_alpha: signed_fixed_point::SBfp,
+    pub params_beta: signed_fixed_point::SBfp,
+    pub params_c: signed_fixed_point::SBfp,
+    pub params_s: signed_fixed_point::SBfp,
+    pub params_lambda: signed_fixed_point::SBfp,
+    pub tau_alpha_x: signed_fixed_point::SBfp,
+    pub tau_alpha_y: signed_fixed_point::SBfp,
+    pub tau_beta_x: signed_fixed_point::SBfp,
+    pub tau_beta_y: signed_fixed_point::SBfp,
+    pub u: signed_fixed_point::SBfp,
+    pub v: signed_fixed_point::SBfp,
+    pub w: signed_fixed_point::SBfp,
+    pub z: signed_fixed_point::SBfp,
+    pub d_sq: signed_fixed_point::SBfp,
+}
+
+impl GyroEPoolRef<'_> {
+    fn get_amount_out_inner(
+        &self,
+        out_token: H160,
+        in_amount: U256,
+        in_token: H160,
+    ) -> Option<U256> {
+        // Get token reserves
+        let in_reserves = self.reserves.get(&in_token)?;
+        let out_reserves = self.reserves.get(&out_token)?;
+
+        // Apply swap fee to input amount
+        let in_amount_minus_fees = subtract_swap_fee_amount(in_amount, self.swap_fee).ok()?;
+
+        // Determine token order (token0 vs token1)
+        let token_in_is_token0 = in_token < out_token;
+
+        // Convert reserves to the format expected by gyro_e_math
+        let _balances = if token_in_is_token0 {
+            vec![
+                in_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+                out_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+            ]
+        } else {
+            vec![
+                out_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+                in_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+            ]
+        };
+
+        // Convert input amount to BigInt
+        let in_amount_scaled = in_reserves.upscale(in_amount_minus_fees).ok()?;
+        let _amount_in_big_int = in_amount_scaled.as_uint256().to_big_int();
+
+        // Convert SBfp parameters to gyro_e_math format and perform swap calculation
+        let params = gyro_e_math::EclpParams {
+            alpha: self.params_alpha.to_big_int(),
+            beta: self.params_beta.to_big_int(),
+            c: self.params_c.to_big_int(),
+            s: self.params_s.to_big_int(),
+            lambda: self.params_lambda.to_big_int(),
+        };
+
+        let derived = gyro_e_math::DerivedEclpParams {
+            tau_alpha: gyro_e_math::Vector2 {
+                x: self.tau_alpha_x.to_big_int(),
+                y: self.tau_alpha_y.to_big_int(),
+            },
+            tau_beta: gyro_e_math::Vector2 {
+                x: self.tau_beta_x.to_big_int(),
+                y: self.tau_beta_y.to_big_int(),
+            },
+            u: self.u.to_big_int(),
+            v: self.v.to_big_int(),
+            w: self.w.to_big_int(),
+            z: self.z.to_big_int(),
+            d_sq: self.d_sq.to_big_int(),
+        };
+
+        // Calculate the current invariant from pool balances using gyro_e_math
+        let (current_invariant, inv_err) =
+            gyro_e_math::calculate_invariant_with_error(&_balances, &params, &derived).ok()?;
+
+        // Convert to Vector2 format with error bounds (as used in tests and Python
+        // reference)
+        let invariant = gyro_e_math::Vector2::new(
+            &current_invariant + BigInt::from(2) * &inv_err, // x: upper bound
+            current_invariant,                               // y: actual invariant
+        );
+
+        // Call the gyro_e_math function
+        let out_amount_big_int = gyro_e_math::calc_out_given_in(
+            &_balances,
+            &_amount_in_big_int,
+            token_in_is_token0,
+            &params,
+            &derived,
+            &invariant,
+        )
+        .ok()?;
+
+        // Convert BigInt result back to U256 and apply downscaling
+        let out_amount_sbfp = signed_fixed_point::SBfp::from_big_int(&out_amount_big_int).ok()?;
+        // Convert I256 to U256 by extracting bytes (assuming positive result)
+        if out_amount_sbfp.is_negative() {
+            return None; // Cannot handle negative amounts in baseline solver
+        }
+        let mut bytes = [0u8; 32];
+        out_amount_sbfp.as_i256().to_big_endian(&mut bytes);
+        let out_amount_u256 = U256::from_big_endian(&bytes);
+        let out_amount_bfp = Bfp::from_wei(out_amount_u256);
+        let out_amount_downscaled = out_reserves.downscale_down(out_amount_bfp).ok()?;
+
+        Some(out_amount_downscaled)
+    }
+}
+
+impl BaselineSolvable for GyroEPoolRef<'_> {
+    async fn get_amount_out(
+        &self,
+        out_token: H160,
+        (in_amount, in_token): (U256, H160),
+    ) -> Option<U256> {
+        self.get_amount_out_inner(out_token, in_amount, in_token)
+    }
+
+    async fn get_amount_in(
+        &self,
+        in_token: H160,
+        (out_amount, out_token): (U256, H160),
+    ) -> Option<U256> {
+        // Get token reserves for the reverse calculation
+        let in_reserves = self.reserves.get(&in_token)?;
+        let out_reserves = self.reserves.get(&out_token)?;
+
+        // Determine token order
+        let token_in_is_token0 = in_token < out_token;
+
+        // Convert reserves to BigInt format
+        let balances = if token_in_is_token0 {
+            vec![
+                in_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+                out_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+            ]
+        } else {
+            vec![
+                out_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+                in_reserves
+                    .upscaled_balance()
+                    .ok()?
+                    .as_uint256()
+                    .to_big_int(),
+            ]
+        };
+
+        // Scale the output amount
+        let out_amount_scaled = out_reserves.upscale(out_amount).ok()?;
+        let amount_out_big_int = out_amount_scaled.as_uint256().to_big_int();
+
+        // Convert parameters (same as get_amount_out)
+        let params = gyro_e_math::EclpParams {
+            alpha: self.params_alpha.to_big_int(),
+            beta: self.params_beta.to_big_int(),
+            c: self.params_c.to_big_int(),
+            s: self.params_s.to_big_int(),
+            lambda: self.params_lambda.to_big_int(),
+        };
+
+        let derived = gyro_e_math::DerivedEclpParams {
+            tau_alpha: gyro_e_math::Vector2 {
+                x: self.tau_alpha_x.to_big_int(),
+                y: self.tau_alpha_y.to_big_int(),
+            },
+            tau_beta: gyro_e_math::Vector2 {
+                x: self.tau_beta_x.to_big_int(),
+                y: self.tau_beta_y.to_big_int(),
+            },
+            u: self.u.to_big_int(),
+            v: self.v.to_big_int(),
+            w: self.w.to_big_int(),
+            z: self.z.to_big_int(),
+            d_sq: self.d_sq.to_big_int(),
+        };
+
+        // Calculate the current invariant from pool balances using gyro_e_math
+        let (current_invariant, inv_err) =
+            gyro_e_math::calculate_invariant_with_error(&balances, &params, &derived).ok()?;
+
+        // Convert to Vector2 format with error bounds (as used in tests and Python
+        // reference)
+        let invariant = gyro_e_math::Vector2::new(
+            &current_invariant + BigInt::from(2) * &inv_err, // x: upper bound
+            current_invariant,                               // y: actual invariant
+        );
+
+        // Call the gyro_e_math function
+        let in_amount_big_int = gyro_e_math::calc_in_given_out(
+            &balances,
+            &amount_out_big_int,
+            token_in_is_token0,
+            &params,
+            &derived,
+            &invariant,
+        )
+        .ok()?;
+
+        // Convert result back and apply fee
+        let in_amount_sbfp = signed_fixed_point::SBfp::from_big_int(&in_amount_big_int).ok()?;
+        // Convert I256 to U256 by extracting bytes (assuming positive result)
+        if in_amount_sbfp.is_negative() {
+            return None; // Cannot handle negative amounts in baseline solver
+        }
+        let mut bytes = [0u8; 32];
+        in_amount_sbfp.as_i256().to_big_endian(&mut bytes);
+        let in_amount_u256 = U256::from_big_endian(&bytes);
+        let in_amount_bfp = Bfp::from_wei(in_amount_u256);
+        let in_amount_downscaled = in_reserves.downscale_up(in_amount_bfp).ok()?;
+
+        // Apply swap fee to get final amount
+        add_swap_fee_amount(in_amount_downscaled, self.swap_fee).ok()
+    }
+
+    async fn gas_cost(&self) -> usize {
+        GYRO_E_SWAP_GAS_COST
+    }
+}
+
+impl GyroEPool {
+    fn as_pool_ref(&self) -> GyroEPoolRef {
+        GyroEPoolRef {
+            reserves: &self.reserves,
+            swap_fee: self.common.swap_fee,
+            version: self.version,
+            params_alpha: self.params_alpha,
+            params_beta: self.params_beta,
+            params_c: self.params_c,
+            params_s: self.params_s,
+            params_lambda: self.params_lambda,
+            tau_alpha_x: self.tau_alpha_x,
+            tau_alpha_y: self.tau_alpha_y,
+            tau_beta_x: self.tau_beta_x,
+            tau_beta_y: self.tau_beta_y,
+            u: self.u,
+            v: self.v,
+            w: self.w,
+            z: self.z,
+            d_sq: self.d_sq,
+        }
+    }
+}
+
+impl BaselineSolvable for GyroEPool {
     async fn get_amount_out(&self, out_token: H160, input: (U256, H160)) -> Option<U256> {
         self.as_pool_ref().get_amount_out(out_token, input).await
     }

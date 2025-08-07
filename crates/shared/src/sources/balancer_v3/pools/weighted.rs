@@ -157,6 +157,20 @@ mod tests {
             ],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 0,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
 
         assert_eq!(
@@ -203,6 +217,20 @@ mod tests {
             ],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 0,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
 
         assert!(PoolInfo::from_graph_data(&pool, 42).is_err());

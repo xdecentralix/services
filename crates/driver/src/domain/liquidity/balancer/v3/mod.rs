@@ -5,6 +5,7 @@ use {
 
 pub mod stable;
 pub mod weighted;
+pub mod gyro_e;
 
 /// A Balancer V3 pool ID.
 ///

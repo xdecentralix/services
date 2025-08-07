@@ -37,8 +37,11 @@ use {
                     StableTokenState as V3StableTokenState,
                     WeightedPoolVersion as V3WeightedPoolVersion,
                     WeightedTokenState as V3WeightedTokenState,
+                    GyroEPoolVersion as V3GyroEPoolVersion,
+                    TokenState as V3TokenState,
                 },
                 swap::fixed_point::Bfp as V3Bfp,
+                swap::signed_fixed_point::SBfp as V3SBfp,
             },
             uniswap_v2::pool_fetching::Pool,
             uniswap_v3::pool_fetching::PoolInfo,
@@ -58,6 +61,7 @@ pub enum Liquidity {
     BalancerStable(StablePoolOrder),
     BalancerV3Stable(BalancerV3StablePoolOrder),
     BalancerGyroE(GyroEPoolOrder),
+    BalancerV3GyroE(BalancerV3GyroEOrder),
     LimitOrder(LimitOrder),
     Concentrated(ConcentratedLiquidity),
 }
@@ -399,6 +403,33 @@ pub struct GyroEPoolOrder {
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
 }
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
+pub struct BalancerV3GyroEOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, V3TokenState>,
+    pub fee: V3Bfp,
+    pub version: V3GyroEPoolVersion,
+    pub params_alpha: V3SBfp,
+    pub params_beta: V3SBfp,
+    pub params_c: V3SBfp,
+    pub params_s: V3SBfp,
+    pub params_lambda: V3SBfp,
+    pub tau_alpha_x: V3SBfp,
+    pub tau_alpha_y: V3SBfp,
+    pub tau_beta_x: V3SBfp,
+    pub tau_beta_y: V3SBfp,
+    pub u: V3SBfp,
+    pub v: V3SBfp,
+    pub w: V3SBfp,
+    pub z: V3SBfp,
+    pub d_sq: V3SBfp,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
+
 impl std::fmt::Debug for StablePoolOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Stable Pool AMM {:?}", self.reserves.keys())
@@ -414,6 +445,12 @@ impl std::fmt::Debug for BalancerV3StablePoolOrder {
 impl std::fmt::Debug for GyroEPoolOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Gyro E-CLP Pool AMM {:?}", self.reserves.keys())
+    }
+}
+
+impl std::fmt::Debug for BalancerV3GyroEOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Balancer V3 Gyro E-CLP Pool AMM {:?}", self.reserves.keys())
     }
 }
 
@@ -477,6 +514,14 @@ impl Settleable for BalancerV3StablePoolOrder {
 }
 
 impl Settleable for GyroEPoolOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for BalancerV3GyroEOrder {
     type Execution = AmmOrderExecution;
 
     fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {

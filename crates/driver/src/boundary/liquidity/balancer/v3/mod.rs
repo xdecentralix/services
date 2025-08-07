@@ -15,6 +15,7 @@ use {
         BalancerV3StablePoolFactoryV2,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
+        BalancerV3GyroECLPPoolFactory,
         GPv2Settlement,
     },
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
@@ -38,6 +39,7 @@ use {
 
 pub mod stable;
 pub mod weighted;
+pub mod gyro_e;
 
 /// Maps a Chain to the corresponding GqlChain for Balancer V3 API.
 fn chain_to_gql_chain(chain: &Chain) -> GqlChain {
@@ -161,6 +163,16 @@ async fn init_liquidity(
                     (
                         BalancerFactoryKind::StableV2,
                         BalancerV3StablePoolFactoryV2::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            config
+                .gyro_e
+                .iter()
+                .map(|&factory| {
+                    (BalancerFactoryKind::GyroE, BalancerV3GyroECLPPoolFactory::at(&web3, factory.into())
                             .raw_instance()
                             .clone(),
                     )

@@ -713,6 +713,11 @@ mod tests {
                         // This is just to handle the exhaustive pattern
                         // matching
                     }
+                    PoolKind::GyroE(_) => {
+                        // GyroE pools are not tested in this specific test
+                        // This is just to handle the exhaustive pattern
+                        // matching
+                    }
                 }
             }
             _ => panic!("expected active pool"),
@@ -986,6 +991,20 @@ mod tests {
             ],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 1234567890,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
 
         let pool_info = PoolInfo::from_graph_data(&pool, 42).unwrap();
@@ -1017,6 +1036,20 @@ mod tests {
             }],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 1234567890,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
 
         let result = PoolInfo::from_graph_data(&pool, 42);
@@ -1048,6 +1081,20 @@ mod tests {
             ],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 1234567890,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
 
         let result = PoolInfo::from_graph_data(&pool, 42);
