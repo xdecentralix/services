@@ -8,9 +8,9 @@ use {
         },
         liquidity::{
             AmmOrderExecution,
+            BalancerV3GyroEOrder,
             BalancerV3StablePoolOrder,
             BalancerV3WeightedProductOrder,
-            BalancerV3GyroEOrder,
             Liquidity,
             SettlementHandling,
         },

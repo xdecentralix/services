@@ -33,15 +33,14 @@ use {
             balancer_v3::{
                 pool_fetching::{
                     AmplificationParameter as V3AmplificationParameter,
+                    GyroEPoolVersion as V3GyroEPoolVersion,
                     StablePoolVersion as V3StablePoolVersion,
                     StableTokenState as V3StableTokenState,
+                    TokenState as V3TokenState,
                     WeightedPoolVersion as V3WeightedPoolVersion,
                     WeightedTokenState as V3WeightedTokenState,
-                    GyroEPoolVersion as V3GyroEPoolVersion,
-                    TokenState as V3TokenState,
                 },
-                swap::fixed_point::Bfp as V3Bfp,
-                swap::signed_fixed_point::SBfp as V3SBfp,
+                swap::{fixed_point::Bfp as V3Bfp, signed_fixed_point::SBfp as V3SBfp},
             },
             uniswap_v2::pool_fetching::Pool,
             uniswap_v3::pool_fetching::PoolInfo,
@@ -429,7 +428,6 @@ pub struct BalancerV3GyroEOrder {
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
 }
 
-
 impl std::fmt::Debug for StablePoolOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Stable Pool AMM {:?}", self.reserves.keys())
@@ -450,7 +448,11 @@ impl std::fmt::Debug for GyroEPoolOrder {
 
 impl std::fmt::Debug for BalancerV3GyroEOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Balancer V3 Gyro E-CLP Pool AMM {:?}", self.reserves.keys())
+        write!(
+            f,
+            "Balancer V3 Gyro E-CLP Pool AMM {:?}",
+            self.reserves.keys()
+        )
     }
 }
 

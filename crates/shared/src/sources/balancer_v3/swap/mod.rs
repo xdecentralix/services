@@ -6,27 +6,27 @@ use {
         conversions::U256Ext,
         sources::balancer_v3::pool_fetching::{
             AmplificationParameter,
+            GyroEPool,
+            GyroEPoolVersion,
             StablePool,
             TokenState,
             WeightedPool,
             WeightedPoolVersion,
             WeightedTokenState,
-            GyroEPool,
-            GyroEPoolVersion
         },
     },
     error::Error,
     ethcontract::{H160, U256},
-    num::BigInt,
     fixed_point::Bfp,
+    num::BigInt,
     std::collections::BTreeMap,
 };
 
 mod error;
 pub mod fixed_point;
 pub mod gyro_e_math;
-pub mod signed_fixed_point;
 mod math;
+pub mod signed_fixed_point;
 mod stable_math;
 mod weighted_math;
 

@@ -8,9 +8,9 @@
 //! pool types by just implementing the required `BalancerV3Factory` trait.
 
 pub mod common;
+pub mod gyro_e;
 pub mod stable;
 pub mod weighted;
-pub mod gyro_e;
 
 use {
     super::graph_api::PoolData,

@@ -393,7 +393,7 @@ pub fn new(
                             .reserves
                             .iter()
                             .map(|r| {
-                                ( 
+                                (
                                     r.asset.token.into(),
                                     solvers_dto::auction::GyroEReserve {
                                         balance: r.asset.amount.into(),

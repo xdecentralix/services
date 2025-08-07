@@ -11,11 +11,11 @@ use {
     chain::Chain,
     contracts::{
         BalancerV3BatchRouter,
+        BalancerV3GyroECLPPoolFactory,
         BalancerV3StablePoolFactory,
         BalancerV3StablePoolFactoryV2,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
-        BalancerV3GyroECLPPoolFactory,
         GPv2Settlement,
     },
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
@@ -37,9 +37,9 @@ use {
     std::sync::Arc,
 };
 
+pub mod gyro_e;
 pub mod stable;
 pub mod weighted;
-pub mod gyro_e;
 
 /// Maps a Chain to the corresponding GqlChain for Balancer V3 API.
 fn chain_to_gql_chain(chain: &Chain) -> GqlChain {
@@ -172,7 +172,9 @@ async fn init_liquidity(
                 .gyro_e
                 .iter()
                 .map(|&factory| {
-                    (BalancerFactoryKind::GyroE, BalancerV3GyroECLPPoolFactory::at(&web3, factory.into())
+                    (
+                        BalancerFactoryKind::GyroE,
+                        BalancerV3GyroECLPPoolFactory::at(&web3, factory.into())
                             .raw_instance()
                             .clone(),
                     )

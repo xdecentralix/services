@@ -165,8 +165,10 @@ impl<Factory> PoolInfoFetcher<Factory> {
 
             let (token_addresses, balances, _) = balances;
             {
-                let graph_set: std::collections::BTreeSet<_> = pool.tokens.iter().copied().collect();
-                let vault_set: std::collections::BTreeSet<_> = token_addresses.iter().copied().collect();
+                let graph_set: std::collections::BTreeSet<_> =
+                    pool.tokens.iter().copied().collect();
+                let vault_set: std::collections::BTreeSet<_> =
+                    token_addresses.iter().copied().collect();
                 ensure!(graph_set == vault_set, "pool token mismatch");
             }
 
@@ -183,7 +185,9 @@ impl<Factory> PoolInfoFetcher<Factory> {
 
             let tokens = itertools::izip!(&token_addresses, balances)
                 .map(|(&address, balance)| {
-                    let scaling_factor = *scaling_by_addr.get(&address).expect("missing scaling factor");
+                    let scaling_factor = *scaling_by_addr
+                        .get(&address)
+                        .expect("missing scaling factor");
                     let rate = *rate_by_addr.get(&address).expect("missing rate");
                     (
                         address,

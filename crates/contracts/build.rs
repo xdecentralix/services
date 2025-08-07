@@ -1324,7 +1324,6 @@ fn main() {
             )
     });
 
-
     generate_contract("BalancerV3WeightedPool");
     generate_contract("BalancerV3StablePool");
     generate_contract("BalancerV3GyroECLPPool");

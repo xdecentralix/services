@@ -175,21 +175,21 @@ impl<Factory> PoolInfoFetcher<Factory> {
                     .map(|(&addr, &sf)| (addr, sf))
                     .collect();
 
-                    let tokens = itertools::izip!(&tokens, balances, token_rates)
-                    .map(|(&address, balance, rate)| {
-                        let scaling_factor = *scaling_by_addr
-                            .get(&address)
-                            .expect("missing scaling factor for address");
-                        (
-                            address,
-                            TokenState {
-                                balance,
-                                scaling_factor,
-                                rate,
-                            },
-                        )
-                    })
-                    .collect();
+            let tokens = itertools::izip!(&tokens, balances, token_rates)
+                .map(|(&address, balance, rate)| {
+                    let scaling_factor = *scaling_by_addr
+                        .get(&address)
+                        .expect("missing scaling factor for address");
+                    (
+                        address,
+                        TokenState {
+                            balance,
+                            scaling_factor,
+                            rate,
+                        },
+                    )
+                })
+                .collect();
 
             Ok(PoolState {
                 paused,

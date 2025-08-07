@@ -35,9 +35,9 @@ use {
     clap::ValueEnum,
     contracts::{
         BalancerV3BatchRouter,
+        BalancerV3GyroECLPPoolFactory,
         BalancerV3StablePoolFactory,
         BalancerV3StablePoolFactoryV2,
-        BalancerV3GyroECLPPoolFactory,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
     },
@@ -52,12 +52,12 @@ use {
 };
 pub use {
     common::TokenState,
+    gyro_e::Version as GyroEPoolVersion,
     stable::{
         AmplificationParameter,
         TokenState as StableTokenState,
         Version as StablePoolVersion,
     },
-    gyro_e::Version as GyroEPoolVersion,
     weighted::{TokenState as WeightedTokenState, Version as WeightedPoolVersion},
 };
 
