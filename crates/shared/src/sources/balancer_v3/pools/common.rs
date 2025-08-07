@@ -170,18 +170,26 @@ impl<Factory> PoolInfoFetcher<Factory> {
                 token_rates.len()
             );
 
-            let tokens = itertools::izip!(&tokens, balances, &pool.scaling_factors, token_rates)
-                .map(|(&address, balance, &scaling_factor, rate)| {
-                    (
-                        address,
-                        TokenState {
-                            balance,
-                            scaling_factor,
-                            rate,
-                        },
-                    )
-                })
-                .collect();
+            let scaling_by_addr: std::collections::BTreeMap<ethcontract::H160, Bfp> =
+                itertools::izip!(&pool.tokens, &pool.scaling_factors)
+                    .map(|(&addr, &sf)| (addr, sf))
+                    .collect();
+
+                    let tokens = itertools::izip!(&tokens, balances, token_rates)
+                    .map(|(&address, balance, rate)| {
+                        let scaling_factor = *scaling_by_addr
+                            .get(&address)
+                            .expect("missing scaling factor for address");
+                        (
+                            address,
+                            TokenState {
+                                balance,
+                                scaling_factor,
+                                rate,
+                            },
+                        )
+                    })
+                    .collect();
 
             Ok(PoolState {
                 paused,
