@@ -599,15 +599,7 @@ pub fn calc_invariant_sqrt(
     let term2 = calc_2_atx_aty_a_chix_a_chiy(x, y, params, derived)?;
     let term3 = calc_min_aty_a_chix_sq_plus_aty_sq(x, y, params, derived)?;
 
-    eprintln!("Debug: DEBUG calc_invariant_sqrt terms:");
-    eprintln!("   term1 (calc_min_atx_a_chiy_sq_plus_atx_sq): {}", term1);
-    eprintln!("   term2 (calc_2_atx_aty_a_chix_a_chiy): {}", term2);
-    eprintln!("   term3 (calc_min_aty_a_chix_sq_plus_aty_sq): {}", term3);
-
     let val = SignedFixedPoint::add(&SignedFixedPoint::add(&term1, &term2)?, &term3)?;
-
-    eprintln!("   sum (val): {}", val);
-    eprintln!("   val > 0: {}", val > BigInt::from(0));
 
     let err = SignedFixedPoint::div_down_mag_u(
         &SignedFixedPoint::add(
@@ -618,10 +610,8 @@ pub fn calc_invariant_sqrt(
     )?;
 
     let sqrt_val = if val > BigInt::from(0) {
-        eprintln!("   Taking sqrt of: {}", val);
         gyro_pool_math_sqrt(&val, 5)?
     } else {
-        eprintln!("   Val <= 0, returning 0");
         BigInt::from(0)
     };
 
