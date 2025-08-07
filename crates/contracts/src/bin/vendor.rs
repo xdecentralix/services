@@ -151,6 +151,10 @@ fn run() -> Result<()> {
         .github(
             "BalancerV3StablePoolFactoryV2",
             "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/tasks/20250324-v3-stable-pool-v2/artifact/StablePoolFactory.json",
+        )?
+        .github(
+            "BalancerV3GyroECLPPoolFactory",
+            "balancer/balancer-deployments/7a16f4463fb33d5f8c63118b6427b73fdb727cfc/v3/tasks/20250124-v3-gyro-eclp/artifact/GyroECLPPoolFactory.json",
         )?;
 
     // Balancer V3 contracts - ABI Only
@@ -163,6 +167,10 @@ fn run() -> Result<()> {
         .github(
             "BalancerV3StablePool",
             "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/deprecated/20241205-v3-stable-pool/artifact/StablePool.json",
+        )?
+        .github(
+            "BalancerV3GyroECLPPool",
+            "balancer/balancer-deployments/7a16f4463fb33d5f8c63118b6427b73fdb727cfc/v3/tasks/20250124-v3-gyro-eclp/artifact/GyroECLPPool.json",
         )?;
 
     // CowSwap contracts - Full

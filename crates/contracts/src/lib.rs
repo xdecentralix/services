@@ -79,6 +79,8 @@ include_contracts! {
     BalancerV3StablePool;
     BalancerV3StablePoolFactory;
     BalancerV3StablePoolFactoryV2;
+    BalancerV3GyroECLPPool;
+    BalancerV3GyroECLPPoolFactory;
     BaoswapRouter;
     CowAmm;
     CowAmmConstantProductFactory;
