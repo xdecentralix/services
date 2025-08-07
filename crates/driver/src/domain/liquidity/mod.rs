@@ -51,6 +51,8 @@ pub enum Kind {
     BalancerV3Stable(balancer::v3::stable::Pool),
     BalancerV2Weighted(balancer::v2::weighted::Pool),
     BalancerV3Weighted(balancer::v3::weighted::Pool),
+    BalancerV2GyroE(balancer::v2::gyro_e::Pool),
+    BalancerV3GyroE(balancer::v3::gyro_e::Pool),
     Swapr(swapr::Pool),
     ZeroEx(zeroex::LimitOrder),
 }
@@ -64,6 +66,8 @@ impl From<&Kind> for &'static str {
             Kind::BalancerV3Stable(_) => "BalancerV3Stable",
             Kind::BalancerV2Weighted(_) => "BalancerV2Weighted",
             Kind::BalancerV3Weighted(_) => "BalancerV3Weighted",
+            Kind::BalancerV2GyroE(_) => "BalancerV2GyroE",
+            Kind::BalancerV3GyroE(_) => "BalancerV3GyroE",
             Kind::Swapr(_) => "Swapr",
             Kind::ZeroEx(_) => "ZeroExLimitOrder",
         }

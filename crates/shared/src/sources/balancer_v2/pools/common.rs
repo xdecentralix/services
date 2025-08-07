@@ -164,9 +164,31 @@ impl<Factory> PoolInfoFetcher<Factory> {
             let swap_fee = Bfp::from_wei(swap_fee);
 
             let (token_addresses, balances, _) = balances;
-            ensure!(pool.tokens == token_addresses, "pool token mismatch");
-            let tokens = itertools::izip!(&pool.tokens, balances, &pool.scaling_factors, &rates)
-                .map(|(&address, balance, &scaling_factor, &rate)| {
+            {
+                let graph_set: std::collections::BTreeSet<_> =
+                    pool.tokens.iter().copied().collect();
+                let vault_set: std::collections::BTreeSet<_> =
+                    token_addresses.iter().copied().collect();
+                ensure!(graph_set == vault_set, "pool token mismatch");
+            }
+
+            // Reindex scaling factors and rates by address
+            let scaling_by_addr: std::collections::BTreeMap<ethcontract::H160, Bfp> =
+                itertools::izip!(&pool.tokens, &pool.scaling_factors)
+                    .map(|(&addr, &sf)| (addr, sf))
+                    .collect();
+
+            let rate_by_addr: std::collections::BTreeMap<ethcontract::H160, ethcontract::U256> =
+                itertools::izip!(&pool.tokens, &rates)
+                    .map(|(&addr, &r)| (addr, r))
+                    .collect();
+
+            let tokens = itertools::izip!(&token_addresses, balances)
+                .map(|(&address, balance)| {
+                    let scaling_factor = *scaling_by_addr
+                        .get(&address)
+                        .expect("missing scaling factor");
+                    let rate = *rate_by_addr.get(&address).expect("missing rate");
                     (
                         address,
                         TokenState {
@@ -853,6 +875,20 @@ mod tests {
             ],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 0,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
 
         assert_eq!(
@@ -885,6 +921,20 @@ mod tests {
             }],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 0,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
         assert!(PoolInfo::from_graph_data(&pool, 42).is_err());
     }
@@ -914,6 +964,20 @@ mod tests {
             ],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 0,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
         assert!(PoolInfo::from_graph_data(&pool, 42).is_err());
     }

@@ -647,6 +647,10 @@ enum BalancerV2Config {
         #[serde(default)]
         composable_stable: Vec<eth::H160>,
 
+        /// The GyroE pool factory contract addresses.
+        #[serde(default)]
+        gyro_e: Vec<eth::H160>,
+
         /// Deny listed Balancer V2 pools.
         #[serde(default)]
         pool_deny_list: Vec<eth::H256>,
@@ -706,6 +710,10 @@ enum BalancerV3Config {
         /// The stable pool factory v2 contract addresses.
         #[serde(default)]
         stable_v2: Vec<eth::H160>,
+
+        /// The GyroE pool factory contract addresses.
+        #[serde(default)]
+        gyro_e: Vec<eth::H160>,
 
         /// Deny listed Balancer V3 pools.
         #[serde(default)]

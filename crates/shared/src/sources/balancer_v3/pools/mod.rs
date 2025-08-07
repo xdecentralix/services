@@ -8,6 +8,7 @@
 //! pool types by just implementing the required `BalancerV3Factory` trait.
 
 pub mod common;
+pub mod gyro_e;
 pub mod stable;
 pub mod weighted;
 
@@ -32,6 +33,7 @@ pub struct Pool {
 pub enum PoolKind {
     Weighted(weighted::PoolState),
     Stable(stable::PoolState),
+    GyroE(gyro_e::PoolState),
 }
 
 macro_rules! impl_from_state {
@@ -46,6 +48,7 @@ macro_rules! impl_from_state {
 
 impl_from_state!(weighted::PoolState, Weighted);
 impl_from_state!(stable::PoolState, Stable);
+impl_from_state!(gyro_e::PoolState, GyroE);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Balancer V3 pool status.

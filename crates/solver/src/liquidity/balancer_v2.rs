@@ -8,6 +8,7 @@ use {
         },
         liquidity::{
             AmmOrderExecution,
+            GyroEPoolOrder,
             Liquidity,
             SettlementHandling,
             StablePoolOrder,
@@ -58,7 +59,11 @@ impl BalancerV2Liquidity {
         &self,
         pairs: HashSet<TokenPair>,
         block: Block,
-    ) -> Result<(Vec<StablePoolOrder>, Vec<WeightedProductOrder>)> {
+    ) -> Result<(
+        Vec<StablePoolOrder>,
+        Vec<WeightedProductOrder>,
+        Vec<GyroEPoolOrder>,
+    )> {
         let pools = self.pool_fetcher.fetch(pairs, block).await?;
 
         let tokens = pools.relevant_tokens();
@@ -103,7 +108,41 @@ impl BalancerV2Liquidity {
             })
             .collect();
 
-        Ok((stable_pool_orders, weighted_product_orders))
+        let gyro_e_pool_orders: Vec<_> = pools
+            .gyro_e_pools
+            .into_iter()
+            .map(|pool| GyroEPoolOrder {
+                address: pool.common.address,
+                reserves: pool.reserves,
+                fee: pool.common.swap_fee,
+                version: pool.version,
+                // Static parameters from GyroEPool
+                params_alpha: pool.params_alpha,
+                params_beta: pool.params_beta,
+                params_c: pool.params_c,
+                params_s: pool.params_s,
+                params_lambda: pool.params_lambda,
+                tau_alpha_x: pool.tau_alpha_x,
+                tau_alpha_y: pool.tau_alpha_y,
+                tau_beta_x: pool.tau_beta_x,
+                tau_beta_y: pool.tau_beta_y,
+                u: pool.u,
+                v: pool.v,
+                w: pool.w,
+                z: pool.z,
+                d_sq: pool.d_sq,
+                settlement_handling: Arc::new(SettlementHandler {
+                    pool_id: pool.common.id,
+                    inner: inner.clone(),
+                }),
+            })
+            .collect();
+
+        Ok((
+            stable_pool_orders,
+            weighted_product_orders,
+            gyro_e_pool_orders,
+        ))
     }
 }
 
@@ -117,11 +156,12 @@ impl LiquidityCollecting for BalancerV2Liquidity {
         pairs: HashSet<TokenPair>,
         block: Block,
     ) -> Result<Vec<Liquidity>> {
-        let (stable, weighted) = self.get_orders(pairs, block).await?;
+        let (stable, weighted, gyro_e) = self.get_orders(pairs, block).await?;
         let liquidity = stable
             .into_iter()
             .map(Liquidity::BalancerStable)
             .chain(weighted.into_iter().map(Liquidity::BalancerWeighted))
+            .chain(gyro_e.into_iter().map(Liquidity::BalancerGyroE))
             .collect();
         Ok(liquidity)
     }
@@ -193,6 +233,16 @@ impl SettlementHandling<WeightedProductOrder> for SettlementHandler {
 }
 
 impl SettlementHandling<StablePoolOrder> for SettlementHandler {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn encode(&self, execution: AmmOrderExecution, encoder: &mut SettlementEncoder) -> Result<()> {
+        self.inner_encode(execution, encoder)
+    }
+}
+
+impl SettlementHandling<GyroEPoolOrder> for SettlementHandler {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -384,6 +434,7 @@ mod tests {
                     Ok(FetchedBalancerPools {
                         stable_pools: stable_pools.clone(),
                         weighted_pools: weighted_pools.clone(),
+                        gyro_e_pools: vec![],
                     })
                 }
             });
@@ -417,13 +468,14 @@ mod tests {
             pool_fetcher: Arc::new(pool_fetcher),
             allowance_manager: Box::new(allowance_manager),
         };
-        let (stable_orders, weighted_orders) = liquidity_provider
+        let (stable_orders, weighted_orders, gyro_e_orders) = liquidity_provider
             .get_orders(pairs, Block::Recent)
             .await
             .unwrap();
 
         assert_eq!(weighted_orders.len(), 2);
         assert_eq!(stable_orders.len(), 1);
+        assert_eq!(gyro_e_orders.len(), 0); // No Gyro E pools in this test
 
         assert_eq!(
             (

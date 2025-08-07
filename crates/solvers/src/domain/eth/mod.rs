@@ -1,5 +1,5 @@
 pub use ethereum_types::{H160, H256, U256};
-use {crate::util::bytes::Bytes, derive_more::From, web3::types::AccessList};
+use {crate::util::bytes::Bytes, derive_more::From, ethcontract::I256, web3::types::AccessList};
 
 /// A contract address.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -65,6 +65,10 @@ impl std::ops::Add<SignedGas> for Gas {
 
 /// A 256-bit rational type.
 pub type Rational = num::rational::Ratio<U256>;
+
+/// A 256-bit signed rational type for parameters that can be negative.
+/// Used primarily for Gyroscope E-CLP pool parameters.
+pub type SignedRational = num::rational::Ratio<I256>;
 
 /// An address. Can be an EOA or a smart contract address.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

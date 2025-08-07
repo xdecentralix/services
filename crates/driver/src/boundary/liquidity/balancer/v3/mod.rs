@@ -11,6 +11,7 @@ use {
     chain::Chain,
     contracts::{
         BalancerV3BatchRouter,
+        BalancerV3GyroECLPPoolFactory,
         BalancerV3StablePoolFactory,
         BalancerV3StablePoolFactoryV2,
         BalancerV3Vault,
@@ -36,6 +37,7 @@ use {
     std::sync::Arc,
 };
 
+pub mod gyro_e;
 pub mod stable;
 pub mod weighted;
 
@@ -161,6 +163,18 @@ async fn init_liquidity(
                     (
                         BalancerFactoryKind::StableV2,
                         BalancerV3StablePoolFactoryV2::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            config
+                .gyro_e
+                .iter()
+                .map(|&factory| {
+                    (
+                        BalancerFactoryKind::GyroE,
+                        BalancerV3GyroECLPPoolFactory::at(&web3, factory.into())
                             .raw_instance()
                             .clone(),
                     )

@@ -43,6 +43,8 @@ impl Interaction {
                     liquidity::Kind::BalancerV3Stable(pool) => pool.batch_router.into(),
                     liquidity::Kind::BalancerV2Weighted(pool) => pool.vault.into(),
                     liquidity::Kind::BalancerV3Weighted(pool) => pool.batch_router.into(),
+                    liquidity::Kind::BalancerV2GyroE(pool) => pool.vault.into(),
+                    liquidity::Kind::BalancerV3GyroE(pool) => pool.batch_router.into(),
                     liquidity::Kind::Swapr(pool) => pool.base.router.into(),
                     liquidity::Kind::ZeroEx(pool) => pool.zeroex.address().into(),
                 };

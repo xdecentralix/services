@@ -170,8 +170,16 @@ impl<Factory> PoolInfoFetcher<Factory> {
                 token_rates.len()
             );
 
-            let tokens = itertools::izip!(&tokens, balances, &pool.scaling_factors, token_rates)
-                .map(|(&address, balance, &scaling_factor, rate)| {
+            let scaling_by_addr: std::collections::BTreeMap<ethcontract::H160, Bfp> =
+                itertools::izip!(&pool.tokens, &pool.scaling_factors)
+                    .map(|(&addr, &sf)| (addr, sf))
+                    .collect();
+
+            let tokens = itertools::izip!(&tokens, balances, token_rates)
+                .map(|(&address, balance, rate)| {
+                    let scaling_factor = *scaling_by_addr
+                        .get(&address)
+                        .expect("missing scaling factor for address");
                     (
                         address,
                         TokenState {
@@ -408,9 +416,9 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_token_info())
             .predicate((predicate::eq(pool.address()),))
             .returns((
-                tokens.to_vec(),                                // tokens
+                tokens.to_vec(), // tokens
                 vec![(0u8, H160::zero(), false); 3], /* token_infos: (tokenType, rateProvider,
-                                                      * paysYieldFees) */
+                                  * paysYieldFees) */
                 vec![U256::zero(), U256::zero(), U256::zero()], // balances_raw
                 vec![U256::zero(), U256::zero(), U256::zero()], // last_balances_live_scaled18
             ));
@@ -474,10 +482,10 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_data())
             .predicate((predicate::eq(mock_pool.address()),))
             .returns((
-                Bytes([0u8; 32]),                               // pool_config_bits
-                tokens.to_vec(),                                // tokens
+                Bytes([0u8; 32]), // pool_config_bits
+                tokens.to_vec(),  // tokens
                 vec![(0u8, H160::zero(), false); 3], /* token_infos: (tokenType, rateProvider,
-                                                      * paysYieldFees) */
+                                   * paysYieldFees) */
                 balances.to_vec(),                              // balances_raw
                 vec![U256::zero(), U256::zero(), U256::zero()], // balances_live_scaled18
                 vec![U256::zero(), U256::zero(), U256::zero()], // token_rates
@@ -713,6 +721,11 @@ mod tests {
                         // This is just to handle the exhaustive pattern
                         // matching
                     }
+                    PoolKind::GyroE(_) => {
+                        // GyroE pools are not tested in this specific test
+                        // This is just to handle the exhaustive pattern
+                        // matching
+                    }
                 }
             }
             _ => panic!("expected active pool"),
@@ -888,9 +901,9 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_token_info())
             .predicate((predicate::eq(pool.address()),))
             .returns((
-                tokens.to_vec(),                     // tokens
+                tokens.to_vec(), // tokens
                 vec![(0u8, H160::zero(), false); 2], /* token_infos: (tokenType, rateProvider,
-                                                      * paysYieldFees) */
+                                  * paysYieldFees) */
                 vec![U256::zero(), U256::zero()], // balances_raw
                 vec![U256::zero(), U256::zero()], // last_balances_live_scaled18
             ));
@@ -926,9 +939,9 @@ mod tests {
             .expect_call(BalancerV3Vault::signatures().get_pool_token_info())
             .predicate((predicate::eq(pool.address()),))
             .returns((
-                tokens.to_vec(),                     // tokens
+                tokens.to_vec(), // tokens
                 vec![(0u8, H160::zero(), false); 2], /* token_infos: (tokenType, rateProvider,
-                                                      * paysYieldFees) */
+                                  * paysYieldFees) */
                 vec![U256::zero(), U256::zero()], // balances_raw
                 vec![U256::zero(), U256::zero()], // last_balances_live_scaled18
             ));
@@ -986,6 +999,20 @@ mod tests {
             ],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 1234567890,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
 
         let pool_info = PoolInfo::from_graph_data(&pool, 42).unwrap();
@@ -1017,6 +1044,20 @@ mod tests {
             }],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 1234567890,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
 
         let result = PoolInfo::from_graph_data(&pool, 42);
@@ -1048,6 +1089,20 @@ mod tests {
             ],
             dynamic_data: DynamicData { swap_enabled: true },
             create_time: 1234567890,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
 
         let result = PoolInfo::from_graph_data(&pool, 42);

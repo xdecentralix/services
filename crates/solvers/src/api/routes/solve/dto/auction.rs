@@ -84,6 +84,7 @@ pub fn to_domain(auction: &Auction) -> Result<auction::Auction, Error> {
                 Liquidity::ConcentratedLiquidity(liquidity) => {
                     concentrated_liquidity_pool::to_domain(liquidity)
                 }
+                Liquidity::GyroE(liquidity) => gyro_e_pool::to_domain(liquidity),
                 Liquidity::LimitOrder(liquidity) => Ok(foreign_limit_order::to_domain(liquidity)),
             })
             .try_collect()?,
@@ -272,5 +273,68 @@ mod foreign_limit_order {
                 fee: liquidity::limit_order::TakerAmount(order.taker_token_fee_amount),
             }),
         }
+    }
+}
+
+mod gyro_e_pool {
+    use super::*;
+
+    pub fn to_domain(pool: &GyroEPool) -> Result<liquidity::Liquidity, Error> {
+        let reserves = {
+            let entries = pool
+                .tokens
+                .iter()
+                .map(|(address, token)| {
+                    Ok(liquidity::gyro_e::Reserve {
+                        asset: eth::Asset {
+                            token: eth::TokenAddress(*address),
+                            amount: token.balance,
+                        },
+                        scale: conv::decimal_to_rational(&token.scaling_factor)
+                            .and_then(liquidity::ScalingFactor::new)
+                            .ok_or("invalid token scaling factor")?,
+                    })
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
+            liquidity::gyro_e::Reserves::new(entries).ok_or("duplicate GyroE token addresses")?
+        };
+
+        Ok(liquidity::Liquidity {
+            id: liquidity::Id(pool.id.clone()),
+            address: pool.address,
+            gas: eth::Gas(pool.gas_estimate),
+            state: liquidity::State::GyroE(liquidity::gyro_e::Pool {
+                reserves,
+                fee: conv::decimal_to_rational(&pool.fee).ok_or("invalid GyroE pool fee")?,
+                version: match pool.version {
+                    GyroEVersion::V1 => liquidity::gyro_e::Version::V1,
+                },
+                // Convert all Gyro E-CLP static parameters from BigDecimal to SignedRational
+                // These parameters can be negative, so we use the new signed conversion function
+                params_alpha: conv::decimal_to_signed_rational(&pool.params_alpha)
+                    .ok_or("invalid params_alpha")?,
+                params_beta: conv::decimal_to_signed_rational(&pool.params_beta)
+                    .ok_or("invalid params_beta")?,
+                params_c: conv::decimal_to_signed_rational(&pool.params_c)
+                    .ok_or("invalid params_c")?,
+                params_s: conv::decimal_to_signed_rational(&pool.params_s)
+                    .ok_or("invalid params_s")?,
+                params_lambda: conv::decimal_to_signed_rational(&pool.params_lambda)
+                    .ok_or("invalid params_lambda")?,
+                tau_alpha_x: conv::decimal_to_signed_rational(&pool.tau_alpha_x)
+                    .ok_or("invalid tau_alpha_x")?,
+                tau_alpha_y: conv::decimal_to_signed_rational(&pool.tau_alpha_y)
+                    .ok_or("invalid tau_alpha_y")?,
+                tau_beta_x: conv::decimal_to_signed_rational(&pool.tau_beta_x)
+                    .ok_or("invalid tau_beta_x")?,
+                tau_beta_y: conv::decimal_to_signed_rational(&pool.tau_beta_y)
+                    .ok_or("invalid tau_beta_y")?,
+                u: conv::decimal_to_signed_rational(&pool.u).ok_or("invalid u")?,
+                v: conv::decimal_to_signed_rational(&pool.v).ok_or("invalid v")?,
+                w: conv::decimal_to_signed_rational(&pool.w).ok_or("invalid w")?,
+                z: conv::decimal_to_signed_rational(&pool.z).ok_or("invalid z")?,
+                d_sq: conv::decimal_to_signed_rational(&pool.d_sq).ok_or("invalid d_sq")?,
+            }),
+        })
     }
 }
