@@ -11,6 +11,7 @@ use {
 mod paths;
 
 const MAINNET: &str = "1";
+const GOERLI: &str = "5";
 const OPTIMISM: &str = "10";
 const BNB: &str = "56";
 const GNOSIS: &str = "100";

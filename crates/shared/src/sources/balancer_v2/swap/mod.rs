@@ -755,7 +755,7 @@ impl BaselineSolvable for GyroEPoolRef<'_> {
 }
 
 impl GyroEPool {
-    fn as_pool_ref(&self) -> GyroEPoolRef {
+    fn as_pool_ref(&self) -> GyroEPoolRef<'_> {
         GyroEPoolRef {
             reserves: &self.reserves,
             swap_fee: self.common.swap_fee,
