@@ -11,7 +11,7 @@
 const QUERY_PAGE_SIZE: usize = 100;
 
 use {
-    super::swap::fixed_point::Bfp,
+    super::swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     crate::subgraph::SubgraphClient,
     anyhow::{Context, Result},
     ethcontract::H160,
@@ -73,7 +73,7 @@ impl BalancerApiClient {
                         "orderDirection" => "desc",
                         "where" => json!({
                             "chainIn": [self.chain],
-                            "poolTypeIn": ["WEIGHTED", "STABLE"],
+                            "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE"],
                             "protocolVersionIn": [3] // V3 protocol
                         }),
                     }),
@@ -151,6 +151,34 @@ pub struct PoolData {
     pub pool_tokens: Vec<Token>,
     pub dynamic_data: DynamicData,
     pub create_time: u64,
+    #[serde(default)]
+    pub alpha: Option<SBfp>,
+    #[serde(default)]
+    pub beta: Option<SBfp>,
+    #[serde(default)]
+    pub c: Option<SBfp>,
+    #[serde(default)]
+    pub s: Option<SBfp>,
+    #[serde(default)]
+    pub lambda: Option<SBfp>,
+    #[serde(default)]
+    pub tau_alpha_x: Option<SBfp>,
+    #[serde(default)]
+    pub tau_alpha_y: Option<SBfp>,
+    #[serde(default)]
+    pub tau_beta_x: Option<SBfp>,
+    #[serde(default)]
+    pub tau_beta_y: Option<SBfp>,
+    #[serde(default)]
+    pub u: Option<SBfp>,
+    #[serde(default)]
+    pub v: Option<SBfp>,
+    #[serde(default)]
+    pub w: Option<SBfp>,
+    #[serde(default)]
+    pub z: Option<SBfp>,
+    #[serde(default)]
+    pub d_sq: Option<SBfp>,
 }
 
 /// Dynamic data for pools from Balancer V3 API.
@@ -178,6 +206,7 @@ pub struct Token {
 pub enum PoolType {
     Weighted, // BalancerV3WeightedPoolFactory
     Stable,   // BalancerV3StablePoolFactory, BalancerV3StablePoolFactoryV2
+    GyroE,    // BalancerV3GyroECLPPoolFactory
 }
 
 impl PoolData {
@@ -186,6 +215,7 @@ impl PoolData {
         match self.pool_type.as_str() {
             "WEIGHTED" => PoolType::Weighted,
             "STABLE" => PoolType::Stable,
+            "GYROE" => PoolType::GyroE,
             _ => panic!("Unknown pool type: {}", self.pool_type),
         }
     }
@@ -256,6 +286,20 @@ mod pools_query {
                     swapEnabled
                 }
                 createTime
+                alpha
+                beta
+                c
+                s
+                lambda
+                tauAlphaX
+                tauAlphaY
+                tauBetaX
+                tauBetaY
+                u
+                v
+                w
+                z
+                dSq
             }
         }
     "#;
@@ -333,6 +377,20 @@ mod tests {
                 swap_enabled: false,
             },
             create_time: 1234567891,
+            alpha: None,
+            beta: None,
+            c: None,
+            s: None,
+            lambda: None,
+            tau_alpha_x: None,
+            tau_alpha_y: None,
+            tau_beta_x: None,
+            tau_beta_y: None,
+            u: None,
+            v: None,
+            w: None,
+            z: None,
+            d_sq: None,
         };
         let pools = RegisteredPools {
             fetched_block_number: 0,
