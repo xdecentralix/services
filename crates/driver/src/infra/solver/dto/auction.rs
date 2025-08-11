@@ -61,6 +61,7 @@ pub fn new(
                     limit_order.order.taker_token.into(),
                 ]
             }
+            liquidity::Kind::Erc4626(edge) => vec![edge.tokens.0, edge.tokens.1],
         })
     {
         tokens.entry(token.into()).or_insert_with(Default::default);
@@ -169,7 +170,7 @@ pub fn new(
             .collect(),
         liquidity: liquidity
             .iter()
-            .map(|liquidity| match &liquidity.kind {
+            .filter_map(|liquidity| Some(match &liquidity.kind {
                 liquidity::Kind::UniswapV2(pool) => {
                     solvers_dto::auction::Liquidity::ConstantProduct(
                         solvers_dto::auction::ConstantProductPool {
@@ -462,7 +463,19 @@ pub fn new(
                         },
                     )
                 }
-            })
+                liquidity::Kind::Erc4626(edge) => {
+                    // Expose a minimal ERC4626 edge to external solvers.
+                    // Add a new DTO variant and map it here.
+                    solvers_dto::auction::Liquidity::Erc4626(
+                        solvers_dto::auction::Erc4626Edge {
+                            id: liquidity.id.0.to_string(),
+                            gas_estimate: liquidity.gas.into(),
+                            vault: edge.tokens.1 .0.into(),
+                            asset: edge.tokens.0 .0.into(),
+                        },
+                    )
+                }
+            }))
             .collect(),
         tokens,
         effective_gas_price: auction.gas_price().effective().into(),

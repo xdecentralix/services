@@ -2,6 +2,7 @@ pub mod balancer_v2;
 pub mod balancer_v3;
 pub mod order_converter;
 pub mod slippage;
+pub mod erc4626;
 pub mod uniswap_v2;
 pub mod uniswap_v3;
 pub mod zeroex;
@@ -63,6 +64,7 @@ pub enum Liquidity {
     BalancerV3GyroE(BalancerV3GyroEOrder),
     LimitOrder(LimitOrder),
     Concentrated(ConcentratedLiquidity),
+    Erc4626(erc4626::Erc4626Order),
 }
 
 /// A trait associating some liquidity model to how it is executed and encoded

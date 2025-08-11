@@ -1,6 +1,6 @@
 use ethcontract::H160;
 use serde::Deserialize;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::Path, sync::{Arc, RwLock}};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Erc4626Config {
@@ -19,13 +19,13 @@ pub struct VaultMeta {
 pub struct Erc4626Registry {
     enabled: bool,
     vaults: Vec<H160>,
-    cache: parking_lot::RwLock<HashMap<H160, VaultMeta>>,
-    web3: ethcontract::Web3,
+    cache: Arc<RwLock<HashMap<H160, VaultMeta>>>,
+    web3: crate::ethrpc::Web3,
 }
 
 impl Erc4626Registry {
-    pub fn new(cfg: Erc4626Config, web3: ethcontract::Web3) -> Self {
-        Self { enabled: cfg.enabled, vaults: cfg.vaults, cache: Default::default(), web3 }
+    pub fn new(cfg: Erc4626Config, web3: crate::ethrpc::Web3) -> Self {
+        Self { enabled: cfg.enabled, vaults: cfg.vaults, cache: Arc::new(Default::default()), web3 }
     }
 
     pub fn enabled(&self) -> bool { self.enabled }
@@ -33,12 +33,12 @@ impl Erc4626Registry {
     // Resolve on first use; cache result.
     pub async fn get(&self, vault: H160) -> Option<VaultMeta> {
         if !self.enabled || !self.vaults.contains(&vault) { return None; }
-        if let Some(m) = self.cache.read().get(&vault).cloned() { return Some(m); }
+        if let Some(m) = self.cache.read().unwrap().get(&vault).cloned() { return Some(m); }
 
         let ierc4626 = contracts::IERC4626::at(&self.web3, vault);
         let asset = ierc4626.asset().call().await.ok()?;
         let meta = VaultMeta { vault, asset, epsilon_bps: 5 };
-        self.cache.write().insert(vault, meta.clone());
+        self.cache.write().unwrap().insert(vault, meta.clone());
         Some(meta)
     }
 
@@ -49,4 +49,20 @@ impl Erc4626Registry {
         }
         out
     }
+}
+
+/// Load an `Erc4626Config` from a TOML file located at `path`.
+pub fn load_config_from_file(path: &Path) -> anyhow::Result<Erc4626Config> {
+    let text = std::fs::read_to_string(path)?;
+    let cfg: Erc4626Config = toml::from_str(&text)?;
+    Ok(cfg)
+}
+
+/// Construct a registry from a TOML config file path and a `web3` instance.
+pub fn registry_from_file(
+    path: &Path,
+    web3: crate::ethrpc::Web3,
+) -> anyhow::Result<Erc4626Registry> {
+    let cfg = load_config_from_file(path)?;
+    Ok(Erc4626Registry::new(cfg, web3))
 }

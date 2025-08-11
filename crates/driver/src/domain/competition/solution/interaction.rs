@@ -47,20 +47,47 @@ impl Interaction {
                     liquidity::Kind::BalancerV3GyroE(pool) => pool.batch_router.into(),
                     liquidity::Kind::Swapr(pool) => pool.base.router.into(),
                     liquidity::Kind::ZeroEx(pool) => pool.zeroex.address().into(),
+                    liquidity::Kind::Erc4626(edge) => edge.tokens.1 .0 .into(),
                 };
-                // As a gas optimization, we always approve the max amount possible. This
-                // minimizes the number of approvals necessary, and therefore
-                // minimizes the approval fees over time. This is a
-                // potential security issue, but we assume that the router contract for protocol
-                // indexed liquidity to be safe.
-                vec![
-                    eth::Allowance {
-                        token: interaction.input.token,
-                        spender: address,
-                        amount: eth::U256::max_value(),
+                match &interaction.liquidity.kind {
+                    // For AMMs and 0x, keep using max approvals
+                    liquidity::Kind::UniswapV2(_)
+                    | liquidity::Kind::UniswapV3(_)
+                    | liquidity::Kind::BalancerV2Stable(_)
+                    | liquidity::Kind::BalancerV3Stable(_)
+                    | liquidity::Kind::BalancerV2Weighted(_)
+                    | liquidity::Kind::BalancerV3Weighted(_)
+                    | liquidity::Kind::BalancerV2GyroE(_)
+                    | liquidity::Kind::BalancerV3GyroE(_)
+                    | liquidity::Kind::Swapr(_)
+                    | liquidity::Kind::ZeroEx(_) => vec![
+                        eth::Allowance {
+                            token: interaction.input.token,
+                            spender: address,
+                            amount: eth::U256::max_value(),
+                        }
+                        .into(),
+                    ],
+                    liquidity::Kind::Erc4626(edge) => {
+                        // For ERC4626, only require bounded approval on wrap (asset->vault) direction.
+                        // Wrap if input token equals asset and output token equals vault.
+                        if interaction.input.token == edge.tokens.0
+                            && interaction.output.token == edge.tokens.1
+                        {
+                            vec![
+                                eth::Allowance {
+                                    token: interaction.input.token,
+                                    spender: address,
+                                    amount: interaction.input.amount.into(),
+                                }
+                                .into(),
+                            ]
+                        } else {
+                            // Unwrap: no approval required (owner is settlement)
+                            vec![]
+                        }
                     }
-                    .into(),
-                ]
+                }
             }
         }
     }

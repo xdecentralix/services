@@ -11,6 +11,7 @@ pub mod balancer;
 pub mod swapr;
 pub mod uniswap;
 pub mod zeroex;
+pub mod erc4626;
 
 /// A source of liquidity which can be used by the solver.
 #[derive(Debug, Clone)]
@@ -55,6 +56,7 @@ pub enum Kind {
     BalancerV3GyroE(balancer::v3::gyro_e::Pool),
     Swapr(swapr::Pool),
     ZeroEx(zeroex::LimitOrder),
+    Erc4626(erc4626::Edge),
 }
 
 impl From<&Kind> for &'static str {
@@ -70,6 +72,7 @@ impl From<&Kind> for &'static str {
             Kind::BalancerV3GyroE(_) => "BalancerV3GyroE",
             Kind::Swapr(_) => "Swapr",
             Kind::ZeroEx(_) => "ZeroExLimitOrder",
+            Kind::Erc4626(_) => "Erc4626",
         }
     }
 }

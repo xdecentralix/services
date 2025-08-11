@@ -6,6 +6,7 @@ pub mod gyro_e;
 pub mod limit_order;
 pub mod stable;
 pub mod weighted_product;
+pub mod erc4626;
 
 use {crate::domain::eth, ethereum_types::H160, std::cmp::Ordering};
 
@@ -31,6 +32,7 @@ pub enum State {
     Concentrated(concentrated::Pool),
     GyroE(gyro_e::Pool),
     LimitOrder(limit_order::LimitOrder),
+    Erc4626(erc4626::Edge),
 }
 
 /// An ordered token pair.

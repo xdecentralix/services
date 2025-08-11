@@ -30,6 +30,7 @@ pub mod balancer;
 pub mod swapr;
 pub mod uniswap;
 pub mod zeroex;
+pub mod erc4626;
 
 /// The default poll interval for the block stream updating task.
 const BLOCK_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -126,10 +127,13 @@ impl Fetcher {
                 .collect::<Vec<_>>(),
         );
 
+        // Optionally include ERC4626 liquidity source if configured
+        let erc4626_sources = erc4626::maybe_collector(eth).await?;
+
         Ok(Self {
             blocks: block_stream.clone(),
             inner: LiquidityCollector {
-                liquidity_sources: [uni_v2, swapr, bal_v2, bal_v3, uni_v3, zeroex]
+                liquidity_sources: [uni_v2, swapr, bal_v2, bal_v3, uni_v3, zeroex, erc4626_sources]
                     .into_iter()
                     .flatten()
                     .collect(),
@@ -184,6 +188,7 @@ impl Fetcher {
                     Liquidity::BalancerV3GyroE(pool) => balancer::v3::gyro_e::to_domain(id, pool),
                     Liquidity::LimitOrder(pool) => zeroex::to_domain(id, pool),
                     Liquidity::Concentrated(pool) => uniswap::v3::to_domain(id, pool),
+                    Liquidity::Erc4626(order) => erc4626::to_domain(id, order),
                 }
                 // Ignore "bad" liquidity - this allows the driver to continue
                 // solving with the other good stuff.

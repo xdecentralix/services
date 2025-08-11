@@ -265,6 +265,11 @@ fn to_boundary_liquidity(
                         }
                     }
                 }
+                liquidity::State::Erc4626(_edge) => {
+                    // Represent as two directed edges as boundary sources: asset->vault and vault->asset.
+                    // We reuse the driver boundary ERC4626 encoder via LiquiditySource::LimitOrder-like fallback
+                    // by not adding it to baseline AMM sources here. ERC4626 will be consumed via driver boundary.
+                }
             };
             onchain_liquidity
         })
