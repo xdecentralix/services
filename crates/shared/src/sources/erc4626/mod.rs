@@ -56,12 +56,32 @@ impl BaselineSolvable for Erc4626Edge {
 
         // Wrap (asset -> vault): use previewDeposit
         if in_token == this.asset && out_token == this.vault {
-            return this.contract.preview_deposit(in_amount).call().await.ok();
+            let res = this.contract.preview_deposit(in_amount).call().await.ok();
+            if let Some(ref shares_out) = res {
+                tracing::debug!(
+                    asset = ?this.asset,
+                    vault = ?this.vault,
+                    assets_in = ?in_amount,
+                    shares_out = ?shares_out,
+                    "ERC4626 get_amount_out wrap: preview_deposit"
+                );
+            }
+            return res;
         }
 
         // Unwrap (vault -> asset): use previewRedeem
         if in_token == this.vault && out_token == this.asset {
-            return this.contract.preview_redeem(in_amount).call().await.ok();
+            let res = this.contract.preview_redeem(in_amount).call().await.ok();
+            if let Some(ref assets_out) = res {
+                tracing::debug!(
+                    vault = ?this.vault,
+                    asset = ?this.asset,
+                    shares_in = ?in_amount,
+                    assets_out = ?assets_out,
+                    "ERC4626 get_amount_out unwrap: preview_redeem"
+                );
+            }
+            return res;
         }
 
         None
@@ -78,13 +98,33 @@ impl BaselineSolvable for Erc4626Edge {
         // Wrap exact-out (asset -> vault): assets_in_max = ceil(previewMint(shares_out) * (1+ε))
         if in_token == this.asset && out_token == this.vault {
             let preview = this.contract.preview_mint(out_amount).call().await.ok()?;
-            return Some(apply_epsilon_ceiled(preview, this.epsilon_bps));
+            let needed = apply_epsilon_ceiled(preview, this.epsilon_bps);
+            tracing::debug!(
+                asset = ?this.asset,
+                vault = ?this.vault,
+                shares_out = ?out_amount,
+                assets_preview = ?preview,
+                epsilon_bps = this.epsilon_bps,
+                assets_in_max = ?needed,
+                "ERC4626 get_amount_in wrap exact-out: preview_mint with epsilon"
+            );
+            return Some(needed);
         }
 
         // Unwrap exact-out (vault -> asset): shares_in_max = ceil(previewWithdraw(assets_out) * (1+ε))
         if in_token == this.vault && out_token == this.asset {
             let preview = this.contract.preview_withdraw(out_amount).call().await.ok()?;
-            return Some(apply_epsilon_ceiled(preview, this.epsilon_bps));
+            let needed = apply_epsilon_ceiled(preview, this.epsilon_bps);
+            tracing::debug!(
+                vault = ?this.vault,
+                asset = ?this.asset,
+                assets_out = ?out_amount,
+                shares_preview = ?preview,
+                epsilon_bps = this.epsilon_bps,
+                shares_in_max = ?needed,
+                "ERC4626 get_amount_in unwrap exact-out: preview_withdraw with epsilon"
+            );
+            return Some(needed);
         }
 
         None
