@@ -1619,6 +1619,7 @@ fn main() {
             .add_network_str(POLYGON, "0x61fFE014bA17989E743c5F6cB21bF9697530B21e")
         // Not listed on Gnosis and Sepolia chains
     });
+    generate_contract("IERC4626");
     generate_contract_with_config("WETH9", |builder| {
         // Note: the WETH address must be consistent with the one used by the ETH-flow
         // contract

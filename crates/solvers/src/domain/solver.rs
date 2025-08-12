@@ -37,6 +37,7 @@ pub struct Config {
     pub solution_gas_offset: eth::SignedGas,
     pub native_token_price_estimation_amount: eth::U256,
     pub uni_v3_node_url: Option<Url>,
+    pub erc4626_node_url: Option<Url>,
 }
 
 struct Inner {
@@ -71,6 +72,9 @@ struct Inner {
 
     /// If provided, the solver can rely on Uniswap V3 LPs
     uni_v3_quoter_v2: Option<contracts::UniswapV3QuoterV2>,
+    /// If provided, ERC4626 baseline quoting will be enabled using this Web3.
+    /// If not provided but `uni_v3_quoter_v2` is, its Web3 will be reused.
+    erc4626_web3: Option<shared::ethrpc::Web3>,
 }
 
 impl Solver {
@@ -89,6 +93,13 @@ impl Solver {
             None => None,
         };
 
+        // Configure ERC4626 Web3 from dedicated URL if present; else reuse Uniswap V3 Web3 if present
+        let erc4626_web3 = match (config.erc4626_node_url, &uni_v3_quoter_v2) {
+            (Some(url), _) => Some(ethrpc::web3(Default::default(), Default::default(), &url, "erc4626")),
+            (None, Some(quoter)) => Some(quoter.raw_instance().web3()),
+            (None, None) => None,
+        };
+
         Self(Arc::new(Inner {
             weth: config.weth,
             base_tokens: config.base_tokens.into_iter().collect(),
@@ -97,6 +108,7 @@ impl Solver {
             solution_gas_offset: config.solution_gas_offset,
             native_token_price_estimation_amount: config.native_token_price_estimation_amount,
             uni_v3_quoter_v2,
+            erc4626_web3,
         }))
     }
 
@@ -152,6 +164,7 @@ impl Inner {
             &self.base_tokens,
             &auction.liquidity,
             self.uni_v3_quoter_v2.as_ref(),
+            self.erc4626_web3.as_ref(),
         );
 
         for (i, order) in auction.orders.into_iter().enumerate() {

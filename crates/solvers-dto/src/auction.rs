@@ -168,6 +168,7 @@ pub enum Liquidity {
     ConcentratedLiquidity(ConcentratedLiquidityPool),
     GyroE(GyroEPool),
     LimitOrder(ForeignLimitOrder),
+    Erc4626(Erc4626Edge),
 }
 
 #[serde_as]
@@ -283,6 +284,17 @@ pub struct ForeignLimitOrder {
     pub taker_amount: U256,
     #[serde_as(as = "HexOrDecimalU256")]
     pub taker_token_fee_amount: U256,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Erc4626Edge {
+    pub id: String,
+    #[serde_as(as = "HexOrDecimalU256")]
+    pub gas_estimate: U256,
+    pub vault: H160,
+    pub asset: H160,
 }
 
 #[serde_as]

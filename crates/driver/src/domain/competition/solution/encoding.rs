@@ -182,6 +182,9 @@ pub fn tx(
         prices: auction.native_prices().clone(),
     };
 
+    // NOTE: ERC4626 bounded approvals are emitted via allowances() for Liquidity
+    // interactions or as separate logic if needed.
+
     // Add all interactions needed to move flash loaned tokens around
     // These interactions are executed before all other pre-interactions
     let flashloans = solution
@@ -417,6 +420,29 @@ pub fn liquidity_interaction(
             .swap(&input, &output, &settlement.address().into())
             .ok(),
         liquidity::Kind::ZeroEx(limit_order) => limit_order.to_interaction(&input).ok(),
+        liquidity::Kind::Erc4626(edge) => {
+            // Decide direction by tokens: input.0.token -> output.0.token
+            let (sell, buy) = (input.0.token, output.0.token);
+            if edge.tokens.0 == sell && edge.tokens.1 == buy {
+                // Wrap: mint shares_out to settlement, with bounded approve emitted separately
+                crate::boundary::liquidity::erc4626::to_wrap_interaction(
+                    &input,
+                    &output,
+                    &settlement.address().into(),
+                )
+                .ok()
+            } else if edge.tokens.0 == buy && edge.tokens.1 == sell {
+                // Unwrap: withdraw assets_out to settlement
+                crate::boundary::liquidity::erc4626::to_unwrap_interaction(
+                    &input,
+                    &output,
+                    &settlement.address().into(),
+                )
+                .ok()
+            } else {
+                None
+            }
+        }
     }
     .ok_or(Error::InvalidInteractionExecution(Box::new(
         liquidity.clone(),
@@ -614,5 +640,88 @@ mod test {
                 "095ea7b3000000000000000000000000000000000022d473030f116ddee9f6b43ac78ba3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
             )
         );
+    }
+
+    #[test]
+    fn erc4626_wrap_emits_bounded_approval_before_mint() {
+        // Build a minimal solution with a single ERC4626 wrap liquidity interaction
+        use crate::domain::{
+            competition::solution::{
+                Interaction,
+                interaction::Liquidity as InteractionLiquidity,
+                slippage,
+            },
+            eth,
+            liquidity as dl,
+        };
+        let asset = eth::H160::from_low_u64_be(1);
+        let vault = eth::H160::from_low_u64_be(2);
+        let settlement =
+            contracts::dummy_contract!(contracts::GPv2Settlement, eth::H160::from_low_u64_be(3));
+        let liquidity = dl::Liquidity {
+            id: dl::Id(0),
+            gas: eth::Gas(90_000.into()),
+            kind: dl::Kind::Erc4626(dl::erc4626::Edge {
+                tokens: (asset.into(), vault.into()),
+            }),
+        };
+        let liq_interaction = Interaction::Liquidity(InteractionLiquidity {
+            liquidity: liquidity.clone(),
+            input: eth::Asset {
+                token: asset.into(),
+                amount: 100.into(),
+            },
+            output: eth::Asset {
+                token: vault.into(),
+                amount: 95.into(),
+            },
+            internalize: false,
+        });
+
+        // Note: we validate via direct allowances() and interaction selector; no need
+        // to build full Solution here.
+
+        // Encode to interactions list
+        let interaction = liquidity_interaction(
+            &InteractionLiquidity {
+                liquidity: liquidity.clone(),
+                input: eth::Asset {
+                    token: asset.into(),
+                    amount: 100.into(),
+                },
+                output: eth::Asset {
+                    token: vault.into(),
+                    amount: 95.into(),
+                },
+                internalize: false,
+            },
+            &slippage::Parameters {
+                relative: num::rational::Ratio::from_integer(0.into()),
+                max: None,
+                min: None,
+                prices: Default::default(),
+            },
+            &settlement,
+        )
+        .unwrap();
+
+        // Ensure allowance requires bounded amount
+        let allowances = Interaction::Liquidity(InteractionLiquidity {
+            liquidity,
+            input: eth::Asset {
+                token: asset.into(),
+                amount: 100.into(),
+            },
+            output: eth::Asset {
+                token: vault.into(),
+                amount: 95.into(),
+            },
+            internalize: false,
+        })
+        .allowances();
+        assert_eq!(allowances.len(), 1);
+        assert_eq!(allowances[0].0.amount, 100.into());
+        // Ensure interaction is a mint (selector 0x94bf804d)
+        assert_eq!(&interaction.call_data.0[0..4], &hex!("94bf804d"));
     }
 }

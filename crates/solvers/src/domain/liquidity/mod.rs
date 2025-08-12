@@ -2,6 +2,7 @@
 
 pub mod concentrated;
 pub mod constant_product;
+pub mod erc4626;
 pub mod gyro_e;
 pub mod limit_order;
 pub mod stable;
@@ -31,6 +32,7 @@ pub enum State {
     Concentrated(concentrated::Pool),
     GyroE(gyro_e::Pool),
     LimitOrder(limit_order::LimitOrder),
+    Erc4626(erc4626::Edge),
 }
 
 /// An ordered token pair.

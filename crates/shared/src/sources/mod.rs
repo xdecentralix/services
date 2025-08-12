@@ -2,6 +2,7 @@
 
 pub mod balancer_v2;
 pub mod balancer_v3;
+pub mod erc4626;
 pub mod swapr;
 pub mod uniswap_v2;
 pub mod uniswap_v3;

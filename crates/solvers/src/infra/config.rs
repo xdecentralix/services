@@ -53,6 +53,11 @@ struct Config {
     /// If this is configured the solver will also use the Uniswap V3 liquidity
     /// sources that rely on RPC request.
     uni_v3_node_url: Option<Url>,
+
+    /// Optional RPC endpoint used for ERC4626 preview_* quoting in baseline routing.
+    /// If unset, we fall back to `uni_v3_node_url` if present. If both are unset,
+    /// ERC4626 baseline routing is disabled.
+    erc4626_node_url: Option<Url>,
 }
 
 /// Load the driver configuration from a TOML file.
@@ -90,6 +95,7 @@ pub async fn load(path: &Path) -> solver::Config {
         solution_gas_offset: config.solution_gas_offset.into(),
         native_token_price_estimation_amount: config.native_token_price_estimation_amount,
         uni_v3_node_url: config.uni_v3_node_url,
+        erc4626_node_url: config.erc4626_node_url,
     }
 }
 

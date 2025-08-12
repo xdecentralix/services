@@ -2,12 +2,15 @@
 
 use {
     crate::{
-        boundary,
+        boundary::{self, liquidity::erc4626 as boundary_erc4626},
         domain::{eth, liquidity, order, solver},
     },
     ethereum_types::{H160, U256},
     model::TokenPair,
-    shared::baseline_solver::{self, BaseTokens, BaselineSolvable},
+    shared::{
+        baseline_solver::{self, BaseTokens, BaselineSolvable},
+        ethrpc::Web3,
+    },
     std::collections::{HashMap, HashSet},
 };
 
@@ -23,10 +26,11 @@ impl<'a> Solver<'a> {
         base_tokens: &HashSet<eth::TokenAddress>,
         liquidity: &'a [liquidity::Liquidity],
         uni_v3_quoter_v2: Option<&contracts::UniswapV3QuoterV2>,
+        erc4626_web3: Option<&Web3>,
     ) -> Self {
         Self {
             base_tokens: to_boundary_base_tokens(weth, base_tokens),
-            onchain_liquidity: to_boundary_liquidity(liquidity, uni_v3_quoter_v2),
+            onchain_liquidity: to_boundary_liquidity(liquidity, uni_v3_quoter_v2, erc4626_web3),
             liquidity: liquidity
                 .iter()
                 .map(|liquidity| (liquidity.id.clone(), liquidity))
@@ -155,6 +159,7 @@ impl<'a> Solver<'a> {
 fn to_boundary_liquidity(
     liquidity: &[liquidity::Liquidity],
     uni_v3_quoter_v2: Option<&contracts::UniswapV3QuoterV2>,
+    erc4626_web3: Option<&Web3>,
 ) -> HashMap<TokenPair, Vec<OnchainLiquidity>> {
     liquidity
         .iter()
@@ -265,6 +270,38 @@ fn to_boundary_liquidity(
                         }
                     }
                 }
+                liquidity::State::Erc4626(edge) => {
+                    if let Some(web3) = erc4626_web3 {
+                        let edge_boundary =
+                            boundary_erc4626::Edge::new(web3, edge.vault.0, edge.asset.0);
+                        if let Some(pair_fw) = TokenPair::new(edge.asset.0, edge.vault.0) {
+                            onchain_liquidity
+                                .entry(pair_fw)
+                                .or_default()
+                                .push(OnchainLiquidity {
+                                    id: liquidity.id.clone(),
+                                    token_pair: pair_fw,
+                                    source: LiquiditySource::Erc4626(edge_boundary.clone()),
+                                });
+                        }
+                        if let Some(pair_bw) = TokenPair::new(edge.vault.0, edge.asset.0) {
+                            onchain_liquidity
+                                .entry(pair_bw)
+                                .or_default()
+                                .push(OnchainLiquidity {
+                                    id: liquidity.id.clone(),
+                                    token_pair: pair_bw,
+                                    source: LiquiditySource::Erc4626(edge_boundary),
+                                });
+                        }
+                    } else {
+                        tracing::debug!(
+                            vault = ?edge.vault.0,
+                            asset = ?edge.asset.0,
+                            "Skipping ERC4626 in baseline routing: no Web3 configured"
+                        );
+                    }
+                }
             };
             onchain_liquidity
         })
@@ -285,6 +322,7 @@ enum LiquiditySource {
     GyroE(boundary::liquidity::gyro_e::Pool),
     LimitOrder(liquidity::limit_order::LimitOrder),
     Concentrated(boundary::liquidity::concentrated::Pool),
+    Erc4626(boundary_erc4626::Edge),
 }
 
 impl BaselineSolvable for OnchainLiquidity {
@@ -298,6 +336,7 @@ impl BaselineSolvable for OnchainLiquidity {
                 limit_order.get_amount_out(out_token, input).await
             }
             LiquiditySource::Concentrated(pool) => pool.get_amount_out(out_token, input).await,
+            LiquiditySource::Erc4626(edge) => edge.get_amount_out(out_token, input).await,
         }
     }
 
@@ -311,6 +350,7 @@ impl BaselineSolvable for OnchainLiquidity {
                 limit_order.get_amount_in(in_token, out).await
             }
             LiquiditySource::Concentrated(pool) => pool.get_amount_in(in_token, out).await,
+            LiquiditySource::Erc4626(edge) => edge.get_amount_in(in_token, out).await,
         }
     }
 
@@ -322,6 +362,7 @@ impl BaselineSolvable for OnchainLiquidity {
             LiquiditySource::GyroE(pool) => pool.gas_cost().await,
             LiquiditySource::LimitOrder(limit_order) => limit_order.gas_cost().await,
             LiquiditySource::Concentrated(pool) => pool.gas_cost().await,
+            LiquiditySource::Erc4626(edge) => edge.gas_cost().await,
         }
     }
 }

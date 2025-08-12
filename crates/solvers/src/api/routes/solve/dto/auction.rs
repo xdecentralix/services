@@ -86,11 +86,27 @@ pub fn to_domain(auction: &Auction) -> Result<auction::Auction, Error> {
                 }
                 Liquidity::GyroE(liquidity) => gyro_e_pool::to_domain(liquidity),
                 Liquidity::LimitOrder(liquidity) => Ok(foreign_limit_order::to_domain(liquidity)),
+                Liquidity::Erc4626(liquidity) => erc4626::to_domain(liquidity),
             })
             .try_collect()?,
         gas_price: auction::GasPrice(eth::Ether(auction.effective_gas_price)),
         deadline: auction::Deadline(auction.deadline),
     })
+}
+
+mod erc4626 {
+    use super::*;
+    pub fn to_domain(edge: &Erc4626Edge) -> Result<liquidity::Liquidity, Error> {
+        Ok(liquidity::Liquidity {
+            id: liquidity::Id(edge.id.clone()),
+            address: edge.vault,
+            gas: eth::Gas(edge.gas_estimate),
+            state: liquidity::State::Erc4626(liquidity::erc4626::Edge {
+                asset: eth::TokenAddress(edge.asset),
+                vault: eth::TokenAddress(edge.vault),
+            }),
+        })
+    }
 }
 
 mod constant_product_pool {
