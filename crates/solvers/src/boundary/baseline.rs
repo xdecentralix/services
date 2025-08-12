@@ -272,16 +272,27 @@ fn to_boundary_liquidity(
                 }
                 liquidity::State::Erc4626(edge) => {
                     if let Some(web3) = erc4626_web3 {
-                        if let Some(token_pair) = TokenPair::new(edge.asset.0, edge.vault.0) {
-                            let boundary_edge =
-                                boundary_erc4626::Edge::new(web3, edge.vault.0, edge.asset.0);
-                            onchain_liquidity.entry(token_pair).or_default().push(
-                                OnchainLiquidity {
+                        let edge_boundary =
+                            boundary_erc4626::Edge::new(web3, edge.vault.0, edge.asset.0);
+                        if let Some(pair_fw) = TokenPair::new(edge.asset.0, edge.vault.0) {
+                            onchain_liquidity
+                                .entry(pair_fw)
+                                .or_default()
+                                .push(OnchainLiquidity {
                                     id: liquidity.id.clone(),
-                                    token_pair,
-                                    source: LiquiditySource::Erc4626(boundary_edge),
-                                },
-                            );
+                                    token_pair: pair_fw,
+                                    source: LiquiditySource::Erc4626(edge_boundary.clone()),
+                                });
+                        }
+                        if let Some(pair_bw) = TokenPair::new(edge.vault.0, edge.asset.0) {
+                            onchain_liquidity
+                                .entry(pair_bw)
+                                .or_default()
+                                .push(OnchainLiquidity {
+                                    id: liquidity.id.clone(),
+                                    token_pair: pair_bw,
+                                    source: LiquiditySource::Erc4626(edge_boundary),
+                                });
                         }
                     } else {
                         tracing::debug!(
