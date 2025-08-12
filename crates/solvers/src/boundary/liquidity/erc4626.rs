@@ -35,30 +35,10 @@ impl BaselineSolvable for Edge {
             }
             if in_token == this.asset && out_token == this.vault {
                 // asset -> vault
-                let res = this.contract.preview_deposit(in_amount).call().await.ok();
-                if let Some(ref shares_out) = res {
-                    tracing::debug!(
-                        vault = ?this.vault,
-                        asset = ?this.asset,
-                        assets_in = ?in_amount,
-                        shares_out = ?shares_out,
-                        "Baseline ERC4626 get_amount_out wrap: preview_deposit"
-                    );
-                }
-                res
+                this.contract.preview_deposit(in_amount).call().await.ok()
             } else if in_token == this.vault && out_token == this.asset {
                 // vault -> asset
-                let res = this.contract.preview_redeem(in_amount).call().await.ok();
-                if let Some(ref assets_out) = res {
-                    tracing::debug!(
-                        vault = ?this.vault,
-                        asset = ?this.asset,
-                        shares_in = ?in_amount,
-                        assets_out = ?assets_out,
-                        "Baseline ERC4626 get_amount_out unwrap: preview_redeem"
-                    );
-                }
-                res
+                this.contract.preview_redeem(in_amount).call().await.ok()
             } else {
                 None
             }
@@ -77,30 +57,10 @@ impl BaselineSolvable for Edge {
             }
             if in_token == this.asset && out_token == this.vault {
                 // asset -> vault (exact shares out)
-                let res = this.contract.preview_mint(out_amount).call().await.ok();
-                if let Some(ref assets_in) = res {
-                    tracing::debug!(
-                        vault = ?this.vault,
-                        asset = ?this.asset,
-                        shares_out = ?out_amount,
-                        assets_preview_in = ?assets_in,
-                        "Baseline ERC4626 get_amount_in wrap exact-out: preview_mint"
-                    );
-                }
-                res
+                this.contract.preview_mint(out_amount).call().await.ok()
             } else if in_token == this.vault && out_token == this.asset {
                 // vault -> asset (exact assets out)
-                let res = this.contract.preview_withdraw(out_amount).call().await.ok();
-                if let Some(ref shares_in) = res {
-                    tracing::debug!(
-                        vault = ?this.vault,
-                        asset = ?this.asset,
-                        assets_out = ?out_amount,
-                        shares_preview_in = ?shares_in,
-                        "Baseline ERC4626 get_amount_in unwrap exact-out: preview_withdraw"
-                    );
-                }
-                res
+                this.contract.preview_withdraw(out_amount).call().await.ok()
             } else {
                 None
             }
