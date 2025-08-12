@@ -39,10 +39,12 @@ impl Interaction for WithdrawExactAssetsInteraction {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use contracts::dummy_contract;
-    use hex_literal::hex;
-    use primitive_types::{H160, U256};
+    use {
+        super::*,
+        contracts::dummy_contract,
+        hex_literal::hex,
+        primitive_types::{H160, U256},
+    };
 
     #[test]
     fn encode_mint_exact_shares() {
@@ -75,5 +77,3 @@ mod tests {
         assert_eq!(&calldata.0[0..4], &hex!("b460af94"));
     }
 }
-
-

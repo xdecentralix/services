@@ -4,7 +4,3 @@ use crate::domain::eth;
 pub struct Edge {
     pub tokens: (eth::TokenAddress, eth::TokenAddress),
 }
-
-
-
-

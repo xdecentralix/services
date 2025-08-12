@@ -1,8 +1,8 @@
 pub mod balancer_v2;
 pub mod balancer_v3;
+pub mod erc4626;
 pub mod order_converter;
 pub mod slippage;
-pub mod erc4626;
 pub mod uniswap_v2;
 pub mod uniswap_v3;
 pub mod zeroex;

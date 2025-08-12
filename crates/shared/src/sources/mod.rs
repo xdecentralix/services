@@ -2,11 +2,11 @@
 
 pub mod balancer_v2;
 pub mod balancer_v3;
+pub mod erc4626;
 pub mod swapr;
 pub mod uniswap_v2;
 pub mod uniswap_v3;
 pub mod uniswap_v3_pair_provider;
-pub mod erc4626;
 
 use {
     self::uniswap_v2::pool_fetching::{Pool, PoolFetching},

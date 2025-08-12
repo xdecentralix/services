@@ -1,12 +1,15 @@
 use {
     super::{Liquidity, Settleable, SettlementHandling},
     crate::{
-        interactions::{erc4626::{MintExactSharesInteraction, WithdrawExactAssetsInteraction}, Erc20ApproveInteraction},
+        interactions::{
+            Erc20ApproveInteraction,
+            erc4626::{MintExactSharesInteraction, WithdrawExactAssetsInteraction},
+        },
         liquidity_collector::LiquidityCollecting,
         settlement::SettlementEncoder,
     },
     anyhow::Result,
-    contracts::{ERC20, IERC4626, GPv2Settlement},
+    contracts::{ERC20, GPv2Settlement, IERC4626},
     model::TokenPair,
     primitive_types::U256,
     shared::{
@@ -79,7 +82,8 @@ impl LiquidityCollecting for Erc4626LiquiditySource {
         for pair in pairs {
             if let Some(edges_for_pair) = edges.get(&pair) {
                 for edge in edges_for_pair {
-                    // Build wrap or unwrap order shell; exact amounts will be computed by route realization.
+                    // Build wrap or unwrap order shell; exact amounts will be computed by route
+                    // realization.
                     if pair.get() == (edge.asset, edge.vault) {
                         out.push(Liquidity::Erc4626(Erc4626Order {
                             tokens: pair,
@@ -159,5 +163,3 @@ impl SettlementHandling<Erc4626UnwrapOrder> for Erc4626UnwrapOrder {
         Ok(())
     }
 }
-
-

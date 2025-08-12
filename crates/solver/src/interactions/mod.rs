@@ -2,11 +2,11 @@ pub mod allowances;
 mod balancer_v2;
 mod balancer_v3;
 mod erc20;
+pub mod erc4626;
 mod uniswap_v2;
 mod uniswap_v3;
 mod weth;
 mod zeroex;
-pub mod erc4626;
 
 pub use {
     balancer_v2::BalancerSwapGivenOutInteraction,

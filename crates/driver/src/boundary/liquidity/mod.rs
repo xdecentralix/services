@@ -27,10 +27,10 @@ use {
 };
 
 pub mod balancer;
+pub mod erc4626;
 pub mod swapr;
 pub mod uniswap;
 pub mod zeroex;
-pub mod erc4626;
 
 /// The default poll interval for the block stream updating task.
 const BLOCK_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -133,10 +133,18 @@ impl Fetcher {
         Ok(Self {
             blocks: block_stream.clone(),
             inner: LiquidityCollector {
-                liquidity_sources: [uni_v2, swapr, bal_v2, bal_v3, uni_v3, zeroex, erc4626_sources]
-                    .into_iter()
-                    .flatten()
-                    .collect(),
+                liquidity_sources: [
+                    uni_v2,
+                    swapr,
+                    bal_v2,
+                    bal_v3,
+                    uni_v3,
+                    zeroex,
+                    erc4626_sources,
+                ]
+                .into_iter()
+                .flatten()
+                .collect(),
                 base_tokens: Arc::new(base_tokens),
             },
             swapr_routers,

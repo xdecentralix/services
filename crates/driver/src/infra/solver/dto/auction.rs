@@ -170,108 +170,56 @@ pub fn new(
             .collect(),
         liquidity: liquidity
             .iter()
-            .filter_map(|liquidity| Some(match &liquidity.kind {
-                liquidity::Kind::UniswapV2(pool) => {
-                    solvers_dto::auction::Liquidity::ConstantProduct(
-                        solvers_dto::auction::ConstantProductPool {
-                            id: liquidity.id.0.to_string(),
-                            address: pool.address.into(),
-                            router: pool.router.into(),
-                            gas_estimate: liquidity.gas.into(),
-                            tokens: pool
-                                .reserves
-                                .iter()
-                                .map(|asset| {
-                                    (
-                                        asset.token.into(),
-                                        solvers_dto::auction::ConstantProductReserve {
-                                            balance: asset.amount.into(),
-                                        },
-                                    )
-                                })
-                                .collect(),
-                            fee: bigdecimal::BigDecimal::new(3.into(), 3),
-                        },
-                    )
-                }
-                liquidity::Kind::UniswapV3(pool) => {
-                    solvers_dto::auction::Liquidity::ConcentratedLiquidity(
-                        solvers_dto::auction::ConcentratedLiquidityPool {
-                            id: liquidity.id.0.to_string(),
-                            address: pool.address.0,
-                            router: pool.router.into(),
-                            gas_estimate: liquidity.gas.0,
-                            tokens: vec![pool.tokens.get().0.into(), pool.tokens.get().1.into()],
-                            sqrt_price: pool.sqrt_price.0,
-                            liquidity: pool.liquidity.0,
-                            tick: pool.tick.0,
-                            liquidity_net: pool
-                                .liquidity_net
-                                .iter()
-                                .map(|(key, value)| (key.0, value.0))
-                                .collect(),
-                            fee: rational_to_big_decimal(&pool.fee.0),
-                        },
-                    )
-                }
-                liquidity::Kind::BalancerV2Stable(pool) => {
-                    solvers_dto::auction::Liquidity::Stable(solvers_dto::auction::StablePool {
-                        id: liquidity.id.0.to_string(),
-                        address: pool.id.address().into(),
-                        balancer_pool_id: pool.id.into(),
-                        gas_estimate: liquidity.gas.into(),
-                        tokens: pool
-                            .reserves
-                            .iter()
-                            .map(|r| {
-                                (
-                                    r.asset.token.into(),
-                                    solvers_dto::auction::StableReserve {
-                                        balance: r.asset.amount.into(),
-                                        scaling_factor: scaling_factor_to_decimal(r.scale),
-                                    },
-                                )
-                            })
-                            .collect(),
-                        amplification_parameter: rational_to_big_decimal(&num::BigRational::new(
-                            pool.amplification_parameter.factor().to_big_int(),
-                            pool.amplification_parameter.precision().to_big_int(),
-                        )),
-                        fee: fee_to_decimal(pool.fee),
-                    })
-                }
-                liquidity::Kind::BalancerV3Stable(pool) => {
-                    solvers_dto::auction::Liquidity::Stable(solvers_dto::auction::StablePool {
-                        id: liquidity.id.0.to_string(),
-                        address: pool.id.address().into(),
-                        balancer_pool_id: {
-                            let pool_id_h160: eth::H160 = pool.id.into();
-                            pool_id_h160.into()
-                        },
-                        gas_estimate: liquidity.gas.into(),
-                        tokens: pool
-                            .reserves
-                            .iter()
-                            .map(|r| {
-                                (
-                                    r.asset.token.into(),
-                                    solvers_dto::auction::StableReserve {
-                                        balance: r.asset.amount.into(),
-                                        scaling_factor: scaling_factor_to_decimal_v3(r.scale),
-                                    },
-                                )
-                            })
-                            .collect(),
-                        amplification_parameter: rational_to_big_decimal(&num::BigRational::new(
-                            pool.amplification_parameter.factor().to_big_int(),
-                            pool.amplification_parameter.precision().to_big_int(),
-                        )),
-                        fee: fee_to_decimal_v3(pool.fee),
-                    })
-                }
-                liquidity::Kind::BalancerV2Weighted(pool) => {
-                    solvers_dto::auction::Liquidity::WeightedProduct(
-                        solvers_dto::auction::WeightedProductPool {
+            .filter_map(|liquidity| {
+                Some(match &liquidity.kind {
+                    liquidity::Kind::UniswapV2(pool) => {
+                        solvers_dto::auction::Liquidity::ConstantProduct(
+                            solvers_dto::auction::ConstantProductPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.address.into(),
+                                router: pool.router.into(),
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|asset| {
+                                        (
+                                            asset.token.into(),
+                                            solvers_dto::auction::ConstantProductReserve {
+                                                balance: asset.amount.into(),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: bigdecimal::BigDecimal::new(3.into(), 3),
+                            },
+                        )
+                    }
+                    liquidity::Kind::UniswapV3(pool) => {
+                        solvers_dto::auction::Liquidity::ConcentratedLiquidity(
+                            solvers_dto::auction::ConcentratedLiquidityPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.address.0,
+                                router: pool.router.into(),
+                                gas_estimate: liquidity.gas.0,
+                                tokens: vec![
+                                    pool.tokens.get().0.into(),
+                                    pool.tokens.get().1.into(),
+                                ],
+                                sqrt_price: pool.sqrt_price.0,
+                                liquidity: pool.liquidity.0,
+                                tick: pool.tick.0,
+                                liquidity_net: pool
+                                    .liquidity_net
+                                    .iter()
+                                    .map(|(key, value)| (key.0, value.0))
+                                    .collect(),
+                                fee: rational_to_big_decimal(&pool.fee.0),
+                            },
+                        )
+                    }
+                    liquidity::Kind::BalancerV2Stable(pool) => {
+                        solvers_dto::auction::Liquidity::Stable(solvers_dto::auction::StablePool {
                             id: liquidity.id.0.to_string(),
                             address: pool.id.address().into(),
                             balancer_pool_id: pool.id.into(),
@@ -282,29 +230,24 @@ pub fn new(
                                 .map(|r| {
                                     (
                                         r.asset.token.into(),
-                                        solvers_dto::auction::WeightedProductReserve {
+                                        solvers_dto::auction::StableReserve {
                                             balance: r.asset.amount.into(),
                                             scaling_factor: scaling_factor_to_decimal(r.scale),
-                                            weight: weight_to_decimal(r.weight),
                                         },
                                     )
                                 })
                                 .collect(),
+                            amplification_parameter: rational_to_big_decimal(
+                                &num::BigRational::new(
+                                    pool.amplification_parameter.factor().to_big_int(),
+                                    pool.amplification_parameter.precision().to_big_int(),
+                                ),
+                            ),
                             fee: fee_to_decimal(pool.fee),
-                            version: match pool.version {
-                                liquidity::balancer::v2::weighted::Version::V0 => {
-                                    solvers_dto::auction::WeightedProductVersion::V0
-                                }
-                                liquidity::balancer::v2::weighted::Version::V3Plus => {
-                                    solvers_dto::auction::WeightedProductVersion::V3Plus
-                                }
-                            },
-                        },
-                    )
-                }
-                liquidity::Kind::BalancerV3Weighted(pool) => {
-                    solvers_dto::auction::Liquidity::WeightedProduct(
-                        solvers_dto::auction::WeightedProductPool {
+                        })
+                    }
+                    liquidity::Kind::BalancerV3Stable(pool) => {
+                        solvers_dto::auction::Liquidity::Stable(solvers_dto::auction::StablePool {
                             id: liquidity.id.0.to_string(),
                             address: pool.id.address().into(),
                             balancer_pool_id: {
@@ -318,164 +261,237 @@ pub fn new(
                                 .map(|r| {
                                     (
                                         r.asset.token.into(),
-                                        solvers_dto::auction::WeightedProductReserve {
+                                        solvers_dto::auction::StableReserve {
                                             balance: r.asset.amount.into(),
                                             scaling_factor: scaling_factor_to_decimal_v3(r.scale),
-                                            weight: weight_to_decimal_v3(r.weight),
+                                        },
+                                    )
+                                })
+                                .collect(),
+                            amplification_parameter: rational_to_big_decimal(
+                                &num::BigRational::new(
+                                    pool.amplification_parameter.factor().to_big_int(),
+                                    pool.amplification_parameter.precision().to_big_int(),
+                                ),
+                            ),
+                            fee: fee_to_decimal_v3(pool.fee),
+                        })
+                    }
+                    liquidity::Kind::BalancerV2Weighted(pool) => {
+                        solvers_dto::auction::Liquidity::WeightedProduct(
+                            solvers_dto::auction::WeightedProductPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.id.address().into(),
+                                balancer_pool_id: pool.id.into(),
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.asset.token.into(),
+                                            solvers_dto::auction::WeightedProductReserve {
+                                                balance: r.asset.amount.into(),
+                                                scaling_factor: scaling_factor_to_decimal(r.scale),
+                                                weight: weight_to_decimal(r.weight),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: fee_to_decimal(pool.fee),
+                                version: match pool.version {
+                                    liquidity::balancer::v2::weighted::Version::V0 => {
+                                        solvers_dto::auction::WeightedProductVersion::V0
+                                    }
+                                    liquidity::balancer::v2::weighted::Version::V3Plus => {
+                                        solvers_dto::auction::WeightedProductVersion::V3Plus
+                                    }
+                                },
+                            },
+                        )
+                    }
+                    liquidity::Kind::BalancerV3Weighted(pool) => {
+                        solvers_dto::auction::Liquidity::WeightedProduct(
+                            solvers_dto::auction::WeightedProductPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.id.address().into(),
+                                balancer_pool_id: {
+                                    let pool_id_h160: eth::H160 = pool.id.into();
+                                    pool_id_h160.into()
+                                },
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.asset.token.into(),
+                                            solvers_dto::auction::WeightedProductReserve {
+                                                balance: r.asset.amount.into(),
+                                                scaling_factor: scaling_factor_to_decimal_v3(
+                                                    r.scale,
+                                                ),
+                                                weight: weight_to_decimal_v3(r.weight),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: fee_to_decimal_v3(pool.fee),
+                                version: match pool.version {
+                                    liquidity::balancer::v3::weighted::Version::V1 => {
+                                        // V3 V1 pools use the same math as V2 V3Plus pools
+                                        solvers_dto::auction::WeightedProductVersion::V3Plus
+                                    } /* Future versions can be added here:
+                                       * liquidity::balancer::v3::weighted::Version::V2 => {
+                                       *     solvers_dto::auction::WeightedProductVersion::V2
+                                       * } */
+                                },
+                            },
+                        )
+                    }
+                    liquidity::Kind::BalancerV2GyroE(pool) => {
+                        solvers_dto::auction::Liquidity::GyroE(solvers_dto::auction::GyroEPool {
+                            id: liquidity.id.0.to_string(),
+                            address: pool.id.address().into(),
+                            balancer_pool_id: pool.id.into(),
+                            gas_estimate: liquidity.gas.into(),
+                            tokens: pool
+                                .reserves
+                                .iter()
+                                .map(|r| {
+                                    (
+                                        r.asset.token.into(),
+                                        solvers_dto::auction::GyroEReserve {
+                                            balance: r.asset.amount.into(),
+                                            scaling_factor: scaling_factor_to_decimal(r.scale),
+                                        },
+                                    )
+                                })
+                                .collect(),
+                            fee: fee_to_decimal(pool.fee),
+                            version: match pool.version {
+                                liquidity::balancer::v2::gyro_e::Version::V1 => {
+                                    solvers_dto::auction::GyroEVersion::V1
+                                }
+                            },
+                            // Convert all Gyro E-CLP static parameters to BigDecimal
+                            params_alpha: signed_fixed_point_to_decimal(pool.params_alpha),
+                            params_beta: signed_fixed_point_to_decimal(pool.params_beta),
+                            params_c: signed_fixed_point_to_decimal(pool.params_c),
+                            params_s: signed_fixed_point_to_decimal(pool.params_s),
+                            params_lambda: signed_fixed_point_to_decimal(pool.params_lambda),
+                            tau_alpha_x: signed_fixed_point_to_decimal(pool.tau_alpha_x),
+                            tau_alpha_y: signed_fixed_point_to_decimal(pool.tau_alpha_y),
+                            tau_beta_x: signed_fixed_point_to_decimal(pool.tau_beta_x),
+                            tau_beta_y: signed_fixed_point_to_decimal(pool.tau_beta_y),
+                            u: signed_fixed_point_to_decimal(pool.u),
+                            v: signed_fixed_point_to_decimal(pool.v),
+                            w: signed_fixed_point_to_decimal(pool.w),
+                            z: signed_fixed_point_to_decimal(pool.z),
+                            d_sq: signed_fixed_point_to_decimal(pool.d_sq),
+                        })
+                    }
+                    liquidity::Kind::BalancerV3GyroE(pool) => {
+                        solvers_dto::auction::Liquidity::GyroE(solvers_dto::auction::GyroEPool {
+                            id: liquidity.id.0.to_string(),
+                            address: pool.id.address().into(),
+                            balancer_pool_id: {
+                                let pool_id_h160: eth::H160 = pool.id.into();
+                                pool_id_h160.into()
+                            },
+                            gas_estimate: liquidity.gas.into(),
+                            tokens: pool
+                                .reserves
+                                .iter()
+                                .map(|r| {
+                                    (
+                                        r.asset.token.into(),
+                                        solvers_dto::auction::GyroEReserve {
+                                            balance: r.asset.amount.into(),
+                                            scaling_factor: scaling_factor_to_decimal_v3(r.scale),
                                         },
                                     )
                                 })
                                 .collect(),
                             fee: fee_to_decimal_v3(pool.fee),
                             version: match pool.version {
-                                liquidity::balancer::v3::weighted::Version::V1 => {
-                                    // V3 V1 pools use the same math as V2 V3Plus pools
-                                    solvers_dto::auction::WeightedProductVersion::V3Plus
-                                } /* Future versions can be added here:
-                                   * liquidity::balancer::v3::weighted::Version::V2 => {
-                                   *     solvers_dto::auction::WeightedProductVersion::V2
-                                   * } */
+                                liquidity::balancer::v3::gyro_e::Version::V1 => {
+                                    solvers_dto::auction::GyroEVersion::V1
+                                }
                             },
-                        },
-                    )
-                }
-                liquidity::Kind::BalancerV2GyroE(pool) => {
-                    solvers_dto::auction::Liquidity::GyroE(solvers_dto::auction::GyroEPool {
-                        id: liquidity.id.0.to_string(),
-                        address: pool.id.address().into(),
-                        balancer_pool_id: pool.id.into(),
-                        gas_estimate: liquidity.gas.into(),
-                        tokens: pool
-                            .reserves
-                            .iter()
-                            .map(|r| {
-                                (
-                                    r.asset.token.into(),
-                                    solvers_dto::auction::GyroEReserve {
-                                        balance: r.asset.amount.into(),
-                                        scaling_factor: scaling_factor_to_decimal(r.scale),
-                                    },
-                                )
-                            })
-                            .collect(),
-                        fee: fee_to_decimal(pool.fee),
-                        version: match pool.version {
-                            liquidity::balancer::v2::gyro_e::Version::V1 => {
-                                solvers_dto::auction::GyroEVersion::V1
-                            }
-                        },
-                        // Convert all Gyro E-CLP static parameters to BigDecimal
-                        params_alpha: signed_fixed_point_to_decimal(pool.params_alpha),
-                        params_beta: signed_fixed_point_to_decimal(pool.params_beta),
-                        params_c: signed_fixed_point_to_decimal(pool.params_c),
-                        params_s: signed_fixed_point_to_decimal(pool.params_s),
-                        params_lambda: signed_fixed_point_to_decimal(pool.params_lambda),
-                        tau_alpha_x: signed_fixed_point_to_decimal(pool.tau_alpha_x),
-                        tau_alpha_y: signed_fixed_point_to_decimal(pool.tau_alpha_y),
-                        tau_beta_x: signed_fixed_point_to_decimal(pool.tau_beta_x),
-                        tau_beta_y: signed_fixed_point_to_decimal(pool.tau_beta_y),
-                        u: signed_fixed_point_to_decimal(pool.u),
-                        v: signed_fixed_point_to_decimal(pool.v),
-                        w: signed_fixed_point_to_decimal(pool.w),
-                        z: signed_fixed_point_to_decimal(pool.z),
-                        d_sq: signed_fixed_point_to_decimal(pool.d_sq),
-                    })
-                }
-                liquidity::Kind::BalancerV3GyroE(pool) => {
-                    solvers_dto::auction::Liquidity::GyroE(solvers_dto::auction::GyroEPool {
-                        id: liquidity.id.0.to_string(),
-                        address: pool.id.address().into(),
-                        balancer_pool_id: {
-                            let pool_id_h160: eth::H160 = pool.id.into();
-                            pool_id_h160.into()
-                        },
-                        gas_estimate: liquidity.gas.into(),
-                        tokens: pool
-                            .reserves
-                            .iter()
-                            .map(|r| {
-                                (
-                                    r.asset.token.into(),
-                                    solvers_dto::auction::GyroEReserve {
-                                        balance: r.asset.amount.into(),
-                                        scaling_factor: scaling_factor_to_decimal_v3(r.scale),
-                                    },
-                                )
-                            })
-                            .collect(),
-                        fee: fee_to_decimal_v3(pool.fee),
-                        version: match pool.version {
-                            liquidity::balancer::v3::gyro_e::Version::V1 => {
-                                solvers_dto::auction::GyroEVersion::V1
-                            }
-                        },
-                        // Convert all Gyro E-CLP static parameters to BigDecimal
-                        params_alpha: signed_fixed_point_to_decimal_v3(pool.params_alpha),
-                        params_beta: signed_fixed_point_to_decimal_v3(pool.params_beta),
-                        params_c: signed_fixed_point_to_decimal_v3(pool.params_c),
-                        params_s: signed_fixed_point_to_decimal_v3(pool.params_s),
-                        params_lambda: signed_fixed_point_to_decimal_v3(pool.params_lambda),
-                        tau_alpha_x: signed_fixed_point_to_decimal_v3(pool.tau_alpha_x),
-                        tau_alpha_y: signed_fixed_point_to_decimal_v3(pool.tau_alpha_y),
-                        tau_beta_x: signed_fixed_point_to_decimal_v3(pool.tau_beta_x),
-                        tau_beta_y: signed_fixed_point_to_decimal_v3(pool.tau_beta_y),
-                        u: signed_fixed_point_to_decimal_v3(pool.u),
-                        v: signed_fixed_point_to_decimal_v3(pool.v),
-                        w: signed_fixed_point_to_decimal_v3(pool.w),
-                        z: signed_fixed_point_to_decimal_v3(pool.z),
-                        d_sq: signed_fixed_point_to_decimal_v3(pool.d_sq),
-                    })
-                }
-                liquidity::Kind::Swapr(pool) => solvers_dto::auction::Liquidity::ConstantProduct(
-                    solvers_dto::auction::ConstantProductPool {
-                        id: liquidity.id.0.to_string(),
-                        address: pool.base.address.into(),
-                        router: pool.base.router.into(),
-                        gas_estimate: liquidity.gas.into(),
-                        tokens: pool
-                            .base
-                            .reserves
-                            .iter()
-                            .map(|asset| {
-                                (
-                                    asset.token.into(),
-                                    solvers_dto::auction::ConstantProductReserve {
-                                        balance: asset.amount.into(),
-                                    },
-                                )
-                            })
-                            .collect(),
-                        fee: bigdecimal::BigDecimal::new(pool.fee.bps().into(), 4),
-                    },
-                ),
-                liquidity::Kind::ZeroEx(limit_order) => {
-                    solvers_dto::auction::Liquidity::LimitOrder(
-                        solvers_dto::auction::ForeignLimitOrder {
-                            id: liquidity.id.0.to_string(),
-                            address: limit_order.zeroex.address(),
-                            gas_estimate: liquidity.gas.into(),
-                            hash: Default::default(),
-                            maker_token: limit_order.order.maker_token,
-                            taker_token: limit_order.order.taker_token,
-                            maker_amount: limit_order.fillable.maker.into(),
-                            taker_amount: limit_order.fillable.taker.into(),
-                            taker_token_fee_amount: limit_order.order.taker_token_fee_amount.into(),
-                        },
-                    )
-                }
-                liquidity::Kind::Erc4626(edge) => {
-                    // Expose a minimal ERC4626 edge to external solvers.
-                    // Add a new DTO variant and map it here.
-                    solvers_dto::auction::Liquidity::Erc4626(
-                        solvers_dto::auction::Erc4626Edge {
-                            id: liquidity.id.0.to_string(),
-                            gas_estimate: liquidity.gas.into(),
-                            vault: edge.tokens.1 .0.into(),
-                            asset: edge.tokens.0 .0.into(),
-                        },
-                    )
-                }
-            }))
+                            // Convert all Gyro E-CLP static parameters to BigDecimal
+                            params_alpha: signed_fixed_point_to_decimal_v3(pool.params_alpha),
+                            params_beta: signed_fixed_point_to_decimal_v3(pool.params_beta),
+                            params_c: signed_fixed_point_to_decimal_v3(pool.params_c),
+                            params_s: signed_fixed_point_to_decimal_v3(pool.params_s),
+                            params_lambda: signed_fixed_point_to_decimal_v3(pool.params_lambda),
+                            tau_alpha_x: signed_fixed_point_to_decimal_v3(pool.tau_alpha_x),
+                            tau_alpha_y: signed_fixed_point_to_decimal_v3(pool.tau_alpha_y),
+                            tau_beta_x: signed_fixed_point_to_decimal_v3(pool.tau_beta_x),
+                            tau_beta_y: signed_fixed_point_to_decimal_v3(pool.tau_beta_y),
+                            u: signed_fixed_point_to_decimal_v3(pool.u),
+                            v: signed_fixed_point_to_decimal_v3(pool.v),
+                            w: signed_fixed_point_to_decimal_v3(pool.w),
+                            z: signed_fixed_point_to_decimal_v3(pool.z),
+                            d_sq: signed_fixed_point_to_decimal_v3(pool.d_sq),
+                        })
+                    }
+                    liquidity::Kind::Swapr(pool) => {
+                        solvers_dto::auction::Liquidity::ConstantProduct(
+                            solvers_dto::auction::ConstantProductPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.base.address.into(),
+                                router: pool.base.router.into(),
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .base
+                                    .reserves
+                                    .iter()
+                                    .map(|asset| {
+                                        (
+                                            asset.token.into(),
+                                            solvers_dto::auction::ConstantProductReserve {
+                                                balance: asset.amount.into(),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: bigdecimal::BigDecimal::new(pool.fee.bps().into(), 4),
+                            },
+                        )
+                    }
+                    liquidity::Kind::ZeroEx(limit_order) => {
+                        solvers_dto::auction::Liquidity::LimitOrder(
+                            solvers_dto::auction::ForeignLimitOrder {
+                                id: liquidity.id.0.to_string(),
+                                address: limit_order.zeroex.address(),
+                                gas_estimate: liquidity.gas.into(),
+                                hash: Default::default(),
+                                maker_token: limit_order.order.maker_token,
+                                taker_token: limit_order.order.taker_token,
+                                maker_amount: limit_order.fillable.maker.into(),
+                                taker_amount: limit_order.fillable.taker.into(),
+                                taker_token_fee_amount: limit_order
+                                    .order
+                                    .taker_token_fee_amount
+                                    .into(),
+                            },
+                        )
+                    }
+                    liquidity::Kind::Erc4626(edge) => {
+                        // Expose a minimal ERC4626 edge to external solvers.
+                        // Add a new DTO variant and map it here.
+                        solvers_dto::auction::Liquidity::Erc4626(
+                            solvers_dto::auction::Erc4626Edge {
+                                id: liquidity.id.0.to_string(),
+                                gas_estimate: liquidity.gas.into(),
+                                vault: edge.tokens.1.0.into(),
+                                asset: edge.tokens.0.0.into(),
+                            },
+                        )
+                    }
+                })
+            })
             .collect(),
         tokens,
         effective_gas_price: auction.gas_price().effective().into(),

@@ -5,7 +5,3 @@ pub struct Edge {
     pub asset: eth::TokenAddress,
     pub vault: eth::TokenAddress,
 }
-
-
-
-

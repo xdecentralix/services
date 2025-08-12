@@ -8,10 +8,10 @@ use {
 };
 
 pub mod balancer;
+pub mod erc4626;
 pub mod swapr;
 pub mod uniswap;
 pub mod zeroex;
-pub mod erc4626;
 
 /// A source of liquidity which can be used by the solver.
 #[derive(Debug, Clone)]

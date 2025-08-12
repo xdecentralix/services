@@ -47,7 +47,7 @@ impl Interaction {
                     liquidity::Kind::BalancerV3GyroE(pool) => pool.batch_router.into(),
                     liquidity::Kind::Swapr(pool) => pool.base.router.into(),
                     liquidity::Kind::ZeroEx(pool) => pool.zeroex.address().into(),
-                    liquidity::Kind::Erc4626(edge) => edge.tokens.1 .0 .into(),
+                    liquidity::Kind::Erc4626(edge) => edge.tokens.1.0.into(),
                 };
                 match &interaction.liquidity.kind {
                     // For AMMs and 0x, keep using max approvals
@@ -69,8 +69,9 @@ impl Interaction {
                         .into(),
                     ],
                     liquidity::Kind::Erc4626(edge) => {
-                        // For ERC4626, only require bounded approval on wrap (asset->vault) direction.
-                        // Wrap if input token equals asset and output token equals vault.
+                        // For ERC4626, only require bounded approval on wrap (asset->vault)
+                        // direction. Wrap if input token equals asset and
+                        // output token equals vault.
                         if interaction.input.token == edge.tokens.0
                             && interaction.output.token == edge.tokens.1
                         {

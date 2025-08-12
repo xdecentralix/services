@@ -2,11 +2,11 @@
 
 pub mod concentrated;
 pub mod constant_product;
+pub mod erc4626;
 pub mod gyro_e;
 pub mod limit_order;
 pub mod stable;
 pub mod weighted_product;
-pub mod erc4626;
 
 use {crate::domain::eth, ethereum_types::H160, std::cmp::Ordering};
 
