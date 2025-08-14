@@ -181,6 +181,18 @@ async fn init_liquidity(
                     )
                 })
                 .collect::<Vec<_>>(),
+            config
+                .reclamm
+                .iter()
+                .map(|&factory| {
+                    (
+                        BalancerFactoryKind::ReClamm,
+                        contracts::BalancerV3ReClammPoolFactoryV2::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
+                })
+                .collect::<Vec<_>>(),
         ]
         .into_iter()
         .flatten()
