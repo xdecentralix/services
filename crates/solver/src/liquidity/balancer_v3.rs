@@ -9,6 +9,7 @@ use {
         liquidity::{
             AmmOrderExecution,
             BalancerV3GyroEOrder,
+            BalancerV3ReClammOrder,
             BalancerV3StablePoolOrder,
             BalancerV3WeightedProductOrder,
             Liquidity,
@@ -62,6 +63,7 @@ impl BalancerV3Liquidity {
         Vec<BalancerV3StablePoolOrder>,
         Vec<BalancerV3WeightedProductOrder>,
         Vec<BalancerV3GyroEOrder>,
+        Vec<BalancerV3ReClammOrder>,
     )> {
         let pools = self.pool_fetcher.fetch(pairs, block).await?;
 
@@ -137,8 +139,35 @@ impl BalancerV3Liquidity {
                 }),
             })
             .collect();
+        let reclamm_orders: Vec<_> = pools
+            .reclamm_pools
+            .into_iter()
+            .map(|pool| BalancerV3ReClammOrder {
+                address: pool.common.address,
+                reserves: pool.reserves,
+                fee: pool.common.swap_fee,
+                version: pool.version,
+                last_virtual_balances: pool.last_virtual_balances.into_iter().collect(),
+                daily_price_shift_base: pool.daily_price_shift_base,
+                last_timestamp: pool.last_timestamp,
+                centeredness_margin: pool.centeredness_margin,
+                start_fourth_root_price_ratio: pool.start_fourth_root_price_ratio,
+                end_fourth_root_price_ratio: pool.end_fourth_root_price_ratio,
+                price_ratio_update_start_time: pool.price_ratio_update_start_time,
+                price_ratio_update_end_time: pool.price_ratio_update_end_time,
+                settlement_handling: Arc::new(SettlementHandler {
+                    pool_id: pool.common.id,
+                    inner: inner.clone(),
+                }),
+            })
+            .collect();
 
-        Ok((stable_pool_orders, weighted_product_orders, gyro_e_orders))
+        Ok((
+            stable_pool_orders,
+            weighted_product_orders,
+            gyro_e_orders,
+            reclamm_orders,
+        ))
     }
 }
 
@@ -151,12 +180,13 @@ impl LiquidityCollecting for BalancerV3Liquidity {
         pairs: HashSet<TokenPair>,
         block: Block,
     ) -> Result<Vec<Liquidity>> {
-        let (stable, weighted, gyro_e) = self.get_orders(pairs, block).await?;
+        let (stable, weighted, gyro_e, reclamm) = self.get_orders(pairs, block).await?;
         let liquidity = stable
             .into_iter()
             .map(Liquidity::BalancerV3Stable)
             .chain(weighted.into_iter().map(Liquidity::BalancerV3Weighted))
             .chain(gyro_e.into_iter().map(Liquidity::BalancerV3GyroE))
+            .chain(reclamm.into_iter().map(Liquidity::BalancerV3ReClamm))
             .collect();
         Ok(liquidity)
     }
@@ -238,6 +268,16 @@ impl SettlementHandling<BalancerV3StablePoolOrder> for SettlementHandler {
 }
 
 impl SettlementHandling<BalancerV3GyroEOrder> for SettlementHandler {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn encode(&self, execution: AmmOrderExecution, encoder: &mut SettlementEncoder) -> Result<()> {
+        self.inner_encode(execution, encoder)
+    }
+}
+
+impl SettlementHandling<BalancerV3ReClammOrder> for SettlementHandler {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -403,6 +443,7 @@ mod tests {
                         weighted_pools: weighted_pools.clone(),
                         stable_pools: vec![],
                         gyro_e_pools: vec![],
+                        reclamm_pools: vec![],
                     })
                 }
             });
@@ -436,7 +477,7 @@ mod tests {
             pool_fetcher: Arc::new(pool_fetcher),
             allowance_manager: Box::new(allowance_manager),
         };
-        let (_stable_orders, weighted_orders, _gyro_e_orders) = liquidity_provider
+        let (_stable_orders, weighted_orders, _gyro_e_orders, _reclamm_orders) = liquidity_provider
             .get_orders(pairs, Block::Recent)
             .await
             .unwrap();
@@ -467,6 +508,140 @@ mod tests {
                 WeightedPoolVersion::V1
             ),
         );
+    }
+
+    #[tokio::test]
+    async fn fetches_reclamm_liquidity() {
+        let mut pool_fetcher = MockBalancerV3PoolFetching::new();
+        let mut allowance_manager = MockAllowanceManaging::new();
+
+        let token_a = H160([0xaa; 20]);
+        let token_b = H160([0xbb; 20]);
+        let reclamm_pools = vec![shared::sources::balancer_v3::pool_fetching::ReClammPool {
+            common: CommonPoolState {
+                id: H160([0x95; 20]),
+                address: H160([0x95; 20]),
+                swap_fee: "0.003".parse().unwrap(),
+                paused: false,
+            },
+            reserves: btreemap! {
+                token_a => shared::sources::balancer_v3::pool_fetching::TokenState {
+                    balance: 1_000_000u128.into(),
+                    scaling_factor: V3Bfp::exp10(0),
+                    rate: U256::exp10(18),
+                },
+                token_b => shared::sources::balancer_v3::pool_fetching::TokenState {
+                    balance: 2_000_000u128.into(),
+                    scaling_factor: V3Bfp::exp10(0),
+                    rate: U256::exp10(18),
+                },
+            },
+            version: shared::sources::balancer_v3::pools::reclamm::Version::V2,
+            last_virtual_balances: vec![10u64.into(), 20u64.into()],
+            daily_price_shift_base: "1".parse().unwrap(),
+            last_timestamp: 1,
+            centeredness_margin: "0.5".parse().unwrap(),
+            start_fourth_root_price_ratio: "1".parse().unwrap(),
+            end_fourth_root_price_ratio: "1".parse().unwrap(),
+            price_ratio_update_start_time: 0,
+            price_ratio_update_end_time: 0,
+        }];
+
+        pool_fetcher
+            .expect_fetch()
+            .with(always(), always())
+            .returning({
+                let reclamm_pools = reclamm_pools.clone();
+                move |_, _| {
+                    Ok(FetchedBalancerPools {
+                        weighted_pools: vec![],
+                        stable_pools: vec![],
+                        gyro_e_pools: vec![],
+                        reclamm_pools: reclamm_pools.clone(),
+                    })
+                }
+            });
+
+        allowance_manager
+            .expect_get_allowances()
+            .with(eq(hashset![token_a, token_b]), always())
+            .returning(|_, _| Ok(Allowances::empty(H160([0xc1; 20]))));
+
+        let base_tokens = BaseTokens::new(token_a, &[]);
+        let pairs =
+            base_tokens.relevant_pairs([TokenPair::new(token_a, token_b).unwrap()].into_iter());
+
+        let (settlement, batch_router) = dummy_contracts();
+        let liquidity_provider = BalancerV3Liquidity {
+            settlement,
+            batch_router,
+            pool_fetcher: Arc::new(pool_fetcher),
+            allowance_manager: Box::new(allowance_manager),
+        };
+        let (_stable_orders, _weighted_orders, _gyro_e_orders, reclamm_orders) = liquidity_provider
+            .get_orders(pairs, Block::Recent)
+            .await
+            .unwrap();
+
+        assert_eq!(reclamm_orders.len(), 1);
+        let order = &reclamm_orders[0];
+        assert_eq!(order.address, H160([0x95; 20]));
+        assert_eq!(order.fee, "0.003".parse().unwrap());
+        assert_eq!(
+            order.version,
+            shared::sources::balancer_v3::pools::reclamm::Version::V2
+        );
+        assert_eq!(
+            order.last_virtual_balances,
+            vec![10u64.into(), 20u64.into()]
+        );
+    }
+
+    #[test]
+    fn encodes_reclamm_swaps_in_settlement() {
+        let (settlement, batch_router) = dummy_contracts();
+        let inner = Arc::new(Inner {
+            settlement: settlement.clone(),
+            batch_router: batch_router.clone(),
+            allowances: Allowances::new(
+                batch_router.address(),
+                hashmap! {
+                    H160([0xaa; 20]) => 0.into(),
+                    H160([0xbb; 20]) => 100.into(),
+                },
+            ),
+        });
+        let handler = SettlementHandler {
+            pool_id: H160([0x95; 20]),
+            inner,
+        };
+
+        let mut encoder = SettlementEncoder::new(Default::default());
+        SettlementHandling::<BalancerV3ReClammOrder>::encode(
+            &handler,
+            AmmOrderExecution {
+                input_max: TokenAmount::new(H160([0xaa; 20]), 10),
+                output: TokenAmount::new(H160([0xbb; 20]), 11),
+                internalizable: false,
+            },
+            &mut encoder,
+        )
+        .unwrap();
+        SettlementHandling::<BalancerV3ReClammOrder>::encode(
+            &handler,
+            AmmOrderExecution {
+                input_max: TokenAmount::new(H160([0xbb; 20]), 12),
+                output: TokenAmount::new(H160([0xcc; 20]), 13),
+                internalizable: false,
+            },
+            &mut encoder,
+        )
+        .unwrap();
+
+        let [_, interactions, _] = encoder
+            .finish(InternalizationStrategy::SkipInternalizableInteraction)
+            .interactions;
+        assert_eq!(interactions.len(), 3);
     }
 
     #[test]

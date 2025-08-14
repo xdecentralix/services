@@ -167,6 +167,7 @@ pub enum Liquidity {
     Stable(StablePool),
     ConcentratedLiquidity(ConcentratedLiquidityPool),
     GyroE(GyroEPool),
+    ReClamm(ReClammPool),
     LimitOrder(ForeignLimitOrder),
     Erc4626(Erc4626Edge),
 }
@@ -339,6 +340,36 @@ pub struct GyroEReserve {
 #[serde(rename_all = "camelCase")]
 pub enum GyroEVersion {
     V1,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReClammPool {
+    pub id: String,
+    pub address: H160,
+    #[serde_as(as = "HexOrDecimalU256")]
+    pub gas_estimate: U256,
+    pub tokens: HashMap<H160, ReClammReserve>,
+    pub fee: BigDecimal,
+    // Dynamic parameters used in math
+    pub last_virtual_balances: Vec<BigDecimal>,
+    pub daily_price_shift_base: BigDecimal,
+    pub last_timestamp: u64,
+    pub centeredness_margin: BigDecimal,
+    pub start_fourth_root_price_ratio: BigDecimal,
+    pub end_fourth_root_price_ratio: BigDecimal,
+    pub price_ratio_update_start_time: u64,
+    pub price_ratio_update_end_time: u64,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReClammReserve {
+    #[serde_as(as = "HexOrDecimalU256")]
+    pub balance: U256,
+    pub scaling_factor: BigDecimal,
 }
 
 #[serde_as]

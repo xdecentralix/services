@@ -4,6 +4,7 @@ use {
 };
 
 pub mod gyro_e;
+pub mod reclamm;
 pub mod stable;
 pub mod weighted;
 
