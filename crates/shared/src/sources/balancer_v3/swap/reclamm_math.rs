@@ -9,8 +9,8 @@
 use {
     super::{error::Error, fixed_point::Bfp},
     ethcontract::U256,
-    number::conversions::{big_int_to_u256, u256_to_big_int},
     num::{BigInt, Zero},
+    number::conversions::{big_int_to_u256, u256_to_big_int},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -198,8 +198,10 @@ fn compute_virtual_balances_updating_price_ratio(
     let one_wad_u = Bfp::one().as_uint256();
     let c_wei: BigInt = u256_to_big_int(&centeredness.as_uint256());
     let q0_wei: BigInt = u256_to_big_int(&sqrt_price_ratio.as_uint256());
-    let four_q0_minus_two = (q0_wei.clone() * BigInt::from(4)) - u256_to_big_int(&Bfp::from(2).as_uint256());
-    let inner36 = &c_wei * (&c_wei + &four_q0_minus_two) + BigInt::from(1_000000000000000000u128) * BigInt::from(1_000000000000000000u128);
+    let four_q0_minus_two =
+        (q0_wei.clone() * BigInt::from(4)) - u256_to_big_int(&Bfp::from(2).as_uint256());
+    let inner36 = &c_wei * (&c_wei + &four_q0_minus_two)
+        + BigInt::from(1_000000000000000000u128) * BigInt::from(1_000000000000000000u128);
     // The above BigInt literal equals RAY (1e36).
     let inner36_u256 = big_int_to_u256(&inner36).map_err(|_| Error::MulOverflow)?;
     let root = Bfp::from_wei(sqrt_u256(inner36_u256));
@@ -213,9 +215,11 @@ fn compute_virtual_balances_updating_price_ratio(
 
     // Denominator: 2 * (Q0 - 1)
     let den18_wei_big: BigInt = BigInt::from(2) * (q0_wei - u256_to_big_int(&one_wad_u));
-    let vu = Bfp::from_wei(big_int_to_u256(&(num36 / den18_wei_big)).map_err(|_| Error::MulOverflow)?);
+    let vu =
+        Bfp::from_wei(big_int_to_u256(&(num36 / den18_wei_big)).map_err(|_| Error::MulOverflow)?);
 
-    // vo = (vu * last_overvalued) / last_undervalued, with single-step 36->18 division
+    // vo = (vu * last_overvalued) / last_undervalued, with single-step 36->18
+    // division
     let vo = mul_div_down_raw(vu, last_overvalued, last_undervalued)?;
 
     if is_pool_above_center {
@@ -234,9 +238,11 @@ fn compute_virtual_balances_updating_price_range(
     current_timestamp: u64,
     last_timestamp: u64,
 ) -> Result<(Bfp, Bfp), Error> {
-    let sqrt_price_ratio = sqrt_36_to_18(
-        compute_price_ratio(balances_scaled18, virtual_balance_a, virtual_balance_b)?,
-    )?;
+    let sqrt_price_ratio = sqrt_36_to_18(compute_price_ratio(
+        balances_scaled18,
+        virtual_balance_a,
+        virtual_balance_b,
+    )?)?;
 
     let (mut v_undervalued, mut v_overvalued, b_undervalued, b_overvalued) = if is_pool_above_center
     {
@@ -262,7 +268,8 @@ fn compute_virtual_balances_updating_price_range(
     v_overvalued = v_overvalued.mul_down(pow)?;
 
     // Va = (Ra * (Vb + Rb)) / (((sqrtPriceRatio - 1) * Vb) - Rb)
-    // Compute numerator in 36-dec and divide by 18-dec denominator in a single step to match TS.
+    // Compute numerator in 36-dec and divide by 18-dec denominator in a single step
+    // to match TS.
     let ra_wei: BigInt = u256_to_big_int(&b_undervalued.as_uint256());
     let vb_plus_rb_wei: BigInt = u256_to_big_int(&v_overvalued.add(b_overvalued)?.as_uint256());
     let va_num36 = ra_wei * vb_plus_rb_wei;
@@ -435,8 +442,8 @@ fn pow_down_fixed(base: Bfp, exp: Bfp) -> Result<Bfp, Error> {
     base.pow_down_v3(exp)
 }
 
-// Helpers to perform a single-step mul/div on raw 18-decimal fixed-point integers,
-// matching the TS reference implementation's bigint behavior exactly.
+// Helpers to perform a single-step mul/div on raw 18-decimal fixed-point
+// integers, matching the TS reference implementation's bigint behavior exactly.
 fn mul_div_down_raw(a: Bfp, b: Bfp, c: Bfp) -> Result<Bfp, Error> {
     if c.is_zero() {
         return Err(Error::ZeroDivision);

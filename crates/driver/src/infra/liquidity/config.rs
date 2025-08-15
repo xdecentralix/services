@@ -335,7 +335,9 @@ impl BalancerV3 {
                 contracts::BalancerV3StablePoolFactoryV2::raw_contract(),
             ]),
             gyro_e: factory_addresses(&[contracts::BalancerV3GyroECLPPoolFactory::raw_contract()]),
-            reclamm: factory_addresses(&[contracts::BalancerV3ReClammPoolFactoryV2::raw_contract()]),
+            reclamm: factory_addresses(
+                &[contracts::BalancerV3ReClammPoolFactoryV2::raw_contract()],
+            ),
             pool_deny_list: Vec::new(),
             graph_url: graph_url.clone(),
             reinit_interval: None,
