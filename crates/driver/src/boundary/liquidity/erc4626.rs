@@ -5,6 +5,7 @@ use {
         infra::blockchain::Ethereum,
     },
     anyhow::Result as AnyResult,
+    chain::Chain,
     shared::sources::erc4626::registry::Erc4626Registry,
     solver::{
         liquidity::erc4626::{Erc4626LiquiditySource, Erc4626Order},
@@ -13,14 +14,30 @@ use {
     std::time::Duration,
 };
 
+/// Maps chain names to their directory names in the configs folder
+fn chain_to_config_dir(chain: &Chain) -> &'static str {
+    match chain {
+        Chain::ArbitrumOne => "arbitrum",
+        Chain::Mainnet => "mainnet",
+        Chain::Goerli => "goerli",
+        Chain::Sepolia => "sepolia",
+        Chain::Gnosis => "gnosis",
+        Chain::Base => "base",
+        Chain::Bnb => "bnb",
+        Chain::Avalanche => "avalanche",
+        Chain::Optimism => "optimism",
+        Chain::Polygon => "polygon",
+        Chain::Hardhat => "hardhat",
+    }
+}
+
 /// Builds the ERC4626 liquidity collector if enabled via
 /// configs/<chain>/erc4626.toml.
 pub async fn maybe_collector(eth: &Ethereum) -> AnyResult<Vec<Box<dyn LiquidityCollecting>>> {
     // Try to load per-chain config file; if missing or disabled, return empty.
     let chain = eth.chain();
-    let chain_str = format!("{:?}", chain);
-    let chain_lc = chain_str.to_lowercase();
-    let primary_path = format!("configs/{}/erc4626.toml", chain_lc);
+    let config_dir = chain_to_config_dir(&chain);
+    let primary_path = format!("configs/{}/erc4626.toml", config_dir);
     let fallback_path = format!("../{}", primary_path);
     let web3 = boundary::web3(eth);
     let settlement = eth.contracts().settlement().clone();
