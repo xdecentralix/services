@@ -54,6 +54,7 @@ pub fn new(
             liquidity::Kind::BalancerV3Weighted(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV2GyroE(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3GyroE(pool) => pool.reserves.tokens().collect(),
+            liquidity::Kind::BalancerV3ReClamm(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::Swapr(pool) => pool.base.reserves.iter().map(|r| r.token).collect(),
             liquidity::Kind::ZeroEx(limit_order) => {
                 vec![
@@ -435,6 +436,51 @@ pub fn new(
                             z: signed_fixed_point_to_decimal_v3(pool.z),
                             d_sq: signed_fixed_point_to_decimal_v3(pool.d_sq),
                         })
+                    }
+                    liquidity::Kind::BalancerV3ReClamm(pool) => {
+                        solvers_dto::auction::Liquidity::ReClamm(
+                            solvers_dto::auction::ReClammPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.id.address().into(),
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.asset.token.into(),
+                                            solvers_dto::auction::ReClammReserve {
+                                                balance: r.asset.amount.into(),
+                                                scaling_factor: scaling_factor_to_decimal_v3(
+                                                    r.scale,
+                                                ),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: fee_to_decimal_v3(pool.fee),
+                                last_virtual_balances: pool
+                                    .last_virtual_balances
+                                    .iter()
+                                    .map(|v| bigdecimal::BigDecimal::new(v.to_big_int(), 0))
+                                    .collect(),
+                                daily_price_shift_base: scaling_factor_to_decimal_v3(
+                                    pool.daily_price_shift_base,
+                                ),
+                                last_timestamp: pool.last_timestamp,
+                                centeredness_margin: scaling_factor_to_decimal_v3(
+                                    pool.centeredness_margin,
+                                ),
+                                start_fourth_root_price_ratio: scaling_factor_to_decimal_v3(
+                                    pool.start_fourth_root_price_ratio,
+                                ),
+                                end_fourth_root_price_ratio: scaling_factor_to_decimal_v3(
+                                    pool.end_fourth_root_price_ratio,
+                                ),
+                                price_ratio_update_start_time: pool.price_ratio_update_start_time,
+                                price_ratio_update_end_time: pool.price_ratio_update_end_time,
+                            },
+                        )
                     }
                     liquidity::Kind::Swapr(pool) => {
                         solvers_dto::auction::Liquidity::ConstantProduct(

@@ -73,7 +73,7 @@ impl BalancerApiClient {
                         "orderDirection" => "desc",
                         "where" => json!({
                             "chainIn": [self.chain],
-                            "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE"],
+                             "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE", "RECLAMM"],
                             "protocolVersionIn": [3] // V3 protocol
                         }),
                     }),
@@ -207,6 +207,7 @@ pub enum PoolType {
     Weighted, // BalancerV3WeightedPoolFactory
     Stable,   // BalancerV3StablePoolFactory, BalancerV3StablePoolFactoryV2
     GyroE,    // BalancerV3GyroECLPPoolFactory
+    ReClamm,  // ReClammPoolFactory
 }
 
 impl PoolData {
@@ -216,6 +217,7 @@ impl PoolData {
             "WEIGHTED" => PoolType::Weighted,
             "STABLE" => PoolType::Stable,
             "GYROE" => PoolType::GyroE,
+            "RECLAMM" => PoolType::ReClamm,
             _ => panic!("Unknown pool type: {}", self.pool_type),
         }
     }

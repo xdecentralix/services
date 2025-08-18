@@ -715,6 +715,11 @@ enum BalancerV3Config {
         #[serde(default)]
         gyro_e: Vec<eth::H160>,
 
+        /// The ReClamm pool factory contract addresses (only supported on
+        /// Balancer V3).
+        #[serde(default)]
+        reclamm: Vec<eth::H160>,
+
         /// Deny listed Balancer V3 pools.
         #[serde(default)]
         pool_deny_list: Vec<eth::H160>,

@@ -93,9 +93,15 @@ impl Solver {
             None => None,
         };
 
-        // Configure ERC4626 Web3 from dedicated URL if present; else reuse Uniswap V3 Web3 if present
+        // Configure ERC4626 Web3 from dedicated URL if present; else reuse Uniswap V3
+        // Web3 if present
         let erc4626_web3 = match (config.erc4626_node_url, &uni_v3_quoter_v2) {
-            (Some(url), _) => Some(ethrpc::web3(Default::default(), Default::default(), &url, "erc4626")),
+            (Some(url), _) => Some(ethrpc::web3(
+                Default::default(),
+                Default::default(),
+                &url,
+                "erc4626",
+            )),
             (None, Some(quoter)) => Some(quoter.raw_instance().web3()),
             (None, None) => None,
         };

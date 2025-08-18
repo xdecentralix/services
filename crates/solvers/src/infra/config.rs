@@ -54,9 +54,9 @@ struct Config {
     /// sources that rely on RPC request.
     uni_v3_node_url: Option<Url>,
 
-    /// Optional RPC endpoint used for ERC4626 preview_* quoting in baseline routing.
-    /// If unset, we fall back to `uni_v3_node_url` if present. If both are unset,
-    /// ERC4626 baseline routing is disabled.
+    /// Optional RPC endpoint used for ERC4626 preview_* quoting in baseline
+    /// routing. If unset, we fall back to `uni_v3_node_url` if present. If
+    /// both are unset, ERC4626 baseline routing is disabled.
     erc4626_node_url: Option<Url>,
 }
 

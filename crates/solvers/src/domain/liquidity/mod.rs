@@ -5,6 +5,7 @@ pub mod constant_product;
 pub mod erc4626;
 pub mod gyro_e;
 pub mod limit_order;
+pub mod reclamm;
 pub mod stable;
 pub mod weighted_product;
 
@@ -31,6 +32,7 @@ pub enum State {
     Stable(stable::Pool),
     Concentrated(concentrated::Pool),
     GyroE(gyro_e::Pool),
+    BalancerV3ReClamm(reclamm::Pool),
     LimitOrder(limit_order::LimitOrder),
     Erc4626(erc4626::Edge),
 }

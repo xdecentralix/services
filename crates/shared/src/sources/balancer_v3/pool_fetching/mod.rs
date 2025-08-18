@@ -21,6 +21,7 @@ use {
             PoolKind,
             common::{self, PoolInfoFetcher},
             gyro_e,
+            reclamm,
             stable,
             weighted,
         },
@@ -36,12 +37,13 @@ use {
     contracts::{
         BalancerV3BatchRouter,
         BalancerV3GyroECLPPoolFactory,
+        BalancerV3ReClammPoolFactoryV2,
         BalancerV3StablePoolFactory,
         BalancerV3StablePoolFactoryV2,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
     },
-    ethcontract::{BlockId, H160, H256, Instance, dyns::DynInstance},
+    ethcontract::{BlockId, H160, H256, Instance, U256, dyns::DynInstance},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
     model::TokenPair,
     reqwest::{Client, Url},
@@ -53,6 +55,7 @@ use {
 pub use {
     common::TokenState,
     gyro_e::Version as GyroEPoolVersion,
+    reclamm::Version as ReClammPoolVersion,
     stable::{
         AmplificationParameter,
         TokenState as StableTokenState,
@@ -147,6 +150,44 @@ pub struct GyroEPool {
     pub d_sq: SBfp,
 }
 
+#[derive(Clone, Debug)]
+pub struct ReClammPool {
+    pub common: CommonPoolState,
+    pub reserves: BTreeMap<H160, TokenState>,
+    pub version: reclamm::Version,
+    pub last_virtual_balances: Vec<U256>,
+    pub daily_price_shift_base: Bfp,
+    pub last_timestamp: u64,
+    pub centeredness_margin: Bfp,
+    pub start_fourth_root_price_ratio: Bfp,
+    pub end_fourth_root_price_ratio: Bfp,
+    pub price_ratio_update_start_time: u64,
+    pub price_ratio_update_end_time: u64,
+}
+
+impl ReClammPool {
+    pub fn new_unpaused(pool_id: H160, reclamm_state: reclamm::PoolState) -> Self {
+        ReClammPool {
+            common: CommonPoolState {
+                id: pool_id,
+                address: pool_id,
+                swap_fee: reclamm_state.swap_fee,
+                paused: false,
+            },
+            reserves: reclamm_state.tokens.into_iter().collect(),
+            version: reclamm_state.version,
+            last_virtual_balances: reclamm_state.last_virtual_balances,
+            daily_price_shift_base: reclamm_state.daily_price_shift_base,
+            last_timestamp: reclamm_state.last_timestamp,
+            centeredness_margin: reclamm_state.centeredness_margin,
+            start_fourth_root_price_ratio: reclamm_state.start_fourth_root_price_ratio,
+            end_fourth_root_price_ratio: reclamm_state.end_fourth_root_price_ratio,
+            price_ratio_update_start_time: reclamm_state.price_ratio_update_start_time,
+            price_ratio_update_end_time: reclamm_state.price_ratio_update_end_time,
+        }
+    }
+}
+
 impl GyroEPool {
     pub fn new_unpaused(pool_id: H160, gyro_e_state: gyro_e::PoolState) -> Self {
         GyroEPool {
@@ -182,6 +223,7 @@ pub struct FetchedBalancerPools {
     pub stable_pools: Vec<StablePool>,
     pub weighted_pools: Vec<WeightedPool>,
     pub gyro_e_pools: Vec<GyroEPool>,
+    pub reclamm_pools: Vec<ReClammPool>,
 }
 
 impl FetchedBalancerPools {
@@ -199,6 +241,11 @@ impl FetchedBalancerPools {
         );
         tokens.extend(
             self.gyro_e_pools
+                .iter()
+                .flat_map(|pool| pool.reserves.keys().copied()),
+        );
+        tokens.extend(
+            self.reclamm_pools
                 .iter()
                 .flat_map(|pool| pool.reserves.keys().copied()),
         );
@@ -231,6 +278,7 @@ pub enum BalancerFactoryKind {
     Stable,
     StableV2,
     GyroE,
+    ReClamm,
 }
 
 impl BalancerFactoryKind {
@@ -238,19 +286,61 @@ impl BalancerFactoryKind {
     pub fn for_chain(chain_id: u64) -> Vec<Self> {
         match chain_id {
             // Mainnet
-            1 => vec![Self::Weighted, Self::Stable, Self::StableV2, Self::GyroE],
+            1 => vec![
+                Self::Weighted,
+                Self::Stable,
+                Self::StableV2,
+                Self::GyroE,
+                Self::ReClamm,
+            ],
             // Gnosis
-            100 => vec![Self::Weighted, Self::Stable, Self::StableV2, Self::GyroE],
+            100 => vec![
+                Self::Weighted,
+                Self::Stable,
+                Self::StableV2,
+                Self::GyroE,
+                Self::ReClamm,
+            ],
             // Arbitrum
-            42161 => vec![Self::Weighted, Self::Stable, Self::StableV2, Self::GyroE],
+            42161 => vec![
+                Self::Weighted,
+                Self::Stable,
+                Self::StableV2,
+                Self::GyroE,
+                Self::ReClamm,
+            ],
             // Optimism
-            10 => vec![Self::Weighted, Self::Stable, Self::StableV2, Self::GyroE],
+            10 => vec![
+                Self::Weighted,
+                Self::Stable,
+                Self::StableV2,
+                Self::GyroE,
+                Self::ReClamm,
+            ],
             // Base
-            8453 => vec![Self::Weighted, Self::Stable, Self::StableV2, Self::GyroE],
+            8453 => vec![
+                Self::Weighted,
+                Self::Stable,
+                Self::StableV2,
+                Self::GyroE,
+                Self::ReClamm,
+            ],
             // Sepolia
-            11155111 => vec![Self::Weighted, Self::Stable, Self::StableV2, Self::GyroE],
+            11155111 => vec![
+                Self::Weighted,
+                Self::Stable,
+                Self::StableV2,
+                Self::GyroE,
+                Self::ReClamm,
+            ],
             // Avalanche
-            43114 => vec![Self::Weighted, Self::Stable, Self::StableV2, Self::GyroE],
+            43114 => vec![
+                Self::Weighted,
+                Self::Stable,
+                Self::StableV2,
+                Self::GyroE,
+                Self::ReClamm,
+            ],
             _ => Default::default(),
         }
     }
@@ -293,6 +383,7 @@ impl BalancerContracts {
                 BalancerFactoryKind::Stable => instance!(BalancerV3StablePoolFactory),
                 BalancerFactoryKind::StableV2 => instance!(BalancerV3StablePoolFactoryV2),
                 BalancerFactoryKind::GyroE => instance!(BalancerV3GyroECLPPoolFactory),
+                BalancerFactoryKind::ReClamm => instance!(BalancerV3ReClammPoolFactoryV2),
             };
             factories.push((factory_kind, factory_instance));
         }
@@ -381,6 +472,9 @@ impl BalancerV3PoolFetching for BalancerPoolFetcher {
                     PoolKind::GyroE(state) => fetched_pools
                         .gyro_e_pools
                         .push(GyroEPool::new_unpaused(pool.id, state)),
+                    PoolKind::ReClamm(state) => fetched_pools
+                        .reclamm_pools
+                        .push(ReClammPool::new_unpaused(pool.id, state)),
                 }
                 fetched_pools
             },
@@ -442,6 +536,9 @@ async fn create_aggregate_pool_fetcher(
             }
             BalancerFactoryKind::GyroE => {
                 registry!(BalancerV3GyroECLPPoolFactory, instance)
+            }
+            BalancerFactoryKind::ReClamm => {
+                registry!(BalancerV3ReClammPoolFactoryV2, instance)
             }
         };
         fetchers.push(registry);

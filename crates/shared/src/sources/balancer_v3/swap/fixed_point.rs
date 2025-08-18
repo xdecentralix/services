@@ -212,6 +212,30 @@ impl Bfp {
             raw.add(max_error)
         }
     }
+
+    /// Rounding-down power, mirroring MathSol.powDownFixed behavior.
+    pub fn pow_down(self, exp: Self) -> Result<Self, Error> {
+        let raw = Bfp(logexpmath::pow(self.0, exp.0)?);
+        let max_error = raw.mul_up(*MAX_POW_RELATIVE_ERROR)?.add(Bfp(1.into()))?;
+        if raw.as_uint256() <= max_error.as_uint256() {
+            Ok(Bfp::zero())
+        } else {
+            raw.sub(max_error)
+        }
+    }
+
+    pub fn pow_down_v3(self, exp: Self) -> Result<Self, Error> {
+        if exp == *ONE {
+            Ok(self)
+        } else if exp == *TWO {
+            self.mul_up(self)
+        } else if exp == *FOUR {
+            let square = self.mul_up(self)?;
+            square.mul_up(square)
+        } else {
+            self.pow_down(exp)
+        }
+    }
 }
 
 impl Add for Bfp {

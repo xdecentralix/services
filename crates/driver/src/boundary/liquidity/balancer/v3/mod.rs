@@ -38,6 +38,7 @@ use {
 };
 
 pub mod gyro_e;
+pub mod reclamm;
 pub mod stable;
 pub mod weighted;
 
@@ -175,6 +176,18 @@ async fn init_liquidity(
                     (
                         BalancerFactoryKind::GyroE,
                         BalancerV3GyroECLPPoolFactory::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            config
+                .reclamm
+                .iter()
+                .map(|&factory| {
+                    (
+                        BalancerFactoryKind::ReClamm,
+                        contracts::BalancerV3ReClammPoolFactoryV2::at(&web3, factory.into())
                             .raw_instance()
                             .clone(),
                     )

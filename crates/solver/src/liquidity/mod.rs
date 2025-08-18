@@ -35,6 +35,7 @@ use {
                 pool_fetching::{
                     AmplificationParameter as V3AmplificationParameter,
                     GyroEPoolVersion as V3GyroEPoolVersion,
+                    ReClammPoolVersion as V3ReClammPoolVersion,
                     StablePoolVersion as V3StablePoolVersion,
                     StableTokenState as V3StableTokenState,
                     TokenState as V3TokenState,
@@ -62,6 +63,7 @@ pub enum Liquidity {
     BalancerV3Stable(BalancerV3StablePoolOrder),
     BalancerGyroE(GyroEPoolOrder),
     BalancerV3GyroE(BalancerV3GyroEOrder),
+    BalancerV3ReClamm(BalancerV3ReClammOrder),
     LimitOrder(LimitOrder),
     Concentrated(ConcentratedLiquidity),
     Erc4626(erc4626::Erc4626Order),
@@ -430,6 +432,32 @@ pub struct BalancerV3GyroEOrder {
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
 }
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
+pub struct BalancerV3ReClammOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, V3TokenState>,
+    pub fee: V3Bfp,
+    pub version: V3ReClammPoolVersion,
+    pub last_virtual_balances: Vec<U256>,
+    pub daily_price_shift_base: V3Bfp,
+    pub last_timestamp: u64,
+    pub centeredness_margin: V3Bfp,
+    pub start_fourth_root_price_ratio: V3Bfp,
+    pub end_fourth_root_price_ratio: V3Bfp,
+    pub price_ratio_update_start_time: u64,
+    pub price_ratio_update_end_time: u64,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
+impl std::fmt::Debug for BalancerV3ReClammOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Balancer V3 ReCLAMM Pool AMM {:?}", self.reserves.keys())
+    }
+}
+
 impl std::fmt::Debug for StablePoolOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Stable Pool AMM {:?}", self.reserves.keys())
@@ -526,6 +554,14 @@ impl Settleable for GyroEPoolOrder {
 }
 
 impl Settleable for BalancerV3GyroEOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for BalancerV3ReClammOrder {
     type Execution = AmmOrderExecution;
 
     fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {

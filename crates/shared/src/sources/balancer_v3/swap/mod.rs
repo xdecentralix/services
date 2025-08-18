@@ -8,6 +8,7 @@ use {
             AmplificationParameter,
             GyroEPool,
             GyroEPoolVersion,
+            ReClammPool,
             StablePool,
             TokenState,
             WeightedPool,
@@ -26,6 +27,7 @@ mod error;
 pub mod fixed_point;
 pub mod gyro_e_math;
 mod math;
+pub mod reclamm_math;
 pub mod signed_fixed_point;
 mod stable_math;
 mod weighted_math;
@@ -33,6 +35,7 @@ mod weighted_math;
 const WEIGHTED_SWAP_GAS_COST: usize = 100_000;
 const STABLE_SWAP_GAS_COST: usize = 183_520;
 const GYRO_E_SWAP_GAS_COST: usize = 100_000;
+const RECLAMM_SWAP_GAS_COST: usize = 100_000;
 
 fn add_swap_fee_amount(amount: U256, swap_fee: Bfp) -> Result<U256, Error> {
     // https://github.com/balancer-labs/balancer-v2-monorepo/blob/6c9e24e22d0c46cca6dd15861d3d33da61a60b98/pkg/core/contracts/pools/BasePool.sol#L454-L457
@@ -779,6 +782,164 @@ impl BaselineSolvable for GyroEPool {
 
     async fn gas_cost(&self) -> usize {
         self.as_pool_ref().gas_cost().await
+    }
+}
+
+#[derive(Debug)]
+pub struct ReClammPoolRef<'a> {
+    pub reserves: &'a BTreeMap<H160, TokenState>,
+    pub swap_fee: Bfp,
+    pub last_virtual_balances: [Bfp; 2],
+    pub daily_price_shift_base: Bfp,
+    pub last_timestamp: u64,
+    pub centeredness_margin: Bfp,
+    pub start_fourth_root_price_ratio: Bfp,
+    pub end_fourth_root_price_ratio: Bfp,
+    pub price_ratio_update_start_time: u64,
+    pub price_ratio_update_end_time: u64,
+}
+
+impl ReClammPoolRef<'_> {
+    fn compute_virtuals_and_balances(
+        &self,
+        token0: H160,
+        token1: H160,
+        balances: &BTreeMap<H160, TokenState>,
+    ) -> Option<([Bfp; 2], Bfp, Bfp, bool)> {
+        let r0 = balances.get(&token0)?;
+        let r1 = balances.get(&token1)?;
+        let balances_scaled18 = [r0.upscaled_balance().ok()?, r1.upscaled_balance().ok()?];
+        let prs = reclamm_math::PriceRatioState {
+            price_ratio_update_start_time: self.price_ratio_update_start_time,
+            price_ratio_update_end_time: self.price_ratio_update_end_time,
+            start_fourth_root_price_ratio: self.start_fourth_root_price_ratio,
+            end_fourth_root_price_ratio: self.end_fourth_root_price_ratio,
+        };
+        let (va, vb, changed) = reclamm_math::compute_current_virtual_balances(
+            self.last_timestamp,
+            &balances_scaled18,
+            self.last_virtual_balances[0],
+            self.last_virtual_balances[1],
+            self.daily_price_shift_base,
+            self.last_timestamp,
+            self.centeredness_margin,
+            prs,
+        )
+        .ok()?;
+        Some((balances_scaled18, va, vb, changed))
+    }
+
+    fn get_amount_out_inner(
+        &self,
+        out_token: H160,
+        in_amount: U256,
+        in_token: H160,
+    ) -> Option<U256> {
+        let (token0, token1) = if in_token < out_token {
+            (in_token, out_token)
+        } else {
+            (out_token, in_token)
+        };
+        let in_reserves = self.reserves.get(&in_token)?;
+        let out_reserves = self.reserves.get(&out_token)?;
+
+        // Apply swap fee
+        let in_amount_minus_fees = subtract_swap_fee_amount(in_amount, self.swap_fee).ok()?;
+
+        let (balances_scaled18, va, vb, _changed) =
+            self.compute_virtuals_and_balances(token0, token1, self.reserves)?;
+
+        // Map token indices based on address ordering
+        let (index_in, index_out) = if in_token == token0 {
+            (0usize, 1usize)
+        } else {
+            (1usize, 0usize)
+        };
+
+        let amount_in_scaled18 = in_reserves.upscale(in_amount_minus_fees).ok()?;
+        let out_scaled = reclamm_math::compute_out_given_in(
+            &balances_scaled18,
+            va,
+            vb,
+            index_in,
+            index_out,
+            amount_in_scaled18,
+        )
+        .ok()?;
+        out_reserves.downscale_down(out_scaled).ok()
+    }
+
+    fn get_amount_in_inner(
+        &self,
+        in_token: H160,
+        out_amount: U256,
+        out_token: H160,
+    ) -> Option<U256> {
+        let (token0, token1) = if in_token < out_token {
+            (in_token, out_token)
+        } else {
+            (out_token, in_token)
+        };
+        let in_reserves = self.reserves.get(&in_token)?;
+        let out_reserves = self.reserves.get(&out_token)?;
+
+        let (balances_scaled18, va, vb, _changed) =
+            self.compute_virtuals_and_balances(token0, token1, self.reserves)?;
+
+        let (index_in, index_out) = if in_token == token0 {
+            (0usize, 1usize)
+        } else {
+            (1usize, 0usize)
+        };
+
+        let out_amount_scaled18 = out_reserves.upscale(out_amount).ok()?;
+        let in_scaled = reclamm_math::compute_in_given_out(
+            &balances_scaled18,
+            va,
+            vb,
+            index_in,
+            index_out,
+            out_amount_scaled18,
+        )
+        .ok()?;
+        let in_downscaled = in_reserves.downscale_up(in_scaled).ok()?;
+        add_swap_fee_amount(in_downscaled, self.swap_fee).ok()
+    }
+}
+
+impl ReClammPool {
+    fn as_pool_ref(&self) -> ReClammPoolRef<'_> {
+        ReClammPoolRef {
+            reserves: &self.reserves,
+            swap_fee: self.common.swap_fee,
+            last_virtual_balances: [
+                Bfp::from_wei(self.last_virtual_balances[0]),
+                Bfp::from_wei(self.last_virtual_balances[1]),
+            ],
+            daily_price_shift_base: self.daily_price_shift_base,
+            last_timestamp: self.last_timestamp,
+            centeredness_margin: self.centeredness_margin,
+            start_fourth_root_price_ratio: self.start_fourth_root_price_ratio,
+            end_fourth_root_price_ratio: self.end_fourth_root_price_ratio,
+            price_ratio_update_start_time: self.price_ratio_update_start_time,
+            price_ratio_update_end_time: self.price_ratio_update_end_time,
+        }
+    }
+}
+
+impl BaselineSolvable for ReClammPool {
+    async fn get_amount_out(&self, out_token: H160, input: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref()
+            .get_amount_out_inner(out_token, input.0, input.1)
+    }
+
+    async fn get_amount_in(&self, in_token: H160, output: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref()
+            .get_amount_in_inner(in_token, output.0, output.1)
+    }
+
+    async fn gas_cost(&self) -> usize {
+        RECLAMM_SWAP_GAS_COST
     }
 }
 

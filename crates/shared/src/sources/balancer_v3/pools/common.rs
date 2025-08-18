@@ -726,6 +726,7 @@ mod tests {
                         // This is just to handle the exhaustive pattern
                         // matching
                     }
+                    PoolKind::ReClamm(_) => {}
                 }
             }
             _ => panic!("expected active pool"),

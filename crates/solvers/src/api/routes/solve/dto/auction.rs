@@ -87,6 +87,7 @@ pub fn to_domain(auction: &Auction) -> Result<auction::Auction, Error> {
                 Liquidity::GyroE(liquidity) => gyro_e_pool::to_domain(liquidity),
                 Liquidity::LimitOrder(liquidity) => Ok(foreign_limit_order::to_domain(liquidity)),
                 Liquidity::Erc4626(liquidity) => erc4626::to_domain(liquidity),
+                Liquidity::ReClamm(liquidity) => reclamm_pool::to_domain(liquidity),
             })
             .try_collect()?,
         gas_price: auction::GasPrice(eth::Ether(auction.effective_gas_price)),
@@ -350,6 +351,61 @@ mod gyro_e_pool {
                 w: conv::decimal_to_signed_rational(&pool.w).ok_or("invalid w")?,
                 z: conv::decimal_to_signed_rational(&pool.z).ok_or("invalid z")?,
                 d_sq: conv::decimal_to_signed_rational(&pool.d_sq).ok_or("invalid d_sq")?,
+            }),
+        })
+    }
+}
+
+mod reclamm_pool {
+    use super::*;
+    pub fn to_domain(pool: &ReClammPool) -> Result<liquidity::Liquidity, Error> {
+        let reserves = {
+            let entries = pool
+                .tokens
+                .iter()
+                .map(|(address, token)| {
+                    Ok(liquidity::reclamm::Reserve {
+                        asset: eth::Asset {
+                            token: eth::TokenAddress(*address),
+                            amount: token.balance,
+                        },
+                        scale: conv::decimal_to_rational(&token.scaling_factor)
+                            .and_then(liquidity::ScalingFactor::new)
+                            .ok_or("invalid token scaling factor")?,
+                    })
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
+            liquidity::reclamm::Reserves::try_new(entries)
+                .map_err(|_| "duplicate token addresses")?
+        };
+
+        Ok(liquidity::Liquidity {
+            id: liquidity::Id(pool.id.clone()),
+            address: pool.address,
+            gas: eth::Gas(pool.gas_estimate),
+            state: liquidity::State::BalancerV3ReClamm(liquidity::reclamm::Pool {
+                reserves,
+                fee: conv::decimal_to_rational(&pool.fee).ok_or("invalid fee")?,
+                last_virtual_balances: pool
+                    .last_virtual_balances
+                    .iter()
+                    .map(|v| conv::decimal_to_rational(v).ok_or("invalid last_virtual_balance"))
+                    .collect::<Result<Vec<_>, _>>()?,
+                daily_price_shift_base: conv::decimal_to_rational(&pool.daily_price_shift_base)
+                    .ok_or("invalid daily_price_shift_base")?,
+                last_timestamp: pool.last_timestamp,
+                centeredness_margin: conv::decimal_to_rational(&pool.centeredness_margin)
+                    .ok_or("invalid centeredness_margin")?,
+                start_fourth_root_price_ratio: conv::decimal_to_rational(
+                    &pool.start_fourth_root_price_ratio,
+                )
+                .ok_or("invalid start_fourth_root_price_ratio")?,
+                end_fourth_root_price_ratio: conv::decimal_to_rational(
+                    &pool.end_fourth_root_price_ratio,
+                )
+                .ok_or("invalid end_fourth_root_price_ratio")?,
+                price_ratio_update_start_time: pool.price_ratio_update_start_time,
+                price_ratio_update_end_time: pool.price_ratio_update_end_time,
             }),
         })
     }
