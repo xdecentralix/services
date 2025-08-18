@@ -286,6 +286,22 @@ fn to_boundary_liquidity(
                         }
                     }
                 }
+                liquidity::State::QuantAmm(pool) => {
+                    if let Some(boundary_pool) =
+                        boundary::liquidity::quantamm::to_boundary_pool(liquidity.address, pool)
+                    {
+                        for pair in pool.reserves.token_pairs() {
+                            let token_pair = to_boundary_token_pair(&pair);
+                            onchain_liquidity.entry(token_pair).or_default().push(
+                                OnchainLiquidity {
+                                    id: liquidity.id.clone(),
+                                    token_pair,
+                                    source: LiquiditySource::QuantAmm(boundary_pool.clone()),
+                                },
+                            );
+                        }
+                    }
+                }
                 liquidity::State::Erc4626(edge) => {
                     if let Some(web3) = erc4626_web3 {
                         let edge_boundary =
@@ -339,6 +355,7 @@ enum LiquiditySource {
     ReClamm(boundary::liquidity::reclamm::Pool),
     LimitOrder(liquidity::limit_order::LimitOrder),
     Concentrated(boundary::liquidity::concentrated::Pool),
+    QuantAmm(boundary::liquidity::quantamm::Pool),
     Erc4626(boundary_erc4626::Edge),
 }
 
@@ -350,6 +367,7 @@ impl BaselineSolvable for OnchainLiquidity {
             LiquiditySource::Stable(pool) => pool.get_amount_out(out_token, input).await,
             LiquiditySource::GyroE(pool) => pool.get_amount_out(out_token, input).await,
             LiquiditySource::ReClamm(pool) => pool.get_amount_out(out_token, input).await,
+            LiquiditySource::QuantAmm(pool) => pool.get_amount_out(out_token, input).await,
             LiquiditySource::LimitOrder(limit_order) => {
                 limit_order.get_amount_out(out_token, input).await
             }
@@ -365,6 +383,7 @@ impl BaselineSolvable for OnchainLiquidity {
             LiquiditySource::Stable(pool) => pool.get_amount_in(in_token, out).await,
             LiquiditySource::GyroE(pool) => pool.get_amount_in(in_token, out).await,
             LiquiditySource::ReClamm(pool) => pool.get_amount_in(in_token, out).await,
+            LiquiditySource::QuantAmm(pool) => pool.get_amount_in(in_token, out).await,
             LiquiditySource::LimitOrder(limit_order) => {
                 limit_order.get_amount_in(in_token, out).await
             }
@@ -380,6 +399,7 @@ impl BaselineSolvable for OnchainLiquidity {
             LiquiditySource::Stable(pool) => pool.gas_cost().await,
             LiquiditySource::GyroE(pool) => pool.gas_cost().await,
             LiquiditySource::ReClamm(pool) => pool.gas_cost().await,
+            LiquiditySource::QuantAmm(pool) => pool.gas_cost().await,
             LiquiditySource::LimitOrder(limit_order) => limit_order.gas_cost().await,
             LiquiditySource::Concentrated(pool) => pool.gas_cost().await,
             LiquiditySource::Erc4626(edge) => edge.gas_cost().await,

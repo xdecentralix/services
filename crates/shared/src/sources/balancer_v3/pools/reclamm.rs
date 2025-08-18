@@ -178,6 +178,7 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            max_trade_size_ratio: None,
         };
 
         assert_eq!(

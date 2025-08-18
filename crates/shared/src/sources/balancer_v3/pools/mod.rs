@@ -9,6 +9,7 @@
 
 pub mod common;
 pub mod gyro_e;
+pub mod quantamm;
 pub mod reclamm;
 pub mod stable;
 pub mod weighted;
@@ -36,6 +37,7 @@ pub enum PoolKind {
     Stable(stable::PoolState),
     GyroE(gyro_e::PoolState),
     ReClamm(reclamm::PoolState),
+    QuantAmm(quantamm::PoolState),
 }
 
 macro_rules! impl_from_state {
@@ -52,6 +54,7 @@ impl_from_state!(weighted::PoolState, Weighted);
 impl_from_state!(stable::PoolState, Stable);
 impl_from_state!(gyro_e::PoolState, GyroE);
 impl_from_state!(reclamm::PoolState, ReClamm);
+impl_from_state!(quantamm::PoolState, QuantAmm);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Balancer V3 pool status.

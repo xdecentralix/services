@@ -74,7 +74,7 @@ impl BalancerApiClient {
                         "orderDirection" => "desc",
                         "where" => json!({
                             "chainIn": [self.chain],
-                             "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE", "RECLAMM"],
+                             "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE", "RECLAMM", "QUANT_AMM_WEIGHTED"],
                             "protocolVersionIn": [3] // V3 protocol
                         }),
                     }),
@@ -139,6 +139,7 @@ impl RegisteredPools {
 }
 
 /// Pool data from the Balancer V3 API.
+#[serde_as]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PoolData {
@@ -180,6 +181,10 @@ pub struct PoolData {
     pub z: Option<SBfp>,
     #[serde(default)]
     pub d_sq: Option<SBfp>,
+    /// QuantAMM-specific parameters
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub max_trade_size_ratio: Option<Bfp>,
 }
 
 /// Dynamic data for pools from Balancer V3 API.
@@ -205,10 +210,11 @@ pub struct Token {
 /// Supported pool kinds for V3.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Hash)]
 pub enum PoolType {
-    Weighted, // BalancerV3WeightedPoolFactory
-    Stable,   // BalancerV3StablePoolFactory, BalancerV3StablePoolFactoryV2
-    GyroE,    // BalancerV3GyroECLPPoolFactory
-    ReClamm,  // ReClammPoolFactory
+    Weighted,         // BalancerV3WeightedPoolFactory
+    Stable,           // BalancerV3StablePoolFactory, BalancerV3StablePoolFactoryV2
+    GyroE,            // BalancerV3GyroECLPPoolFactory
+    ReClamm,          // BalancerV3ReClammPoolFactoryV2
+    QuantAmmWeighted, // BalancerV3QuantAMMWeightedPoolFactory
 }
 
 impl PoolData {
@@ -219,6 +225,7 @@ impl PoolData {
             "STABLE" => PoolType::Stable,
             "GYROE" => PoolType::GyroE,
             "RECLAMM" => PoolType::ReClamm,
+            "QUANT_AMM_WEIGHTED" => PoolType::QuantAmmWeighted,
             _ => panic!("Unknown pool type: {}", self.pool_type),
         }
     }
@@ -303,6 +310,9 @@ mod pools_query {
                 w
                 z
                 dSq
+                quantAmmWeightedParams {
+                    maxTradeSizeRatio
+                }
             }
         }
     "#;
@@ -381,6 +391,7 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            max_trade_size_ratio: None,
         };
         let pool2 = PoolData {
             id: "0x2222222222222222222222222222222222222222".to_string(),
@@ -408,6 +419,7 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            max_trade_size_ratio: None,
         };
         let pools = RegisteredPools {
             fetched_block_number: 0,

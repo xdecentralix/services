@@ -12,6 +12,7 @@ use {
     contracts::{
         BalancerV3BatchRouter,
         BalancerV3GyroECLPPoolFactory,
+        BalancerV3QuantAMMWeightedPoolFactory,
         BalancerV3StablePoolFactory,
         BalancerV3StablePoolFactoryV2,
         BalancerV3Vault,
@@ -38,6 +39,7 @@ use {
 };
 
 pub mod gyro_e;
+pub mod quantamm;
 pub mod reclamm;
 pub mod stable;
 pub mod weighted;
@@ -189,6 +191,18 @@ async fn init_liquidity(
                     (
                         BalancerFactoryKind::ReClamm,
                         contracts::BalancerV3ReClammPoolFactoryV2::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            config
+                .quantamm
+                .iter()
+                .map(|&factory| {
+                    (
+                        BalancerFactoryKind::QuantAmm,
+                        BalancerV3QuantAMMWeightedPoolFactory::at(&web3, factory.into())
                             .raw_instance()
                             .clone(),
                     )

@@ -46,6 +46,7 @@ impl Interaction {
                     liquidity::Kind::BalancerV2GyroE(pool) => pool.vault.into(),
                     liquidity::Kind::BalancerV3GyroE(pool) => pool.batch_router.into(),
                     liquidity::Kind::BalancerV3ReClamm(pool) => pool.batch_router.into(),
+                    liquidity::Kind::BalancerV3QuantAmm(pool) => pool.batch_router.into(),
                     liquidity::Kind::Swapr(pool) => pool.base.router.into(),
                     liquidity::Kind::ZeroEx(pool) => pool.zeroex.address().into(),
                     liquidity::Kind::Erc4626(edge) => edge.tokens.1.0.into(),
@@ -61,6 +62,7 @@ impl Interaction {
                     | liquidity::Kind::BalancerV2GyroE(_)
                     | liquidity::Kind::BalancerV3GyroE(_)
                     | liquidity::Kind::BalancerV3ReClamm(_)
+                    | liquidity::Kind::BalancerV3QuantAmm(_)
                     | liquidity::Kind::Swapr(_)
                     | liquidity::Kind::ZeroEx(_) => vec![
                         eth::Allowance {
