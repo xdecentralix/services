@@ -123,7 +123,7 @@ include_contracts! {
     UniswapV2Router02;
     UniswapV3Pool;
     UniswapV3QuoterV2;
-    UniswapV3SwapRouter;
+    UniswapV3SwapRouterV2;
     WETH9;
 }
 
@@ -159,6 +159,7 @@ mod tests {
     const ARBITRUM_ONE: u64 = 42161;
     const AVALANCHE: u64 = 43114;
     const SEPOLIA: u64 = 11155111;
+    const LENS: u64 = 232;
 
     use {
         super::*,
@@ -247,7 +248,18 @@ mod tests {
             assert_has_deployment_address!(UniswapV2Router02 for *network);
         }
         for network in &[MAINNET, SEPOLIA, ARBITRUM_ONE] {
-            assert_has_deployment_address!(UniswapV3SwapRouter for *network);
+            assert_has_deployment_address!(UniswapV3SwapRouterV2 for *network);
+        for network in &[
+            MAINNET,
+            ARBITRUM_ONE,
+            POLYGON,
+            OPTIMISM,
+            BASE,
+            AVALANCHE,
+            BNB,
+            LENS,
+        ] {
+            assert_has_deployment_address!(UniswapV3SwapRouterV2 for *network);
             assert_has_deployment_address!(IUniswapV3Factory for *network);
         }
         for network in &[MAINNET, ARBITRUM_ONE] {
@@ -323,4 +335,5 @@ mod tests {
         assert_has_bytecode!(support::Trader);
         assert_has_bytecode!(support::Solver);
     }
+}
 }

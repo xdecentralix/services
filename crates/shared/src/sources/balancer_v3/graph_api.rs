@@ -41,6 +41,7 @@ pub enum GqlChain {
     BSC,
     FANTOM,
     SEPOLIA,
+    LENS,
 }
 
 impl BalancerApiClient {

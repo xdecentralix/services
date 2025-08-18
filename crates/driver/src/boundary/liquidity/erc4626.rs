@@ -28,6 +28,7 @@ fn chain_to_config_dir(chain: &Chain) -> &'static str {
         Chain::Optimism => "optimism",
         Chain::Polygon => "polygon",
         Chain::Hardhat => "hardhat",
+        Chain::Lens => "lens",
     }
 }
 

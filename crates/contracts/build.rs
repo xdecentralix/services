@@ -20,6 +20,7 @@ const BASE: &str = "8453";
 const ARBITRUM_ONE: &str = "42161";
 const AVALANCHE: &str = "43114";
 const SEPOLIA: &str = "11155111";
+const LENS: &str = "232";
 
 fn main() {
     // NOTE: This is a workaround for `rerun-if-changed` directives for
@@ -130,6 +131,14 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(71296258)),
                 },
             )
+            .add_network(
+                LENS,
+                Network {
+                    address: addr("0xFb337f8a725A142f65fb9ff4902d41cc901de222"),
+                    // <https://explorer.lens.xyz/tx/0xc59b5ffadb40158f9390b1d77f19346dbe9214b27f26346dfa2990ad379a1a32>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(71296258)),
+                },
+            )
     });
     generate_contract_with_config("CoWSwapOnchainOrders", |builder| {
         builder.contract_mod_override("cowswap_onchain_orders")
@@ -218,6 +227,7 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(15832990)),
                 },
             )
+        // Not available on Lens
     });
     generate_contract_with_config("BalancerV2WeightedPoolFactory", |builder| {
         builder
@@ -255,6 +265,8 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(15832998)),
                 },
             )
+        // Not available on Sepolia (only version ≥ 4)
+        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html>
     });
     generate_contract_with_config("BalancerV2WeightedPoolFactoryV3", |builder| {
         builder
@@ -316,6 +328,8 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(25474982)),
                 },
             )
+        // Not available on Sepolia (only version ≥ 4)
+        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html>
     });
     generate_contract_with_config("BalancerV2WeightedPoolFactoryV4", |builder| {
         builder
@@ -393,6 +407,8 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(26665331)),
                 },
             )
+        // Not available on Base
+        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
     generate_contract_with_config("BalancerV2WeightedPool2TokensFactory", |builder| {
         builder
@@ -430,7 +446,7 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(15869090)),
                 },
             )
-        // Not available on Sepolia, Base, Avalanche and BNB
+        // Not available on Sepolia, Base, Avalanche, BNB and Lens
         // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html>
         // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
@@ -478,6 +494,9 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(29371951)),
                 },
             )
+        // Not available on Sepolia, Base, Avalanche and BNB
+        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html>
+        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
     generate_contract_with_config("BalancerV2LiquidityBootstrappingPoolFactory", |builder| {
         builder
@@ -507,7 +526,7 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(17116402)),
                 },
             )
-        // Not available on Sepolia, Base, Avalanche, BNB and Optimism
+        // Not available on Sepolia, Base, Avalanche, BNB, Optimism and Lens
         // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html>
         // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
@@ -593,6 +612,7 @@ fn main() {
                         deployment_information: Some(DeploymentInformation::BlockNumber(22067480)),
                     },
                 )
+            // Not available on Lens
         },
     );
     generate_contract_with_config("BalancerV2ComposableStablePoolFactory", |builder| {
@@ -638,6 +658,10 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(32774224)),
                 },
             )
+        // Not available on Sepolia, Gnosis Chain, Base and Avalanche
+        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/gnosis.html>
+        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html>
+        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
     generate_contract_with_config("BalancerV2ComposableStablePoolFactoryV3", |builder| {
         builder
@@ -690,6 +714,9 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(39037615)),
                 },
             )
+        // Not available on Sepolia (only version ≥ 4) and on Base (only version ≥ 5)
+        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/sepolia.html>
+        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
     generate_contract_with_config("BalancerV2ComposableStablePoolFactoryV4", |builder| {
         builder
@@ -759,6 +786,8 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(40613553)),
                 },
             )
+        // Not available on Base
+        // <https://docs.balancer.fi/reference/contracts/deployment-addresses/base.html>
     });
     generate_contract_with_config("BalancerV2ComposableStablePoolFactoryV5", |builder| {
         builder
@@ -836,6 +865,7 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(44961548)),
                 },
             )
+        // Not available on Lens
     });
     generate_contract_with_config("BalancerV2ComposableStablePoolFactoryV6", |builder| {
         builder
@@ -1103,6 +1133,7 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(133969588)),
                 },
             )
+        // Not available on Lens
     });
     generate_contract_with_config("BalancerV3WeightedPoolFactory", |builder| {
         builder
@@ -1491,6 +1522,14 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(45854728)),
                 },
             )
+            .add_network(
+                LENS,
+                Network {
+                    address: addr("0x2c4c28DDBdAc9C5E7055b4C863b72eA0149D8aFE"),
+                    // <https://explorer.lens.xyz/tx/0x0730c21885153dcc9a25ab7abdc38309ec7c7a8db15b763fbbaf574d1e7ec498>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(2612937)),
+                },
+            )
     });
     generate_contract_with_config("GPv2Settlement", |builder| {
         builder
@@ -1566,6 +1605,14 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(45859743)),
                 },
             )
+            .add_network(
+                LENS,
+                Network {
+                    address: addr("0x9008D19f58AAbD9eD0D60971565AA8510560ab41"),
+                    // <https://explorer.lens.xyz/tx/0x01584b767dda7b115394b93dbcfecadfe589862ae3f7957846a2db82f2f5c703>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(2621745)),
+                },
+            )
     });
     generate_contract("GnosisSafe");
     generate_contract_with_config("GnosisSafeCompatibilityFallbackHandler", |builder| {
@@ -1589,6 +1636,7 @@ fn main() {
             .add_network_str(BNB, "0x60Bf78233f48eC42eE3F101b9a05eC7878728006")
             .add_network_str(OPTIMISM, "0x60Bf78233f48eC42eE3F101b9a05eC7878728006")
             .add_network_str(POLYGON, "0x60Bf78233f48eC42eE3F101b9a05eC7878728006")
+            .add_network_str(LENS, "0x60Bf78233f48eC42eE3F101b9a05eC7878728006")
     });
     generate_contract("IAavePool");
     generate_contract("IFlashLoanSolverWrapper");
@@ -1602,6 +1650,7 @@ fn main() {
             .add_network_str(ARBITRUM_ONE, "0x8cFe327CEc66d1C090Dd72bd0FF11d690C33a2Eb")
             .add_network_str(BASE, "0x8cFe327CEc66d1C090Dd72bd0FF11d690C33a2Eb")
             .add_network_str(BNB, "0x10ED43C718714eb63d5aA57B78B54704E256024E")
+        // Not available on Lens
     });
     generate_contract_with_config("SushiSwapRouter", |builder| {
         // <https://docs.sushi.com/contracts/cpamm>
@@ -1614,6 +1663,7 @@ fn main() {
             .add_network_str(BNB, "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506")
             .add_network_str(OPTIMISM, "0x2ABf469074dc0b54d793850807E6eb5Faf2625b1")
             .add_network_str(POLYGON, "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506")
+        // Not available on Lens
     });
     generate_contract_with_config("SwaprRouter", |builder| {
         // <https://swapr.gitbook.io/swapr/contracts>
@@ -1621,7 +1671,7 @@ fn main() {
             .add_network_str(MAINNET, "0xb9960d9bca016e9748be75dd52f02188b9d0829f")
             .add_network_str(GNOSIS, "0xE43e60736b1cb4a75ad25240E2f9a62Bff65c0C0")
             .add_network_str(ARBITRUM_ONE, "0x530476d5583724A89c8841eB6Da76E7Af4C0F17E")
-        // Not available on Base
+        // Not available on Base and Lens
     });
     generate_contract("ISwaprPair");
     generate_contract_with_config("UniswapV2Factory", |builder| {
@@ -1636,6 +1686,7 @@ fn main() {
             .add_network_str(BNB, "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6")
             .add_network_str(OPTIMISM, "0x0c3c1c532F1e39EdF36BE9Fe0bE1410313E074Bf")
             .add_network_str(POLYGON, "0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C")
+        // Not available on Lens
     });
     generate_contract_with_config("UniswapV2Router02", |builder| {
         // <https://docs.uniswap.org/contracts/v2/reference/smart-contracts/router-02>
@@ -1649,20 +1700,22 @@ fn main() {
             .add_network_str(BNB, "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24")
             .add_network_str(OPTIMISM, "0x4A7b5Da61326A6379179b40d00F57E5bbDC962c2")
             .add_network_str(POLYGON, "0xedf6066a2b290C185783862C7F4776A2C8077AD1")
+        // Not available on Lens
     });
-    generate_contract_with_config("UniswapV3SwapRouter", |builder| {
+    generate_contract_with_config("UniswapV3SwapRouterV2", |builder| {
         // <https://github.com/Uniswap/v3-periphery/blob/697c2474757ea89fec12a4e6db16a574fe259610/deploys.md>
         builder
-            .add_network_str(MAINNET, "0xE592427A0AEce92De3Edee1F18E0157C05861564")
+            .add_network_str(MAINNET, "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45")
             .add_network_str(SEPOLIA, "0xE592427A0AEce92De3Edee1F18E0157C05861564")
-            .add_network_str(ARBITRUM_ONE, "0xE592427A0AEce92De3Edee1F18E0157C05861564")
+            .add_network_str(ARBITRUM_ONE, "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45")
             // For Base, Avalanche and BNB it is only available SwapRouter02
             // <https://docs.uniswap.org/contracts/v3/reference/deployments/base-deployments>
+            .add_network_str(POLYGON, "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45")
+            .add_network_str(OPTIMISM, "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45")
             .add_network_str(BASE, "0x2626664c2603336E57B271c5C0b26F421741e481")
             .add_network_str(AVALANCHE, "0xbb00FF08d01D300023C629E8fFfFcb65A5a578cE")
             .add_network_str(BNB, "0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2")
-            .add_network_str(OPTIMISM, "0xE592427A0AEce92De3Edee1F18E0157C05861564")
-            .add_network_str(POLYGON, "0xE592427A0AEce92De3Edee1F18E0157C05861564")
+            .add_network_str(LENS, "0x6ddD32cd941041D8b61df213B9f515A7D288Dc13")
         // Not available on Gnosis Chain
     });
     generate_contract("UniswapV3Pool");
@@ -1676,6 +1729,7 @@ fn main() {
             .add_network_str(BNB, "0x78D78E420Da98ad378D7799bE8f4AF69033EB077")
             .add_network_str(OPTIMISM, "0x61fFE014bA17989E743c5F6cB21bF9697530B21e")
             .add_network_str(POLYGON, "0x61fFE014bA17989E743c5F6cB21bF9697530B21e")
+            .add_network_str(LENS, "0x1eEA2B790Dc527c5a4cd3d4f3ae8A2DDB65B2af1")
         // Not listed on Gnosis and Sepolia chains
     });
     generate_contract("IERC4626");
@@ -1692,6 +1746,7 @@ fn main() {
             .add_network_str(BNB, "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c")
             .add_network_str(OPTIMISM, "0x4200000000000000000000000000000000000006")
             .add_network_str(POLYGON, "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270")
+            .add_network_str(LENS, "0x6bDc36E20D267Ff0dd6097799f82e78907105e2F")
     });
     generate_contract_with_config("IUniswapV3Factory", |builder| {
         // <https://github.com/Uniswap/v3-periphery/blob/697c2474757ea89fec12a4e6db16a574fe259610/deploys.md>
@@ -1704,6 +1759,8 @@ fn main() {
             .add_network_str(BNB, "0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7")
             .add_network_str(OPTIMISM, "0x1F98431c8aD98523631AE4a59f267346ea31F984")
             .add_network_str(POLYGON, "0x1F98431c8aD98523631AE4a59f267346ea31F984")
+            // not official
+            .add_network_str(LENS, "0xc3A5b857Ba82a2586A45a8B59ECc3AA50Bc3D0e3")
         // Not available on Gnosis Chain
     });
     generate_contract_with_config("IZeroEx", |builder| {
@@ -1718,6 +1775,7 @@ fn main() {
             .add_network_str(BNB, "0xdef1c0ded9bec7f1a1670819833240f027b25eff")
             .add_network_str(OPTIMISM, "0xdef1abe32c034e558cdd535791643c58a13acc10")
             .add_network_str(POLYGON, "0xdef1c0ded9bec7f1a1670819833240f027b25eff")
+            // Not available on Lens
             .add_method_alias(
                 "_transformERC20((address,address,address,uint256,uint256,(uint32,bytes)[],bool,\
                  address))",
@@ -1747,6 +1805,7 @@ fn main() {
             .add_network_str(SEPOLIA, "0x0625aFB445C3B6B7B929342a04A22599fd5dBB59")
             .add_network_str(ARBITRUM_ONE, "0xcb8b5CD20BdCaea9a010aC1F8d835824F5C87A04")
             .add_network_str(BASE, "0xc694a91e6b071bF030A18BD3053A7fE09B6DaE69")
+        // Not available on Lens
     });
 
     // Unofficial Uniswap v2 liquidity on the Sepolia testnet.
@@ -1765,6 +1824,7 @@ fn main() {
             .add_network_str(BNB, "0x40C57923924B5c5c5455c48D93317139ADDaC8fb")
             .add_network_str(OPTIMISM, "0x40C57923924B5c5c5455c48D93317139ADDaC8fb")
             .add_network_str(POLYGON, "0x40C57923924B5c5c5455c48D93317139ADDaC8fb")
+        // Not available on Lens: <https://go.chainalysis.com/chainalysis-oracle-docs.html>
     });
 
     generate_contract("CowAmm");
@@ -1822,8 +1882,32 @@ fn main() {
     generate_contract("Trader");
 
     // Support contracts used for various order simulations.
-    generate_contract("Balances");
-    generate_contract("Signatures");
+    generate_contract_with_config("Balances", |builder| {
+        builder
+            .add_network_str(MAINNET, "0x3e8C6De9510e7ECad902D005DE3Ab52f35cF4f1b")
+            .add_network_str(ARBITRUM_ONE, "0x3e8C6De9510e7ECad902D005DE3Ab52f35cF4f1b")
+            .add_network_str(BASE, "0x3e8C6De9510e7ECad902D005DE3Ab52f35cF4f1b")
+            .add_network_str(AVALANCHE, "0x3e8C6De9510e7ECad902D005DE3Ab52f35cF4f1b")
+            .add_network_str(BNB, "0x3e8C6De9510e7ECad902D005DE3Ab52f35cF4f1b")
+            .add_network_str(OPTIMISM, "0x3e8C6De9510e7ECad902D005DE3Ab52f35cF4f1b")
+            .add_network_str(POLYGON, "0x3e8C6De9510e7ECad902D005DE3Ab52f35cF4f1b")
+            .add_network_str(LENS, "0x3e8C6De9510e7ECad902D005DE3Ab52f35cF4f1b")
+            .add_network_str(GNOSIS, "0x3e8C6De9510e7ECad902D005DE3Ab52f35cF4f1b")
+            .add_network_str(SEPOLIA, "0x3e8C6De9510e7ECad902D005DE3Ab52f35cF4f1b")
+    });
+    generate_contract_with_config("Signatures", |builder| {
+        builder
+            .add_network_str(MAINNET, "0x8262d639c38470F38d2eff15926F7071c28057Af")
+            .add_network_str(ARBITRUM_ONE, "0x8262d639c38470F38d2eff15926F7071c28057Af")
+            .add_network_str(BASE, "0x8262d639c38470F38d2eff15926F7071c28057Af")
+            .add_network_str(AVALANCHE, "0x8262d639c38470F38d2eff15926F7071c28057Af")
+            .add_network_str(BNB, "0x8262d639c38470F38d2eff15926F7071c28057Af")
+            .add_network_str(OPTIMISM, "0x8262d639c38470F38d2eff15926F7071c28057Af")
+            .add_network_str(POLYGON, "0x8262d639c38470F38d2eff15926F7071c28057Af")
+            .add_network_str(LENS, "0x8262d639c38470F38d2eff15926F7071c28057Af")
+            .add_network_str(GNOSIS, "0x8262d639c38470F38d2eff15926F7071c28057Af")
+            .add_network_str(SEPOLIA, "0x8262d639c38470F38d2eff15926F7071c28057Af")
+    });
     generate_contract("SimulateCode");
 
     // Support contract used for solver fee simulations.
@@ -1914,6 +1998,7 @@ fn main() {
                     deployment_information: Some(DeploymentInformation::BlockNumber(35701901)),
                 },
             )
+        // Not available on Lens
     });
 }
 
