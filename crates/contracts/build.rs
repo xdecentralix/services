@@ -1414,10 +1414,46 @@ fn main() {
                 },
             )
     });
+    generate_contract_with_config("BalancerV3QuantAMMWeightedPoolFactory", |builder| {
+        builder
+            .add_network(
+                MAINNET,
+                Network {
+                    address: addr("0xD5c43063563f9448cE822789651662cA7DcD5773"),
+                    // <https://etherscan.io/tx/0xf0836415bec5a29d4b338ef1c7f09cb070ec5db2e92b3c36903162844508aafc>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(22334706)),
+                },
+            )
+            .add_network(
+                SEPOLIA,
+                Network {
+                    address: addr("0xe9B996395f9B6555426045d6A4d1087244d9490e"),
+                    // <https://sepolia.etherscan.io/tx/0xd7702c5f889c1e20f035f253f725b6c34d6542e511b3b647c61fcf9ff2ee4bc4>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(8180675)),
+                },
+            )
+            .add_network(
+                ARBITRUM_ONE,
+                Network {
+                    address: addr("0x62B9eC6A5BBEBe4F5C5f46C8A8880df857004295"),
+                    // <https://arbiscan.io/tx/0x78424ecdd4fb61f320e4dced0cdf567843cc62cbde7bf56ee95f218a8bd0db3a>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(331549791)),
+                },
+            )
+            .add_network(
+                BASE,
+                Network {
+                    address: addr("0x62B9eC6A5BBEBe4F5C5f46C8A8880df857004295"),
+                    // <https://basescan.org/tx/0xda49be8739db416caa67fce44379fd760d2a162346c229a146e0ba121b06b078>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(29577953)),
+                },
+            )
+    });
     generate_contract("BalancerV3WeightedPool");
     generate_contract("BalancerV3StablePool");
     generate_contract("BalancerV3GyroECLPPool");
     generate_contract("BalancerV3ReClammPool");
+    generate_contract("BalancerV3QuantAMMWeightedPool");
     generate_contract("IRateProvider");
 
     generate_contract_with_config("BaoswapRouter", |builder| {

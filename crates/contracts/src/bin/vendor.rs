@@ -159,7 +159,11 @@ fn run() -> Result<()> {
         .github(
             "BalancerV3ReClammPoolFactoryV2",
             "balancer/balancer-deployments/18839b81d136315c587011c135958b49272547ab/v3/tasks/20250702-v3-reclamm-pool-v2/artifact/ReClammPoolFactory.json",
-        )?;
+        )?
+        .manual(
+            "BalancerV3QuantAMMWeightedPoolFactory",
+            "Manually vendored ABI for Quant AMM Weighted Pool Factory contract",
+        );
 
     // Balancer V3 contracts - ABI Only
     vendor
@@ -179,7 +183,11 @@ fn run() -> Result<()> {
         .github(
             "BalancerV3ReClammPool",
             "balancer/balancer-deployments/18839b81d136315c587011c135958b49272547ab/v3/tasks/20250702-v3-reclamm-pool-v2/artifact/ReClammPool.json",
-        )?;
+        )?
+        .manual(
+            "BalancerV3QuantAMMWeightedPool",
+            "Manually vendored ABI for Quant AMM Weighted Pool contract",
+        );
 
     // CowSwap contracts - Full
     vendor
