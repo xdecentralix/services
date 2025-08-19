@@ -74,7 +74,7 @@ impl BalancerApiClient {
                         "orderDirection" => "desc",
                         "where" => json!({
                             "chainIn": [self.chain],
-                             "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE", "RECLAMM", "QUANT_AMM_WEIGHTED"],
+                             "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE", "RECLAMM", "QUANT_AMM_WEIGHTED", "GYRO"],
                             "protocolVersionIn": [3] // V3 protocol
                         }),
                     }),
@@ -181,6 +181,11 @@ pub struct PoolData {
     pub z: Option<SBfp>,
     #[serde(default)]
     pub d_sq: Option<SBfp>,
+    /// Gyro 2-CLP-specific parameters
+    #[serde(default)]
+    pub sqrt_alpha: Option<SBfp>,
+    #[serde(default)]
+    pub sqrt_beta: Option<SBfp>,
     /// QuantAMM-specific parameters
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[serde(default)]
@@ -213,6 +218,7 @@ pub enum PoolType {
     Weighted,         // BalancerV3WeightedPoolFactory
     Stable,           // BalancerV3StablePoolFactory, BalancerV3StablePoolFactoryV2
     GyroE,            // BalancerV3GyroECLPPoolFactory
+    Gyro2CLP,         // BalancerV3Gyro2CLPPoolFactory
     ReClamm,          // BalancerV3ReClammPoolFactoryV2
     QuantAmmWeighted, // BalancerV3QuantAMMWeightedPoolFactory
 }
@@ -224,6 +230,7 @@ impl PoolData {
             "WEIGHTED" => PoolType::Weighted,
             "STABLE" => PoolType::Stable,
             "GYROE" => PoolType::GyroE,
+            "GYRO" => PoolType::Gyro2CLP,
             "RECLAMM" => PoolType::ReClamm,
             "QUANT_AMM_WEIGHTED" => PoolType::QuantAmmWeighted,
             _ => panic!("Unknown pool type: {}", self.pool_type),
@@ -313,6 +320,8 @@ mod pools_query {
                 quantAmmWeightedParams {
                     maxTradeSizeRatio
                 }
+                sqrtAlpha
+                sqrtBeta
             }
         }
     "#;
@@ -391,6 +400,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: None,
         };
         let pool2 = PoolData {
@@ -419,6 +430,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: None,
         };
         let pools = RegisteredPools {

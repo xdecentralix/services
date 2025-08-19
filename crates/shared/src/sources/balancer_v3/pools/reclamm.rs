@@ -178,6 +178,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: None,
         };
 

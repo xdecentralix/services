@@ -54,6 +54,7 @@ pub fn new(
             liquidity::Kind::BalancerV3Weighted(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV2GyroE(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3GyroE(pool) => pool.reserves.tokens().collect(),
+            liquidity::Kind::BalancerV3Gyro2CLP(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3ReClamm(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3QuantAmm(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::Swapr(pool) => pool.base.reserves.iter().map(|r| r.token).collect(),
@@ -438,6 +439,47 @@ pub fn new(
                             d_sq: signed_fixed_point_to_decimal_v3(pool.d_sq),
                         })
                     }
+                    liquidity::Kind::BalancerV3Gyro2CLP(pool) => {
+                        solvers_dto::auction::Liquidity::Gyro2CLP(
+                            solvers_dto::auction::Gyro2CLPPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.id.address().into(),
+                                balancer_pool_id: {
+                                    let pool_id_h160: eth::H160 = pool.id.into();
+                                    pool_id_h160.into()
+                                },
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.asset.token.into(),
+                                            solvers_dto::auction::Gyro2CLPReserve {
+                                                balance: r.asset.amount.into(),
+                                                scaling_factor: scaling_factor_to_decimal_v3(
+                                                    r.scale,
+                                                ),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: fee_to_decimal_v3(pool.fee),
+                                version: match pool.version {
+                                    liquidity::balancer::v3::gyro_2clp::Version::V1 => {
+                                        solvers_dto::auction::Gyro2CLPVersion::V1
+                                    }
+                                },
+                                // Convert Gyro 2-CLP static parameters to BigDecimal
+                                sqrt_alpha: signed_fixed_point_to_decimal_v3_gyro_2clp(
+                                    pool.sqrt_alpha,
+                                ),
+                                sqrt_beta: signed_fixed_point_to_decimal_v3_gyro_2clp(
+                                    pool.sqrt_beta,
+                                ),
+                            },
+                        )
+                    }
                     liquidity::Kind::BalancerV3ReClamm(pool) => {
                         solvers_dto::auction::Liquidity::ReClamm(
                             solvers_dto::auction::ReClammPool {
@@ -703,6 +745,17 @@ fn signed_fixed_point_to_decimal(
 
 fn signed_fixed_point_to_decimal_v3(
     sfp: liquidity::balancer::v3::gyro_e::SignedFixedPoint,
+) -> bigdecimal::BigDecimal {
+    // Convert I256 to BigInt via string representation to handle signed values
+    // correctly
+    let i256_str = sfp.as_raw().to_string();
+    let big_int = num::BigInt::parse_bytes(i256_str.as_bytes(), 10)
+        .expect("valid I256 should parse to BigInt");
+    bigdecimal::BigDecimal::new(big_int, 18)
+}
+
+fn signed_fixed_point_to_decimal_v3_gyro_2clp(
+    sfp: liquidity::balancer::v3::gyro_2clp::SignedFixedPoint,
 ) -> bigdecimal::BigDecimal {
     // Convert I256 to BigInt via string representation to handle signed values
     // correctly

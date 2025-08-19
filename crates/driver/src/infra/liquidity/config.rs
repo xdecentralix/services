@@ -286,6 +286,9 @@ pub struct BalancerV3 {
     /// GyroE pool factory addresses.
     pub gyro_e: Vec<eth::ContractAddress>,
 
+    /// Gyro2CLP pool factory addresses.
+    pub gyro_2clp: Vec<eth::ContractAddress>,
+
     /// ReClamm pool factory addresses.
     pub reclamm: Vec<eth::ContractAddress>,
 
@@ -338,6 +341,9 @@ impl BalancerV3 {
                 contracts::BalancerV3StablePoolFactoryV2::raw_contract(),
             ]),
             gyro_e: factory_addresses(&[contracts::BalancerV3GyroECLPPoolFactory::raw_contract()]),
+            gyro_2clp: factory_addresses(&[
+                contracts::BalancerV3Gyro2CLPPoolFactory::raw_contract(),
+            ]),
             reclamm: factory_addresses(
                 &[contracts::BalancerV3ReClammPoolFactoryV2::raw_contract()],
             ),

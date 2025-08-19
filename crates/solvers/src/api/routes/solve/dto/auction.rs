@@ -85,6 +85,7 @@ pub fn to_domain(auction: &Auction) -> Result<auction::Auction, Error> {
                     concentrated_liquidity_pool::to_domain(liquidity)
                 }
                 Liquidity::GyroE(liquidity) => gyro_e_pool::to_domain(liquidity),
+                Liquidity::Gyro2CLP(liquidity) => gyro_2clp_pool::to_domain(liquidity),
                 Liquidity::LimitOrder(liquidity) => Ok(foreign_limit_order::to_domain(liquidity)),
                 Liquidity::Erc4626(liquidity) => erc4626::to_domain(liquidity),
                 Liquidity::ReClamm(liquidity) => reclamm_pool::to_domain(liquidity),
@@ -351,6 +352,50 @@ mod gyro_e_pool {
                 w: conv::decimal_to_signed_rational(&pool.w).ok_or("invalid w")?,
                 z: conv::decimal_to_signed_rational(&pool.z).ok_or("invalid z")?,
                 d_sq: conv::decimal_to_signed_rational(&pool.d_sq).ok_or("invalid d_sq")?,
+            }),
+        })
+    }
+}
+
+mod gyro_2clp_pool {
+    use super::*;
+
+    pub fn to_domain(pool: &Gyro2CLPPool) -> Result<liquidity::Liquidity, Error> {
+        let reserves = {
+            let entries = pool
+                .tokens
+                .iter()
+                .map(|(address, token)| {
+                    Ok(liquidity::gyro_2clp::Reserve {
+                        asset: eth::Asset {
+                            token: eth::TokenAddress(*address),
+                            amount: token.balance,
+                        },
+                        scale: conv::decimal_to_rational(&token.scaling_factor)
+                            .and_then(liquidity::ScalingFactor::new)
+                            .ok_or("invalid token scaling factor")?,
+                    })
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
+            liquidity::gyro_2clp::Reserves::new(entries)
+                .ok_or("duplicate Gyro2CLP token addresses")?
+        };
+
+        Ok(liquidity::Liquidity {
+            id: liquidity::Id(pool.id.clone()),
+            address: pool.address,
+            gas: eth::Gas(pool.gas_estimate),
+            state: liquidity::State::Gyro2CLP(liquidity::gyro_2clp::Pool {
+                reserves,
+                fee: conv::decimal_to_rational(&pool.fee).ok_or("invalid Gyro2CLP pool fee")?,
+                version: match pool.version {
+                    Gyro2CLPVersion::V1 => liquidity::gyro_2clp::Version::V1,
+                },
+                // Convert Gyro 2-CLP static parameters from BigDecimal to SignedRational
+                sqrt_alpha: conv::decimal_to_signed_rational(&pool.sqrt_alpha)
+                    .ok_or("invalid sqrt_alpha")?,
+                sqrt_beta: conv::decimal_to_signed_rational(&pool.sqrt_beta)
+                    .ok_or("invalid sqrt_beta")?,
             }),
         })
     }

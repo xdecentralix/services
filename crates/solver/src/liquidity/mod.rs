@@ -34,6 +34,7 @@ use {
             balancer_v3::{
                 pool_fetching::{
                     AmplificationParameter as V3AmplificationParameter,
+                    Gyro2CLPPoolVersion as V3Gyro2CLPPoolVersion,
                     GyroEPoolVersion as V3GyroEPoolVersion,
                     QuantAmmPoolVersion as V3QuantAmmPoolVersion,
                     QuantAmmTokenState as V3QuantAmmTokenState,
@@ -65,6 +66,7 @@ pub enum Liquidity {
     BalancerV3Stable(BalancerV3StablePoolOrder),
     BalancerGyroE(GyroEPoolOrder),
     BalancerV3GyroE(BalancerV3GyroEOrder),
+    BalancerV3Gyro2CLP(BalancerV3Gyro2CLPOrder),
     BalancerV3ReClamm(BalancerV3ReClammOrder),
     BalancerV3QuantAmm(BalancerV3QuantAmmOrder),
     LimitOrder(LimitOrder),
@@ -438,6 +440,34 @@ pub struct BalancerV3GyroEOrder {
 #[derive(Clone)]
 #[cfg_attr(test, derive(Derivative))]
 #[cfg_attr(test, derivative(PartialEq))]
+pub struct BalancerV3Gyro2CLPOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, V3TokenState>,
+    pub fee: V3Bfp,
+    pub version: V3Gyro2CLPPoolVersion,
+    // Gyro 2-CLP static parameters (immutable after pool creation)
+    pub sqrt_alpha: V3SBfp,
+    pub sqrt_beta: V3SBfp,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
+impl std::fmt::Debug for BalancerV3Gyro2CLPOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BalancerV3Gyro2CLPOrder")
+            .field("address", &self.address)
+            .field("reserves", &self.reserves)
+            .field("fee", &self.fee)
+            .field("version", &self.version)
+            .field("sqrt_alpha", &self.sqrt_alpha)
+            .field("sqrt_beta", &self.sqrt_beta)
+            .finish()
+    }
+}
+
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
 pub struct BalancerV3ReClammOrder {
     pub address: H160,
     pub reserves: BTreeMap<H160, V3TokenState>,
@@ -585,6 +615,14 @@ impl Settleable for GyroEPoolOrder {
 }
 
 impl Settleable for BalancerV3GyroEOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for BalancerV3Gyro2CLPOrder {
     type Execution = AmmOrderExecution;
 
     fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {

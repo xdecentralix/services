@@ -344,6 +344,7 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         stable,
                         stable_v2,
                         gyro_e,
+                        gyro_2clp,
                         reclamm,
                         quantamm,
                         pool_deny_list,
@@ -363,6 +364,10 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                             .map(eth::ContractAddress::from)
                             .collect(),
                         gyro_e: gyro_e.into_iter().map(eth::ContractAddress::from).collect(),
+                        gyro_2clp: gyro_2clp
+                            .into_iter()
+                            .map(eth::ContractAddress::from)
+                            .collect(),
                         reclamm: reclamm
                             .into_iter()
                             .map(eth::ContractAddress::from)

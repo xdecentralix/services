@@ -194,6 +194,7 @@ impl Fetcher {
                     Liquidity::BalancerV3Stable(pool) => balancer::v3::stable::to_domain(id, pool),
                     Liquidity::BalancerGyroE(pool) => balancer::v2::gyro_e::to_domain(id, pool),
                     Liquidity::BalancerV3GyroE(pool) => balancer::v3::gyro_e::to_domain(id, pool),
+                    Liquidity::BalancerV3Gyro2CLP(pool) => balancer::v3::gyro_2clp::to_domain(id, pool),
                     Liquidity::BalancerV3ReClamm(pool) => balancer::v3::reclamm::to_domain(id, pool),
                     Liquidity::BalancerV3QuantAmm(pool) => balancer::v3::quantamm::to_domain(id, pool),
                     Liquidity::LimitOrder(pool) => zeroex::to_domain(id, pool),

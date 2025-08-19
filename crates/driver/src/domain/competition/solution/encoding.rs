@@ -416,6 +416,9 @@ pub fn liquidity_interaction(
         liquidity::Kind::BalancerV3GyroE(pool) => pool
             .swap(&input, &output, &settlement.address().into())
             .ok(),
+        liquidity::Kind::BalancerV3Gyro2CLP(pool) => pool
+            .swap(&input, &output, &settlement.address().into())
+            .ok(),
         liquidity::Kind::BalancerV3ReClamm(pool) => pool
             .swap(&input, &output, &settlement.address().into())
             .ok(),
@@ -671,19 +674,6 @@ mod test {
                 tokens: (asset.into(), vault.into()),
             }),
         };
-        let liq_interaction = Interaction::Liquidity(InteractionLiquidity {
-            liquidity: liquidity.clone(),
-            input: eth::Asset {
-                token: asset.into(),
-                amount: 100.into(),
-            },
-            output: eth::Asset {
-                token: vault.into(),
-                amount: 95.into(),
-            },
-            internalize: false,
-        });
-
         // Note: we validate via direct allowances() and interaction selector; no need
         // to build full Solution here.
 

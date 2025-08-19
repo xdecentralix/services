@@ -3,6 +3,7 @@
 pub mod concentrated;
 pub mod constant_product;
 pub mod erc4626;
+pub mod gyro_2clp;
 pub mod gyro_e;
 pub mod limit_order;
 pub mod quantamm;
@@ -33,6 +34,7 @@ pub enum State {
     Stable(stable::Pool),
     Concentrated(concentrated::Pool),
     GyroE(gyro_e::Pool),
+    Gyro2CLP(gyro_2clp::Pool),
     BalancerV3ReClamm(reclamm::Pool),
     QuantAmm(quantamm::Pool),
     LimitOrder(limit_order::LimitOrder),

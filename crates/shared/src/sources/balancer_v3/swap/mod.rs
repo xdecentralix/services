@@ -6,6 +6,8 @@ use {
         conversions::U256Ext,
         sources::balancer_v3::pool_fetching::{
             AmplificationParameter,
+            Gyro2CLPPool,
+            Gyro2CLPPoolVersion,
             GyroEPool,
             GyroEPoolVersion,
             QuantAmmPool,
@@ -21,11 +23,13 @@ use {
     ethcontract::{H160, I256, U256},
     fixed_point::Bfp,
     num::BigInt,
+    number::conversions::big_int_to_u256,
     std::collections::BTreeMap,
 };
 
 mod error;
 pub mod fixed_point;
+pub mod gyro_2clp_math;
 pub mod gyro_e_math;
 mod math;
 pub mod quantamm_math;
@@ -36,6 +40,7 @@ mod weighted_math;
 
 const WEIGHTED_SWAP_GAS_COST: usize = 100_000;
 const STABLE_SWAP_GAS_COST: usize = 183_520;
+const GYRO_2CLP_SWAP_GAS_COST: usize = 100_000;
 const GYRO_E_SWAP_GAS_COST: usize = 100_000;
 const RECLAMM_SWAP_GAS_COST: usize = 100_000;
 
@@ -774,6 +779,199 @@ impl GyroEPool {
 }
 
 impl BaselineSolvable for GyroEPool {
+    async fn get_amount_out(&self, out_token: H160, input: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref().get_amount_out(out_token, input).await
+    }
+
+    async fn get_amount_in(&self, in_token: H160, output: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref().get_amount_in(in_token, output).await
+    }
+
+    async fn gas_cost(&self) -> usize {
+        self.as_pool_ref().gas_cost().await
+    }
+}
+
+#[derive(Debug)]
+pub struct Gyro2CLPPoolRef<'a> {
+    pub reserves: &'a BTreeMap<H160, TokenState>,
+    pub swap_fee: Bfp,
+    pub version: Gyro2CLPPoolVersion,
+    pub sqrt_alpha: signed_fixed_point::SBfp,
+    pub sqrt_beta: signed_fixed_point::SBfp,
+}
+
+impl Gyro2CLPPoolRef<'_> {
+    fn get_amount_out_inner(
+        &self,
+        out_token: H160,
+        in_amount: U256,
+        in_token: H160,
+    ) -> Option<U256> {
+        // Get token reserves
+        let in_reserves = self.reserves.get(&in_token)?;
+        let out_reserves = self.reserves.get(&out_token)?;
+
+        // Apply swap fees to input amount
+        let in_amount_minus_fees = subtract_swap_fee_amount(in_amount, self.swap_fee).ok()?;
+
+        // Convert to upscaled amounts
+        let in_balance_upscaled = in_reserves.upscaled_balance().ok()?.as_uint256();
+        let out_balance_upscaled = out_reserves.upscaled_balance().ok()?.as_uint256();
+        let in_amount_upscaled = in_reserves.upscale(in_amount_minus_fees).ok()?.as_uint256();
+
+        // Convert to BigInt for 2-CLP math
+        let in_balance_bigint = in_balance_upscaled.to_big_int();
+        let out_balance_bigint = out_balance_upscaled.to_big_int();
+        let in_amount_bigint = in_amount_upscaled.to_big_int();
+        let sqrt_alpha_bigint = self.sqrt_alpha.to_big_int().clone();
+        let sqrt_beta_bigint = self.sqrt_beta.to_big_int().clone();
+
+        // Calculate invariant
+        let balances = vec![in_balance_bigint.clone(), out_balance_bigint.clone()];
+        let invariant = gyro_2clp_math::calculate_invariant(
+            &balances,
+            &sqrt_alpha_bigint,
+            &sqrt_beta_bigint,
+            &gyro_2clp_math::Rounding::RoundDown,
+        )
+        .ok()?;
+
+        // Calculate virtual parameters
+        let virtual_offset_in = gyro_2clp_math::calculate_virtual_parameter0(
+            &invariant,
+            &sqrt_beta_bigint,
+            &gyro_2clp_math::Rounding::RoundDown,
+        )
+        .ok()?;
+        let virtual_offset_out = gyro_2clp_math::calculate_virtual_parameter1(
+            &invariant,
+            &sqrt_alpha_bigint,
+            &gyro_2clp_math::Rounding::RoundDown,
+        )
+        .ok()?;
+
+        // Calculate output amount
+        let out_amount_bigint = gyro_2clp_math::calc_out_given_in(
+            &in_balance_bigint,
+            &out_balance_bigint,
+            &in_amount_bigint,
+            &virtual_offset_in,
+            &virtual_offset_out,
+        )
+        .ok()?;
+
+        // Convert back to U256 and downscale
+        let out_amount_u256 = big_int_to_u256(&out_amount_bigint).ok()?;
+        let out_amount_bfp = Bfp::from_wei(out_amount_u256);
+        let out_amount_downscaled = out_reserves.downscale_down(out_amount_bfp).ok()?;
+
+        Some(out_amount_downscaled)
+    }
+
+    fn get_amount_in_inner(
+        &self,
+        in_token: H160,
+        out_amount: U256,
+        out_token: H160,
+    ) -> Option<U256> {
+        // Get token reserves
+        let in_reserves = self.reserves.get(&in_token)?;
+        let out_reserves = self.reserves.get(&out_token)?;
+
+        // Convert to upscaled amounts
+        let in_balance_upscaled = in_reserves.upscaled_balance().ok()?.as_uint256();
+        let out_balance_upscaled = out_reserves.upscaled_balance().ok()?.as_uint256();
+        let out_amount_upscaled = out_reserves.upscale(out_amount).ok()?.as_uint256();
+
+        // Convert to BigInt for 2-CLP math
+        let in_balance_bigint = in_balance_upscaled.to_big_int();
+        let out_balance_bigint = out_balance_upscaled.to_big_int();
+        let out_amount_bigint = out_amount_upscaled.to_big_int();
+        let sqrt_alpha_bigint = self.sqrt_alpha.to_big_int().clone();
+        let sqrt_beta_bigint = self.sqrt_beta.to_big_int().clone();
+
+        // Calculate invariant
+        let balances = vec![in_balance_bigint.clone(), out_balance_bigint.clone()];
+        let invariant = gyro_2clp_math::calculate_invariant(
+            &balances,
+            &sqrt_alpha_bigint,
+            &sqrt_beta_bigint,
+            &gyro_2clp_math::Rounding::RoundUp,
+        )
+        .ok()?;
+
+        // Calculate virtual parameters
+        let virtual_offset_in = gyro_2clp_math::calculate_virtual_parameter0(
+            &invariant,
+            &sqrt_beta_bigint,
+            &gyro_2clp_math::Rounding::RoundUp,
+        )
+        .ok()?;
+        let virtual_offset_out = gyro_2clp_math::calculate_virtual_parameter1(
+            &invariant,
+            &sqrt_alpha_bigint,
+            &gyro_2clp_math::Rounding::RoundDown,
+        )
+        .ok()?;
+
+        // Calculate input amount
+        let in_amount_bigint = gyro_2clp_math::calc_in_given_out(
+            &in_balance_bigint,
+            &out_balance_bigint,
+            &out_amount_bigint,
+            &virtual_offset_in,
+            &virtual_offset_out,
+        )
+        .ok()?;
+
+        // Convert back to U256 and downscale
+        let in_amount_u256 = big_int_to_u256(&in_amount_bigint).ok()?;
+        let in_amount_bfp = Bfp::from_wei(in_amount_u256);
+        let in_amount_downscaled = in_reserves.downscale_up(in_amount_bfp).ok()?;
+
+        // Add swap fees
+        let in_amount_with_fees = add_swap_fee_amount(in_amount_downscaled, self.swap_fee).ok()?;
+
+        Some(in_amount_with_fees)
+    }
+}
+
+impl BaselineSolvable for Gyro2CLPPoolRef<'_> {
+    async fn get_amount_out(
+        &self,
+        out_token: H160,
+        (in_amount, in_token): (U256, H160),
+    ) -> Option<U256> {
+        self.get_amount_out_inner(out_token, in_amount, in_token)
+    }
+
+    async fn get_amount_in(
+        &self,
+        in_token: H160,
+        (out_amount, out_token): (U256, H160),
+    ) -> Option<U256> {
+        self.get_amount_in_inner(in_token, out_amount, out_token)
+    }
+
+    async fn gas_cost(&self) -> usize {
+        GYRO_2CLP_SWAP_GAS_COST
+    }
+}
+
+impl Gyro2CLPPool {
+    fn as_pool_ref(&self) -> Gyro2CLPPoolRef<'_> {
+        Gyro2CLPPoolRef {
+            reserves: &self.reserves,
+            swap_fee: self.common.swap_fee,
+            version: self.version,
+            sqrt_alpha: self.sqrt_alpha,
+            sqrt_beta: self.sqrt_beta,
+        }
+    }
+}
+
+impl BaselineSolvable for Gyro2CLPPool {
     async fn get_amount_out(&self, out_token: H160, input: (U256, H160)) -> Option<U256> {
         self.as_pool_ref().get_amount_out(out_token, input).await
     }

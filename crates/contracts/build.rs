@@ -1023,15 +1023,14 @@ fn main() {
             )
     });
     generate_contract_with_config("BalancerV2Gyro3CLPPoolFactory", |builder| {
-        builder
-            .add_network(
-                POLYGON,
-                Network {
-                    address: addr("0x90f08B3705208E41DbEEB37A42Fb628dD483AdDa"),
-                    // <https://polygonscan.com/tx/0x9199f04b237672a06ac26faa8ab94a963a6f835546caae9e12611eade9221113>
-                    deployment_information: Some(DeploymentInformation::BlockNumber(31556094)),
-                },
-            )
+        builder.add_network(
+            POLYGON,
+            Network {
+                address: addr("0x90f08B3705208E41DbEEB37A42Fb628dD483AdDa"),
+                // <https://polygonscan.com/tx/0x9199f04b237672a06ac26faa8ab94a963a6f835546caae9e12611eade9221113>
+                deployment_information: Some(DeploymentInformation::BlockNumber(31556094)),
+            },
+        )
     });
     generate_contract("BalancerV2WeightedPool");
     generate_contract_with_config("BalancerV2StablePool", |builder| {
