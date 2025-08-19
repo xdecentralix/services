@@ -60,6 +60,10 @@ include_contracts! {
     BalancerV2ComposableStablePoolFactoryV6;
     BalancerV2GyroECLPPool;
     BalancerV2GyroECLPPoolFactory;
+    BalancerV2Gyro2CLPPool;
+    BalancerV2Gyro2CLPPoolFactory;
+    BalancerV2Gyro3CLPPool;
+    BalancerV2Gyro3CLPPoolFactory;
     BalancerV2LiquidityBootstrappingPool;
     BalancerV2LiquidityBootstrappingPoolFactory;
     BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory;
@@ -80,6 +84,8 @@ include_contracts! {
     BalancerV3StablePoolFactoryV2;
     BalancerV3GyroECLPPool;
     BalancerV3GyroECLPPoolFactory;
+    BalancerV3Gyro2CLPPool;
+    BalancerV3Gyro2CLPPoolFactory;
     BalancerV3ReClammPool;
     BalancerV3ReClammPoolFactoryV2;
     BalancerV3QuantAMMWeightedPoolFactory;
