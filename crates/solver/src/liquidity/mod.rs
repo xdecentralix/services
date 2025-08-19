@@ -35,6 +35,8 @@ use {
                 pool_fetching::{
                     AmplificationParameter as V3AmplificationParameter,
                     GyroEPoolVersion as V3GyroEPoolVersion,
+                    QuantAmmPoolVersion as V3QuantAmmPoolVersion,
+                    QuantAmmTokenState as V3QuantAmmTokenState,
                     ReClammPoolVersion as V3ReClammPoolVersion,
                     StablePoolVersion as V3StablePoolVersion,
                     StableTokenState as V3StableTokenState,
@@ -64,6 +66,7 @@ pub enum Liquidity {
     BalancerGyroE(GyroEPoolOrder),
     BalancerV3GyroE(BalancerV3GyroEOrder),
     BalancerV3ReClamm(BalancerV3ReClammOrder),
+    BalancerV3QuantAmm(BalancerV3QuantAmmOrder),
     LimitOrder(LimitOrder),
     Concentrated(ConcentratedLiquidity),
     Erc4626(erc4626::Erc4626Order),
@@ -458,6 +461,34 @@ impl std::fmt::Debug for BalancerV3ReClammOrder {
     }
 }
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
+pub struct BalancerV3QuantAmmOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, V3QuantAmmTokenState>,
+    pub fee: V3Bfp,
+    pub version: V3QuantAmmPoolVersion,
+    pub max_trade_size_ratio: V3Bfp,
+    pub first_four_weights_and_multipliers: Vec<ethcontract::I256>,
+    pub second_four_weights_and_multipliers: Vec<ethcontract::I256>,
+    pub last_update_time: u64,
+    pub last_interop_time: u64,
+    pub current_timestamp: u64,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
+impl std::fmt::Debug for BalancerV3QuantAmmOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Balancer V3 QuantAMM Pool AMM {:?}",
+            self.reserves.keys()
+        )
+    }
+}
+
 impl std::fmt::Debug for StablePoolOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Stable Pool AMM {:?}", self.reserves.keys())
@@ -562,6 +593,14 @@ impl Settleable for BalancerV3GyroEOrder {
 }
 
 impl Settleable for BalancerV3ReClammOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for BalancerV3QuantAmmOrder {
     type Execution = AmmOrderExecution;
 
     fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {

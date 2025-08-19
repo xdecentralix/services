@@ -289,6 +289,9 @@ pub struct BalancerV3 {
     /// ReClamm pool factory addresses.
     pub reclamm: Vec<eth::ContractAddress>,
 
+    /// QuantAMM pool factory addresses.
+    pub quantamm: Vec<eth::ContractAddress>,
+
     /// Deny listed Balancer V3 pools.
     ///
     /// Since pools allow for custom controllers and logic, it is possible for
@@ -338,6 +341,9 @@ impl BalancerV3 {
             reclamm: factory_addresses(
                 &[contracts::BalancerV3ReClammPoolFactoryV2::raw_contract()],
             ),
+            quantamm: factory_addresses(&[
+                contracts::BalancerV3QuantAMMWeightedPoolFactory::raw_contract(),
+            ]),
             pool_deny_list: Vec::new(),
             graph_url: graph_url.clone(),
             reinit_interval: None,

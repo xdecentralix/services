@@ -21,6 +21,7 @@ use {
             PoolKind,
             common::{self, PoolInfoFetcher},
             gyro_e,
+            quantamm,
             reclamm,
             stable,
             weighted,
@@ -37,13 +38,14 @@ use {
     contracts::{
         BalancerV3BatchRouter,
         BalancerV3GyroECLPPoolFactory,
+        BalancerV3QuantAMMWeightedPoolFactory,
         BalancerV3ReClammPoolFactoryV2,
         BalancerV3StablePoolFactory,
         BalancerV3StablePoolFactoryV2,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
     },
-    ethcontract::{BlockId, H160, H256, Instance, U256, dyns::DynInstance},
+    ethcontract::{BlockId, H160, H256, I256, Instance, U256, dyns::DynInstance},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
     model::TokenPair,
     reqwest::{Client, Url},
@@ -55,6 +57,7 @@ use {
 pub use {
     common::TokenState,
     gyro_e::Version as GyroEPoolVersion,
+    quantamm::{TokenState as QuantAmmTokenState, Version as QuantAmmPoolVersion},
     reclamm::Version as ReClammPoolVersion,
     stable::{
         AmplificationParameter,
@@ -188,6 +191,42 @@ impl ReClammPool {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct QuantAmmPool {
+    pub common: CommonPoolState,
+    pub reserves: BTreeMap<H160, QuantAmmTokenState>,
+    pub version: QuantAmmPoolVersion,
+    // QuantAMM-specific static data
+    pub max_trade_size_ratio: Bfp,
+    // QuantAMM-specific dynamic data
+    pub first_four_weights_and_multipliers: Vec<I256>,
+    pub second_four_weights_and_multipliers: Vec<I256>,
+    pub last_update_time: u64,
+    pub last_interop_time: u64,
+    pub current_timestamp: u64,
+}
+
+impl QuantAmmPool {
+    pub fn new_unpaused(pool_id: H160, quantamm_state: quantamm::PoolState) -> Self {
+        QuantAmmPool {
+            common: CommonPoolState {
+                id: pool_id,
+                address: pool_id,
+                swap_fee: quantamm_state.swap_fee,
+                paused: false,
+            },
+            reserves: quantamm_state.tokens.into_iter().collect(),
+            version: quantamm_state.version,
+            max_trade_size_ratio: quantamm_state.max_trade_size_ratio,
+            first_four_weights_and_multipliers: quantamm_state.first_four_weights_and_multipliers,
+            second_four_weights_and_multipliers: quantamm_state.second_four_weights_and_multipliers,
+            last_update_time: quantamm_state.last_update_time,
+            last_interop_time: quantamm_state.last_interop_time,
+            current_timestamp: quantamm_state.current_timestamp, // Use actual block timestamp
+        }
+    }
+}
+
 impl GyroEPool {
     pub fn new_unpaused(pool_id: H160, gyro_e_state: gyro_e::PoolState) -> Self {
         GyroEPool {
@@ -224,6 +263,7 @@ pub struct FetchedBalancerPools {
     pub weighted_pools: Vec<WeightedPool>,
     pub gyro_e_pools: Vec<GyroEPool>,
     pub reclamm_pools: Vec<ReClammPool>,
+    pub quantamm_pools: Vec<QuantAmmPool>,
 }
 
 impl FetchedBalancerPools {
@@ -246,6 +286,11 @@ impl FetchedBalancerPools {
         );
         tokens.extend(
             self.reclamm_pools
+                .iter()
+                .flat_map(|pool| pool.reserves.keys().copied()),
+        );
+        tokens.extend(
+            self.quantamm_pools
                 .iter()
                 .flat_map(|pool| pool.reserves.keys().copied()),
         );
@@ -279,6 +324,7 @@ pub enum BalancerFactoryKind {
     StableV2,
     GyroE,
     ReClamm,
+    QuantAmm,
 }
 
 impl BalancerFactoryKind {
@@ -292,6 +338,7 @@ impl BalancerFactoryKind {
                 Self::StableV2,
                 Self::GyroE,
                 Self::ReClamm,
+                Self::QuantAmm,
             ],
             // Gnosis
             100 => vec![
@@ -308,6 +355,7 @@ impl BalancerFactoryKind {
                 Self::StableV2,
                 Self::GyroE,
                 Self::ReClamm,
+                Self::QuantAmm,
             ],
             // Optimism
             10 => vec![
@@ -324,6 +372,7 @@ impl BalancerFactoryKind {
                 Self::StableV2,
                 Self::GyroE,
                 Self::ReClamm,
+                Self::QuantAmm,
             ],
             // Sepolia
             11155111 => vec![
@@ -332,6 +381,7 @@ impl BalancerFactoryKind {
                 Self::StableV2,
                 Self::GyroE,
                 Self::ReClamm,
+                Self::QuantAmm,
             ],
             // Avalanche
             43114 => vec![
@@ -384,6 +434,7 @@ impl BalancerContracts {
                 BalancerFactoryKind::StableV2 => instance!(BalancerV3StablePoolFactoryV2),
                 BalancerFactoryKind::GyroE => instance!(BalancerV3GyroECLPPoolFactory),
                 BalancerFactoryKind::ReClamm => instance!(BalancerV3ReClammPoolFactoryV2),
+                BalancerFactoryKind::QuantAmm => instance!(BalancerV3QuantAMMWeightedPoolFactory),
             };
             factories.push((factory_kind, factory_instance));
         }
@@ -475,6 +526,9 @@ impl BalancerV3PoolFetching for BalancerPoolFetcher {
                     PoolKind::ReClamm(state) => fetched_pools
                         .reclamm_pools
                         .push(ReClammPool::new_unpaused(pool.id, state)),
+                    PoolKind::QuantAmm(state) => fetched_pools
+                        .quantamm_pools
+                        .push(QuantAmmPool::new_unpaused(pool.id, state)),
                 }
                 fetched_pools
             },
@@ -539,6 +593,9 @@ async fn create_aggregate_pool_fetcher(
             }
             BalancerFactoryKind::ReClamm => {
                 registry!(BalancerV3ReClammPoolFactoryV2, instance)
+            }
+            BalancerFactoryKind::QuantAmm => {
+                registry!(BalancerV3QuantAMMWeightedPoolFactory, instance)
             }
         };
         fetchers.push(registry);

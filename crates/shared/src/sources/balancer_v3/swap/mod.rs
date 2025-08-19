@@ -8,6 +8,7 @@ use {
             AmplificationParameter,
             GyroEPool,
             GyroEPoolVersion,
+            QuantAmmPool,
             ReClammPool,
             StablePool,
             TokenState,
@@ -17,7 +18,7 @@ use {
         },
     },
     error::Error,
-    ethcontract::{H160, U256},
+    ethcontract::{H160, I256, U256},
     fixed_point::Bfp,
     num::BigInt,
     std::collections::BTreeMap,
@@ -27,6 +28,7 @@ mod error;
 pub mod fixed_point;
 pub mod gyro_e_math;
 mod math;
+pub mod quantamm_math;
 pub mod reclamm_math;
 pub mod signed_fixed_point;
 mod stable_math;
@@ -943,6 +945,227 @@ impl BaselineSolvable for ReClammPool {
     }
 }
 
+/// QuantAMM pool data as a reference used for computing input and output
+/// amounts.
+#[derive(Debug)]
+pub struct QuantAmmPoolRef<'a> {
+    pub reserves: &'a BTreeMap<H160, TokenState>,
+    pub swap_fee: Bfp,
+    pub max_trade_size_ratio: Bfp,
+    pub first_four_weights_and_multipliers: &'a [I256],
+    pub second_four_weights_and_multipliers: &'a [I256],
+    pub last_update_time: u64,
+    pub last_interop_time: u64,
+    pub current_timestamp: u64,
+}
+
+impl QuantAmmPoolRef<'_> {
+    fn get_amount_out_inner(
+        &self,
+        out_token: H160,
+        amount_in: U256,
+        in_token: H160,
+    ) -> Option<U256> {
+        // Get reserves
+        let in_reserve = self.reserves.get(&in_token)?;
+        let out_reserve = self.reserves.get(&out_token)?;
+
+        // Get token indices
+        let in_index = self.reserves.keys().position(|&token| token == in_token)?;
+        let out_index = self.reserves.keys().position(|&token| token == out_token)?;
+
+        // Apply swap fee first (subtract from input, like weighted pools)
+        let amount_in_minus_fees = subtract_swap_fee_amount(amount_in, self.swap_fee).ok()?;
+
+        // Extract weights and multipliers from packed arrays (matches balancer-maths
+        // pattern)
+        let (weights, multipliers) = extract_weights_and_multipliers(
+            &self.first_four_weights_and_multipliers,
+            &self.second_four_weights_and_multipliers,
+            self.reserves.len(),
+        )?;
+
+        let upscaled_amount_in = in_reserve.upscale(amount_in_minus_fees).ok()?;
+
+        // Check max trade size ratio for input (matches balancer-maths)
+        let max_in_amount = in_reserve
+            .upscaled_balance()
+            .ok()?
+            .mul_down(self.max_trade_size_ratio)
+            .ok()?;
+        if upscaled_amount_in > max_in_amount {
+            return None; // MaxTradeSizeRatio exceeded
+        }
+
+        // Calculate interpolated weights for token pair (matches balancer-maths
+        // _getNormalizedWeightPair)
+        let (weight_in, weight_out) = quantamm_math::calculate_normalized_weight_pair(
+            in_index,
+            out_index,
+            &weights,
+            &multipliers,
+            self.last_update_time,
+            self.last_interop_time,
+            self.current_timestamp,
+        )
+        .ok()?;
+
+        // Use QuantAMM math functions (matches services pattern)
+        let amount_out = quantamm_math::compute_out_given_in(
+            in_reserve.upscaled_balance().ok()?,
+            weight_in,
+            out_reserve.upscaled_balance().ok()?,
+            weight_out,
+            upscaled_amount_in,
+        )
+        .ok()?;
+
+        // Check max trade size ratio for output (matches balancer-maths)
+        let max_out_amount = out_reserve
+            .upscaled_balance()
+            .ok()?
+            .mul_down(self.max_trade_size_ratio)
+            .ok()?;
+        if amount_out > max_out_amount {
+            return None; // MaxTradeSizeRatio exceeded
+        }
+
+        // Downscale result
+        out_reserve.downscale_down(amount_out).ok()
+    }
+
+    fn get_amount_in_inner(
+        &self,
+        in_token: H160,
+        amount_out: U256,
+        out_token: H160,
+    ) -> Option<U256> {
+        // Get reserves
+        let in_reserve = self.reserves.get(&in_token)?;
+        let out_reserve = self.reserves.get(&out_token)?;
+
+        // Get token indices
+        let in_index = self.reserves.keys().position(|&token| token == in_token)?;
+        let out_index = self.reserves.keys().position(|&token| token == out_token)?;
+
+        // Extract weights and multipliers from packed arrays (matches balancer-maths
+        // pattern)
+        let (weights, multipliers) = extract_weights_and_multipliers(
+            &self.first_four_weights_and_multipliers,
+            &self.second_four_weights_and_multipliers,
+            self.reserves.len(),
+        )?;
+
+        let upscaled_amount_out = out_reserve.upscale(amount_out).ok()?;
+
+        // Check max trade size ratio for output (matches balancer-maths)
+        let max_out_amount = out_reserve
+            .upscaled_balance()
+            .ok()?
+            .mul_down(self.max_trade_size_ratio)
+            .ok()?;
+        if upscaled_amount_out > max_out_amount {
+            return None; // MaxTradeSizeRatio exceeded
+        }
+
+        // Calculate interpolated weights for token pair (matches balancer-maths
+        // _getNormalizedWeightPair)
+        let (weight_in, weight_out) = quantamm_math::calculate_normalized_weight_pair(
+            in_index,
+            out_index,
+            &weights,
+            &multipliers,
+            self.last_update_time,
+            self.last_interop_time,
+            self.current_timestamp,
+        )
+        .ok()?;
+
+        // Use QuantAMM math functions (matches services pattern)
+        let amount_in_before_fee = quantamm_math::compute_in_given_out(
+            in_reserve.upscaled_balance().ok()?,
+            weight_in,
+            out_reserve.upscaled_balance().ok()?,
+            weight_out,
+            upscaled_amount_out,
+        )
+        .ok()?;
+
+        // Check max trade size ratio for input (matches balancer-maths)
+        let max_in_amount = in_reserve
+            .upscaled_balance()
+            .ok()?
+            .mul_down(self.max_trade_size_ratio)
+            .ok()?;
+        if amount_in_before_fee > max_in_amount {
+            return None; // MaxTradeSizeRatio exceeded
+        }
+
+        // Downscale and add swap fee (like weighted pools)
+        let amount_in_raw = in_reserve.downscale_up(amount_in_before_fee).ok()?;
+        add_swap_fee_amount(amount_in_raw, self.swap_fee).ok()
+    }
+}
+
+impl BaselineSolvable for QuantAmmPoolRef<'_> {
+    async fn get_amount_out(
+        &self,
+        out_token: H160,
+        (amount_in, in_token): (U256, H160),
+    ) -> Option<U256> {
+        if amount_in.is_zero() {
+            return Some(U256::zero());
+        }
+        self.get_amount_out_inner(out_token, amount_in, in_token)
+    }
+
+    async fn get_amount_in(
+        &self,
+        in_token: H160,
+        (amount_out, out_token): (U256, H160),
+    ) -> Option<U256> {
+        if amount_out.is_zero() {
+            return Some(U256::zero());
+        }
+        self.get_amount_in_inner(in_token, amount_out, out_token)
+    }
+
+    async fn gas_cost(&self) -> usize {
+        // Approximate gas cost for QuantAMM swaps (higher than weighted due to weight
+        // calculations)
+        180_000
+    }
+}
+
+impl QuantAmmPool {
+    fn as_pool_ref(&self) -> QuantAmmPoolRef<'_> {
+        QuantAmmPoolRef {
+            reserves: &self.reserves,
+            swap_fee: self.common.swap_fee,
+            max_trade_size_ratio: self.max_trade_size_ratio,
+            first_four_weights_and_multipliers: &self.first_four_weights_and_multipliers,
+            second_four_weights_and_multipliers: &self.second_four_weights_and_multipliers,
+            last_update_time: self.last_update_time,
+            last_interop_time: self.last_interop_time,
+            current_timestamp: self.current_timestamp,
+        }
+    }
+}
+
+impl BaselineSolvable for QuantAmmPool {
+    async fn get_amount_out(&self, out_token: H160, input: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref().get_amount_out(out_token, input).await
+    }
+
+    async fn get_amount_in(&self, in_token: H160, output: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref().get_amount_in(in_token, output).await
+    }
+
+    async fn gas_cost(&self) -> usize {
+        self.as_pool_ref().gas_cost().await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {super::*, crate::sources::balancer_v3::pool_fetching::CommonPoolState};
@@ -1182,4 +1405,48 @@ mod tests {
         let res_out = pool.get_amount_in(usdc, (amount_out, dai)).await;
         assert_eq!(res_out.unwrap(), amount_in.into());
     }
+}
+
+/// Extract weights and multipliers from packed arrays.
+/// This matches the getFirstFourWeightsAndMultipliers and
+/// getSecondFourWeightsAndMultipliers pattern from balancer-maths.
+fn extract_weights_and_multipliers(
+    first_four: &[I256],
+    second_four: &[I256],
+    num_tokens: usize,
+) -> Option<(Vec<I256>, Vec<I256>)> {
+    let mut weights = Vec::new();
+    let mut multipliers = Vec::new();
+
+    // Process first four tokens (matches balancer-maths
+    // getFirstFourWeightsAndMultipliers)
+    let first_token_count = std::cmp::min(4, num_tokens);
+    for i in 0..first_token_count {
+        if i < first_four.len() / 2 {
+            weights.push(first_four[i]);
+            if i + first_token_count < first_four.len() {
+                multipliers.push(first_four[i + first_token_count]);
+            } else {
+                multipliers.push(I256::zero());
+            }
+        }
+    }
+
+    // Process remaining tokens if any (matches balancer-maths
+    // getSecondFourWeightsAndMultipliers)
+    if num_tokens > 4 {
+        let remaining_count = num_tokens - 4;
+        for i in 0..remaining_count {
+            if i < second_four.len() / 2 {
+                weights.push(second_four[i]);
+                if i + remaining_count < second_four.len() {
+                    multipliers.push(second_four[i + remaining_count]);
+                } else {
+                    multipliers.push(I256::zero());
+                }
+            }
+        }
+    }
+
+    Some((weights, multipliers))
 }

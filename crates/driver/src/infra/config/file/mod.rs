@@ -726,6 +726,11 @@ enum BalancerV3Config {
         #[serde(default)]
         reclamm: Vec<eth::H160>,
 
+        /// The QuantAMM pool factory contract addresses (only supported on
+        /// Balancer V3).
+        #[serde(default)]
+        quantamm: Vec<eth::H160>,
+
         /// Deny listed Balancer V3 pools.
         #[serde(default)]
         pool_deny_list: Vec<eth::H160>,

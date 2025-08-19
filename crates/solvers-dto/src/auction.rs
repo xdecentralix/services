@@ -168,6 +168,7 @@ pub enum Liquidity {
     ConcentratedLiquidity(ConcentratedLiquidityPool),
     GyroE(GyroEPool),
     ReClamm(ReClammPool),
+    QuantAmm(QuantAmmPool),
     LimitOrder(ForeignLimitOrder),
     Erc4626(Erc4626Edge),
 }
@@ -370,6 +371,42 @@ pub struct ReClammReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuantAmmPool {
+    pub id: String,
+    pub address: H160,
+    pub balancer_pool_id: H256,
+    #[serde_as(as = "HexOrDecimalU256")]
+    pub gas_estimate: U256,
+    pub tokens: HashMap<H160, QuantAmmReserve>,
+    pub fee: BigDecimal,
+    pub version: QuantAmmVersion,
+    // QuantAMM-specific fields for weight interpolation
+    pub max_trade_size_ratio: BigDecimal,
+    pub first_four_weights_and_multipliers: Vec<BigDecimal>,
+    pub second_four_weights_and_multipliers: Vec<BigDecimal>,
+    pub last_update_time: u64,
+    pub last_interop_time: u64,
+    pub current_timestamp: u64,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuantAmmReserve {
+    #[serde_as(as = "HexOrDecimalU256")]
+    pub balance: U256,
+    pub scaling_factor: BigDecimal,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum QuantAmmVersion {
+    V1,
 }
 
 #[serde_as]

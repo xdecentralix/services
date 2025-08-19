@@ -727,6 +727,11 @@ mod tests {
                         // matching
                     }
                     PoolKind::ReClamm(_) => {}
+                    PoolKind::QuantAmm(_) => {
+                        // QuantAmm pools are not tested in this specific test
+                        // This is just to handle the exhaustive pattern
+                        // matching
+                    }
                 }
             }
             _ => panic!("expected active pool"),
@@ -1014,6 +1019,7 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            max_trade_size_ratio: None,
         };
 
         let pool_info = PoolInfo::from_graph_data(&pool, 42).unwrap();
@@ -1059,6 +1065,7 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            max_trade_size_ratio: None,
         };
 
         let result = PoolInfo::from_graph_data(&pool, 42);
@@ -1104,6 +1111,7 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            max_trade_size_ratio: None,
         };
 
         let result = PoolInfo::from_graph_data(&pool, 42);

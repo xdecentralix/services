@@ -88,6 +88,7 @@ pub fn to_domain(auction: &Auction) -> Result<auction::Auction, Error> {
                 Liquidity::LimitOrder(liquidity) => Ok(foreign_limit_order::to_domain(liquidity)),
                 Liquidity::Erc4626(liquidity) => erc4626::to_domain(liquidity),
                 Liquidity::ReClamm(liquidity) => reclamm_pool::to_domain(liquidity),
+                Liquidity::QuantAmm(liquidity) => quant_amm_pool::to_domain(liquidity),
             })
             .try_collect()?,
         gas_price: auction::GasPrice(eth::Ether(auction.effective_gas_price)),
@@ -183,7 +184,6 @@ mod weighted_product_pool {
 
 mod stable_pool {
     use super::*;
-
     pub fn to_domain(pool: &StablePool) -> Result<liquidity::Liquidity, Error> {
         let reserves = {
             let entries = pool
@@ -406,6 +406,63 @@ mod reclamm_pool {
                 .ok_or("invalid end_fourth_root_price_ratio")?,
                 price_ratio_update_start_time: pool.price_ratio_update_start_time,
                 price_ratio_update_end_time: pool.price_ratio_update_end_time,
+            }),
+        })
+    }
+}
+
+mod quant_amm_pool {
+    use super::*;
+    pub fn to_domain(pool: &QuantAmmPool) -> Result<liquidity::Liquidity, Error> {
+        let reserves = {
+            let entries = pool
+                .tokens
+                .iter()
+                .map(|(address, token)| {
+                    Ok(liquidity::quantamm::Reserve {
+                        asset: eth::Asset {
+                            token: eth::TokenAddress(*address),
+                            amount: token.balance,
+                        },
+                        scale: conv::decimal_to_rational(&token.scaling_factor)
+                            .and_then(liquidity::ScalingFactor::new)
+                            .ok_or("invalid token scaling factor")?,
+                    })
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
+            liquidity::quantamm::Reserves::new(entries)
+                .ok_or("duplicate QuantAMM token addresses")?
+        };
+
+        Ok(liquidity::Liquidity {
+            id: liquidity::Id(pool.id.clone()),
+            address: pool.address,
+            gas: eth::Gas(pool.gas_estimate),
+            state: liquidity::State::QuantAmm(liquidity::quantamm::Pool {
+                reserves,
+                fee: conv::decimal_to_rational(&pool.fee).ok_or("invalid fee")?,
+                version: match pool.version {
+                    QuantAmmVersion::V1 => liquidity::quantamm::Version::V1,
+                },
+                max_trade_size_ratio: conv::decimal_to_rational(&pool.max_trade_size_ratio)
+                    .ok_or("invalid max_trade_size_ratio")?,
+                first_four_weights_and_multipliers: pool
+                    .first_four_weights_and_multipliers
+                    .iter()
+                    .map(|v| {
+                        conv::decimal_to_signed_rational(v).ok_or("invalid weights_and_multiplier")
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+                second_four_weights_and_multipliers: pool
+                    .second_four_weights_and_multipliers
+                    .iter()
+                    .map(|v| {
+                        conv::decimal_to_signed_rational(v).ok_or("invalid weights_and_multiplier")
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+                last_update_time: pool.last_update_time,
+                last_interop_time: pool.last_interop_time,
+                current_timestamp: pool.current_timestamp,
             }),
         })
     }

@@ -55,6 +55,7 @@ pub fn new(
             liquidity::Kind::BalancerV2GyroE(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3GyroE(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3ReClamm(pool) => pool.reserves.tokens().collect(),
+            liquidity::Kind::BalancerV3QuantAmm(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::Swapr(pool) => pool.base.reserves.iter().map(|r| r.token).collect(),
             liquidity::Kind::ZeroEx(limit_order) => {
                 vec![
@@ -482,6 +483,56 @@ pub fn new(
                             },
                         )
                     }
+                    liquidity::Kind::BalancerV3QuantAmm(pool) => {
+                        solvers_dto::auction::Liquidity::QuantAmm(
+                            solvers_dto::auction::QuantAmmPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.id.address().into(),
+                                balancer_pool_id: {
+                                    let pool_id_h160: eth::H160 = pool.id.into();
+                                    pool_id_h160.into()
+                                },
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.asset.token.into(),
+                                            solvers_dto::auction::QuantAmmReserve {
+                                                balance: r.asset.amount.into(),
+                                                scaling_factor: scaling_factor_to_decimal_v3(
+                                                    r.scale,
+                                                ),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: fee_to_decimal_v3(pool.fee),
+                                version: match pool.version {
+                                    liquidity::balancer::v3::quantamm::Version::V1 => {
+                                        solvers_dto::auction::QuantAmmVersion::V1
+                                    }
+                                },
+                                max_trade_size_ratio: scaling_factor_to_decimal_v3(
+                                    pool.max_trade_size_ratio,
+                                ),
+                                first_four_weights_and_multipliers: pool
+                                    .first_four_weights_and_multipliers
+                                    .iter()
+                                    .map(|i| i256_to_decimal(*i))
+                                    .collect(),
+                                second_four_weights_and_multipliers: pool
+                                    .second_four_weights_and_multipliers
+                                    .iter()
+                                    .map(|i| i256_to_decimal(*i))
+                                    .collect(),
+                                last_update_time: pool.last_update_time,
+                                last_interop_time: pool.last_interop_time,
+                                current_timestamp: pool.current_timestamp,
+                            },
+                        )
+                    }
                     liquidity::Kind::Swapr(pool) => {
                         solvers_dto::auction::Liquidity::ConstantProduct(
                             solvers_dto::auction::ConstantProductPool {
@@ -600,6 +651,13 @@ fn buy_token_destination_from_domain(
         BuyTokenDestination::Erc20 => solvers_dto::auction::BuyTokenDestination::Erc20,
         BuyTokenDestination::Internal => solvers_dto::auction::BuyTokenDestination::Internal,
     }
+}
+
+fn i256_to_decimal(i256: ethcontract::I256) -> bigdecimal::BigDecimal {
+    let i256_str = i256.to_string();
+    let big_int = num::BigInt::parse_bytes(i256_str.as_bytes(), 10)
+        .expect("valid I256 should parse to BigInt");
+    bigdecimal::BigDecimal::new(big_int, 18)
 }
 
 fn fee_to_decimal(fee: liquidity::balancer::v2::Fee) -> bigdecimal::BigDecimal {
