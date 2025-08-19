@@ -1944,7 +1944,6 @@ fn main() {
             .add_network_str(GNOSIS, "0x8262d639c38470F38d2eff15926F7071c28057Af")
             .add_network_str(SEPOLIA, "0x8262d639c38470F38d2eff15926F7071c28057Af")
     });
-    generate_contract("SimulateCode");
 
     // Support contract used for solver fee simulations.
     generate_contract("AnyoneAuthenticator");
