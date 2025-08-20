@@ -285,6 +285,7 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         liquidity_bootstrapping,
                         composable_stable,
                         gyro_e,
+                        gyro_2clp,
                         pool_deny_list,
                         graph_url,
                         reinit_interval,
@@ -309,6 +310,10 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                             .map(eth::ContractAddress::from)
                             .collect(),
                         gyro_e: gyro_e.into_iter().map(eth::ContractAddress::from).collect(),
+                        gyro_2clp: gyro_2clp
+                            .into_iter()
+                            .map(eth::ContractAddress::from)
+                            .collect(),
                         pool_deny_list: pool_deny_list.clone(),
                         graph_url,
                         reinit_interval,

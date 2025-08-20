@@ -413,6 +413,9 @@ pub fn liquidity_interaction(
         liquidity::Kind::BalancerV2GyroE(pool) => pool
             .swap(&input, &output, &settlement.address().into())
             .ok(),
+        liquidity::Kind::BalancerV2Gyro2CLP(pool) => pool
+            .swap(&input, &output, &settlement.address().into())
+            .ok(),
         liquidity::Kind::BalancerV3GyroE(pool) => pool
             .swap(&input, &output, &settlement.address().into())
             .ok(),

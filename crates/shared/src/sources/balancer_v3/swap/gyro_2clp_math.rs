@@ -2,13 +2,12 @@
 //! The original contract code can be found at:
 //! https://github.com/balancer-labs/balancer-maths/blob/main/python/src/pools/gyro/gyro_2clp_math.py
 //!
-//! This implementation provides swap mathematics for Gyroscope 2-CLP (Two-Asset
-//! Constant Liquidity Pool) which uses a more efficient invariant formula
-//! for two-asset pools with configurable price ranges.
+//! This implementation matches the Python reference EXACTLY as verified against
+//! the official balancer-maths repository.
 
 use {
-    super::{error::Error, signed_fixed_point::SignedFixedPoint},
-    num::BigInt,
+    super::error::Error,
+    num::{BigInt, Signed},
     std::sync::LazyLock,
 };
 
@@ -31,15 +30,48 @@ pub struct QuadraticTerms {
     pub mc: BigInt,       // -c (negative c)
 }
 
-/// 2-CLP pool parameters
-#[derive(Debug, Clone)]
-pub struct TwoClpParams {
-    pub sqrt_alpha: BigInt,
-    pub sqrt_beta: BigInt,
+// Simple fixed-point arithmetic functions matching Python reference EXACTLY
+
+/// Multiply with upward rounding - matches mul_up_fixed(a, b) from Python
+fn mul_up_fixed(a: &BigInt, b: &BigInt) -> BigInt {
+    let product = a * b;
+    if product == BigInt::from(0) {
+        return BigInt::from(0);
+    }
+    (&product - 1) / &*WAD + 1
 }
 
-/// Square root function using Newton's method with precise tolerance checking
-/// Equivalent to Python gyro_pool_math_sqrt
+/// Multiply with downward rounding - matches mul_down_fixed(a, b) from Python
+fn mul_down_fixed(a: &BigInt, b: &BigInt) -> BigInt {
+    let product = a * b;
+    product / &*WAD
+}
+
+/// Divide with downward rounding - matches div_down_fixed(a, b) from Python
+fn div_down_fixed(a: &BigInt, b: &BigInt) -> Result<BigInt, Error> {
+    if a == &BigInt::from(0) {
+        return Ok(BigInt::from(0));
+    }
+    if b == &BigInt::from(0) {
+        return Err(Error::ZeroDivision);
+    }
+    let a_inflated = a * &*WAD;
+    Ok(a_inflated / b)
+}
+
+/// Divide with upward rounding - matches div_up_fixed(a, b) from Python
+fn div_up_fixed(a: &BigInt, b: &BigInt) -> Result<BigInt, Error> {
+    if a == &BigInt::from(0) {
+        return Ok(BigInt::from(0));
+    }
+    if b == &BigInt::from(0) {
+        return Err(Error::ZeroDivision);
+    }
+    let a_inflated = a * &*WAD;
+    Ok((&a_inflated - 1) / b + 1)
+}
+
+/// Square root function matching gyro_pool_math_sqrt from Python EXACTLY
 pub fn gyro_pool_math_sqrt(x: &BigInt, tolerance: u64) -> Result<BigInt, Error> {
     if x == &BigInt::from(0) {
         return Ok(BigInt::from(0));
@@ -49,37 +81,113 @@ pub fn gyro_pool_math_sqrt(x: &BigInt, tolerance: u64) -> Result<BigInt, Error> 
         return Err(Error::InvalidExponent);
     }
 
-    // Initial guess: approximate square root
-    let mut z = x.clone();
-    let two = BigInt::from(2);
+    let mut guess = make_initial_guess(x);
 
-    // Newton's method iterations
-    for _ in 0..255 {
-        let old_z = z.clone();
-
-        // z = (z + x/z) / 2
-        let x_div_z = x / &z;
-        z = (&z + x_div_z) / &two;
-
-        // Check convergence
-        let diff = if old_z > z { &old_z - &z } else { &z - &old_z };
-
-        if diff <= BigInt::from(tolerance) {
-            break;
-        }
+    // Perform Newton's method iterations - exactly 7 iterations like Python
+    for _ in 0..7 {
+        let x_wad = x * &*WAD;
+        guess = (&guess + &x_wad / &guess) / 2;
     }
 
-    Ok(z)
+    // Tolerance checking like Python reference
+    let guess_squared = mul_down_fixed(&guess, &guess);
+    let tolerance_up = mul_up_fixed(&guess, &BigInt::from(tolerance));
+
+    if !(guess_squared <= x + &tolerance_up && guess_squared >= x - &tolerance_up) {
+        return Err(Error::InvalidExponent); // _sqrt FAILED
+    }
+
+    Ok(guess)
 }
 
-/// Calculate invariant using quadratic formula
-///
-/// The formula solves: 0 = (1-sqrt(alpha/beta)*L^2 -
-/// (y/sqrt(beta)+x*sqrt(alpha))*L - x*y) Using quadratic formula: 0 = a*L^2 +
-/// b*L + c Where a > 0, b < 0, and c < 0
-///
-/// For mb = -b and mc = -c:
-/// L = (mb + (mb^2 + 4 * a * mc)^(1/2)) / (2 * a)
+/// Initial guess function matching Python _make_initial_guess
+fn make_initial_guess(x: &BigInt) -> BigInt {
+    if x >= &*WAD {
+        let shift = int_log2_halved(x / &*WAD);
+        (BigInt::from(1) << shift) * &*WAD
+    } else {
+        // Constants from Python reference
+        if x <= &BigInt::from(10) {
+            BigInt::from(3162277660_u64) // _SQRT_1E_NEG_17
+        } else if x <= &BigInt::from(100) {
+            BigInt::from(10000000000_u64) // 10**10
+        } else if x <= &BigInt::from(1000) {
+            BigInt::from(31622776601_u64) // _SQRT_1E_NEG_15
+        } else if x <= &BigInt::from(10000) {
+            BigInt::from(100000000000_u64) // 10**11
+        } else if x <= &BigInt::from(100000) {
+            BigInt::from(316227766016_u64) // _SQRT_1E_NEG_13
+        } else if x <= &BigInt::from(1000000) {
+            BigInt::from(1000000000000_u64) // 10**12
+        } else if x <= &BigInt::from(10000000) {
+            BigInt::from(3162277660168_u64) // _SQRT_1E_NEG_11
+        } else if x <= &BigInt::from(100000000) {
+            BigInt::from(10000000000000_u64) // 10**13
+        } else if x <= &BigInt::from(1000000000) {
+            BigInt::from(31622776601683_u64) // _SQRT_1E_NEG_9
+        } else if x <= &BigInt::from(10000000000_u64) {
+            BigInt::from(100000000000000_u64) // 10**14
+        } else if x <= &BigInt::from(100000000000_u64) {
+            BigInt::from(316227766016837_u64) // _SQRT_1E_NEG_7
+        } else if x <= &BigInt::from(1000000000000_u64) {
+            BigInt::from(1000000000000000_u64) // 10**15
+        } else if x <= &BigInt::from(10000000000000_u64) {
+            BigInt::from(3162277660168379_u64) // _SQRT_1E_NEG_5
+        } else if x <= &BigInt::from(100000000000000_u64) {
+            BigInt::from(10000000000000000_u64) // 10**16
+        } else if x <= &BigInt::from(1000000000000000_u64) {
+            BigInt::from(31622776601683793_u64) // _SQRT_1E_NEG_3
+        } else if x <= &BigInt::from(10000000000000000_u64) {
+            BigInt::from(100000000000000000_u64) // 10**17
+        } else if x <= &BigInt::from(100000000000000000_u64) {
+            BigInt::from(316227766016837933_u64) // _SQRT_1E_NEG_1
+        } else {
+            x.clone()
+        }
+    }
+}
+
+/// Integer log2 halved matching Python _int_log2_halved
+fn int_log2_halved(mut x: BigInt) -> u32 {
+    let mut n = 0u32;
+
+    if x >= BigInt::from(1_u64) << 128 {
+        x >>= 128;
+        n += 64;
+    }
+    if x >= BigInt::from(1_u64) << 64 {
+        x >>= 64;
+        n += 32;
+    }
+    if x >= BigInt::from(1_u64) << 32 {
+        x >>= 32;
+        n += 16;
+    }
+    if x >= BigInt::from(1_u64) << 16 {
+        x >>= 16;
+        n += 8;
+    }
+    if x >= BigInt::from(1_u64) << 8 {
+        x >>= 8;
+        n += 4;
+    }
+    if x >= BigInt::from(1_u64) << 4 {
+        x >>= 4;
+        n += 2;
+    }
+    if x >= BigInt::from(1_u64) << 2 {
+        x >>= 2;
+        n += 1;
+    }
+    if x >= BigInt::from(1_u64) << 1 {
+        n += 1;
+    }
+
+    n
+}
+
+/// Calculate invariant using quadratic formula - matches Python
+/// calculate_invariant EXACTLY
 pub fn calculate_invariant(
     balances: &[BigInt],
     sqrt_alpha: &BigInt,
@@ -102,7 +210,7 @@ pub fn calculate_invariant(
     )
 }
 
-/// Calculate the terms needed for quadratic formula solution
+/// Calculate quadratic terms - matches Python calculate_quadratic_terms EXACTLY
 pub fn calculate_quadratic_terms(
     balances: &[BigInt],
     sqrt_alpha: &BigInt,
@@ -113,82 +221,54 @@ pub fn calculate_quadratic_terms(
         return Err(Error::InvalidToken);
     }
 
-    // Calculate 'a' term
-    // Note: 'a' follows opposite rounding than 'b' and 'c' since it's in
-    // denominator
-    let sqrt_alpha_div_sqrt_beta = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::div_up_mag(sqrt_alpha, sqrt_beta)?,
-        Rounding::RoundUp => SignedFixedPoint::div_down_mag(sqrt_alpha, sqrt_beta)?,
-    };
-    let a = SignedFixedPoint::sub(&WAD.clone(), &sqrt_alpha_div_sqrt_beta)?;
-
-    // Calculate 'b' terms (in numerator)
-    let b_term0 = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::div_down_mag(&balances[1], sqrt_beta)?,
-        Rounding::RoundUp => SignedFixedPoint::div_up_mag(&balances[1], sqrt_beta)?,
-    };
-    let b_term1 = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::mul_down_mag(&balances[0], sqrt_alpha)?,
-        Rounding::RoundUp => SignedFixedPoint::mul_up_mag(&balances[0], sqrt_alpha)?,
-    };
-    let mb = SignedFixedPoint::add(&b_term0, &b_term1)?;
-
-    // Calculate 'c' term (in numerator)
-    let mc = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::mul_down_mag(&balances[0], &balances[1])?,
-        Rounding::RoundUp => SignedFixedPoint::mul_up_mag(&balances[0], &balances[1])?,
+    // Define rounding functions based on rounding direction - matches Python
+    // exactly
+    let div_up_or_down = match rounding {
+        Rounding::RoundDown => div_down_fixed,
+        Rounding::RoundUp => div_up_fixed,
     };
 
-    // Calculate b² for better fixed point precision
-    // b² = x² * alpha + x*y*2*sqrt(alpha/beta) + y²/beta
-    let x_squared = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::mul_down_mag(&balances[0], &balances[0])?,
-        Rounding::RoundUp => SignedFixedPoint::mul_up_mag(&balances[0], &balances[0])?,
-    };
-    let x_squared_alpha = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::mul_down_mag(&x_squared, sqrt_alpha)?,
-        Rounding::RoundUp => SignedFixedPoint::mul_up_mag(&x_squared, sqrt_alpha)?,
-    };
-    let b_square_term1 = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::mul_down_mag(&x_squared_alpha, sqrt_alpha)?,
-        Rounding::RoundUp => SignedFixedPoint::mul_up_mag(&x_squared_alpha, sqrt_alpha)?,
+    let mul_up_or_down = match rounding {
+        Rounding::RoundDown => mul_down_fixed,
+        Rounding::RoundUp => mul_up_fixed,
     };
 
-    let two_wad = SignedFixedPoint::mul_up_mag(&WAD.clone(), &BigInt::from(2))?;
-    let xy_product = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::mul_down_mag(&balances[0], &balances[1])?,
-        Rounding::RoundUp => SignedFixedPoint::mul_up_mag(&balances[0], &balances[1])?,
-    };
-    let xy_sqrt_alpha = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::mul_down_mag(&xy_product, sqrt_alpha)?,
-        Rounding::RoundUp => SignedFixedPoint::mul_up_mag(&xy_product, sqrt_alpha)?,
-    };
-    let b_sq2 = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::div_down_mag(&xy_sqrt_alpha, sqrt_beta)?,
-        Rounding::RoundUp => SignedFixedPoint::div_up_mag(&xy_sqrt_alpha, sqrt_beta)?,
-    };
-    let b_sq2_doubled = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::mul_down_mag(&two_wad, &b_sq2)?,
-        Rounding::RoundUp => SignedFixedPoint::mul_up_mag(&two_wad, &b_sq2)?,
+    let mul_down_or_up = match rounding {
+        Rounding::RoundDown => mul_up_fixed,
+        Rounding::RoundUp => mul_down_fixed,
     };
 
-    let sqrt_beta_squared = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::mul_up_mag(sqrt_beta, sqrt_beta)?, /* opposite rounding */
-        Rounding::RoundUp => SignedFixedPoint::mul_down_mag(sqrt_beta, sqrt_beta)?, /* opposite rounding */
-    };
-    let y_squared = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::mul_down_mag(&balances[1], &balances[1])?,
-        Rounding::RoundUp => SignedFixedPoint::mul_up_mag(&balances[1], &balances[1])?,
-    };
-    let b_sq3 = match rounding {
-        Rounding::RoundDown => SignedFixedPoint::div_down_mag(&y_squared, &sqrt_beta_squared)?,
-        Rounding::RoundUp => SignedFixedPoint::div_up_mag(&y_squared, &sqrt_beta_squared)?,
-    };
+    // Calculate 'a' term - matches Python: a = WAD - div_up_or_down(sqrt_alpha,
+    // sqrt_beta)
+    let a = &*WAD - &div_up_or_down(sqrt_alpha, sqrt_beta)?;
 
-    let b_square = SignedFixedPoint::add(
-        &SignedFixedPoint::add(&b_square_term1, &b_sq2_doubled)?,
-        &b_sq3,
+    // Calculate 'b' terms - matches Python exactly
+    let b_term0 = div_up_or_down(&balances[1], sqrt_beta)?;
+    let b_term1 = mul_up_or_down(&balances[0], sqrt_alpha);
+    let mb = b_term0 + b_term1;
+
+    // Calculate 'c' term - matches Python: mc = mul_up_or_down(balances[0],
+    // balances[1])
+    let mc = mul_up_or_down(&balances[0], &balances[1]);
+
+    // Calculate b² - matches Python calculation exactly
+    let b_square = mul_up_or_down(
+        &mul_up_or_down(&mul_up_or_down(&balances[0], &balances[0]), sqrt_alpha),
+        sqrt_alpha,
+    );
+
+    let b_sq2 = div_up_or_down(
+        &(BigInt::from(2)
+            * mul_up_or_down(&mul_up_or_down(&balances[0], &balances[1]), sqrt_alpha)),
+        sqrt_beta,
     )?;
+
+    let b_sq3 = div_up_or_down(
+        &mul_up_or_down(&balances[1], &balances[1]),
+        &mul_down_or_up(sqrt_beta, sqrt_beta),
+    )?;
+
+    let b_square = b_square + b_sq2 + b_sq3;
 
     Ok(QuadraticTerms {
         a,
@@ -198,63 +278,35 @@ pub fn calculate_quadratic_terms(
     })
 }
 
-/// Calculate quadratic formula solution using provided terms
-///
-/// This function assumes a > 0, b < 0, and c <= 0, which is the case for
-/// a*L^2 + b*L + c = 0 where:
-///   a = 1 - sqrt(alpha/beta)
-///   b = -(y/sqrt(beta) + x*sqrt(alpha))
-///   c = -x*y
-///
-/// The special case works nicely without negative numbers.
-/// The args use the notation "mb" to represent -b, and "mc" to represent -c
+/// Calculate quadratic formula - matches Python calculate_quadratic EXACTLY
 pub fn calculate_quadratic(
     a: &BigInt,
     mb: &BigInt,
     b_square: &BigInt,
     mc: &BigInt,
 ) -> Result<BigInt, Error> {
-    // Calculate denominator
-    let two_wad = SignedFixedPoint::mul_up_mag(&BigInt::from(2), &WAD.clone())?;
-    let denominator = SignedFixedPoint::mul_up_mag(a, &two_wad)?;
+    // Calculate denominator - matches Python: mul_up_fixed(a, 2 * WAD)
+    let denominator = mul_up_fixed(a, &(BigInt::from(2) * &*WAD));
 
-    // Order multiplications for fixed point precision
-    let four_wad = SignedFixedPoint::mul_down_mag(&BigInt::from(4), &WAD.clone())?;
-    let add_term =
-        SignedFixedPoint::mul_down_mag(&SignedFixedPoint::mul_down_mag(mc, &four_wad)?, a)?;
+    // Order multiplications for fixed point precision - matches Python exactly
+    let add_term = mul_down_fixed(&mul_down_fixed(mc, &(BigInt::from(4) * &*WAD)), a);
 
-    // The minus sign in the radicand cancels out in this special case
-    let radicand = SignedFixedPoint::add(b_square, &add_term)?;
+    // The minus sign in the radicand cancels out - matches Python exactly
+    let radicand = b_square + add_term;
 
-    // Calculate square root
+    // Calculate square root - matches Python exactly
     let sqr_result = gyro_pool_math_sqrt(&radicand, 5)?;
 
-    // The minus sign in the numerator cancels out in this special case
-    let numerator = SignedFixedPoint::add(mb, &sqr_result)?;
+    // The minus sign in the numerator cancels out - matches Python exactly
+    let numerator = mb + sqr_result;
 
-    // Calculate final result
-    let invariant = SignedFixedPoint::div_down_mag(&numerator, &denominator)?;
+    // Calculate final result - matches Python exactly
+    let invariant = div_down_fixed(&numerator, &denominator)?;
 
     Ok(invariant)
 }
 
-/// Calculate the output amount given an input amount for a trade
-///
-/// Described for X = 'in' asset and Y = 'out' asset, but equivalent for the
-/// other case: dX = incrX  = amountIn  > 0
-/// dY = incrY = amountOut < 0
-/// x = balanceIn             x' = x + virtualParamX
-/// y = balanceOut            y' = y + virtualParamY
-/// L  = inv.Liq                   /            x' * y'          \          y' *
-/// dX                    |dy| = y' - |   --------------------------  |   = --------------
-/// x' = virtIn                    \          ( x' + dX)         /          x' +
-/// dX y' = virtOut
-///
-/// Note that -dy > 0 is what the trader receives.
-/// We exploit the fact that this formula is symmetric up to virtualOffset{X,Y}.
-/// We do not use L^2, but rather x' * y', to prevent potential accumulation of
-/// errors. We add a very small safety margin to compensate for potential errors
-/// in the invariant.
+/// Calculate output amount - matches Python calc_out_given_in EXACTLY
 pub fn calc_out_given_in(
     balance_in: &BigInt,
     balance_out: &BigInt,
@@ -262,26 +314,17 @@ pub fn calc_out_given_in(
     virtual_offset_in: &BigInt,
     virtual_offset_out: &BigInt,
 ) -> Result<BigInt, Error> {
-    // The factors lead to a multiplicative "safety margin" between virtual offsets
-    // that is very slightly larger than 3e-18
-    let wad_plus_two = SignedFixedPoint::add(&WAD.clone(), &BigInt::from(2))?;
-    let virt_in_over = SignedFixedPoint::add(
-        balance_in,
-        &SignedFixedPoint::mul_up_mag(virtual_offset_in, &wad_plus_two)?,
+    // Safety margins - matches Python exactly
+    let virt_in_over = balance_in + mul_up_fixed(virtual_offset_in, &(&*WAD + 2));
+    let virt_out_under = balance_out + mul_down_fixed(virtual_offset_out, &(&*WAD - 1));
+
+    // Calculate output amount - matches Python exactly
+    let amount_out = div_down_fixed(
+        &mul_down_fixed(&virt_out_under, amount_in),
+        &(&virt_in_over + amount_in),
     )?;
 
-    let wad_minus_one = SignedFixedPoint::sub(&WAD.clone(), &BigInt::from(1))?;
-    let virt_out_under = SignedFixedPoint::add(
-        balance_out,
-        &SignedFixedPoint::mul_down_mag(virtual_offset_out, &wad_minus_one)?,
-    )?;
-
-    // Calculate output amount
-    let numerator = SignedFixedPoint::mul_down_mag(&virt_out_under, amount_in)?;
-    let denominator = SignedFixedPoint::add(&virt_in_over, amount_in)?;
-    let amount_out = SignedFixedPoint::div_down_mag(&numerator, &denominator)?;
-
-    // Ensure amountOut < balanceOut
+    // Ensure amountOut <= balanceOut - matches Python check
     if amount_out > *balance_out {
         return Err(Error::XOutOfBounds);
     }
@@ -289,24 +332,7 @@ pub fn calc_out_given_in(
     Ok(amount_out)
 }
 
-/// Calculate the input amount required given a desired output amount for a
-/// trade
-///
-/// dX = incrX  = amountIn  > 0
-/// dY = incrY  = amountOut < 0
-/// x = balanceIn             x' = x + virtualParamX
-/// y = balanceOut            y' = y + virtualParamY
-/// x = balanceIn
-/// L  = inv.Liq               /            x' * y'          \                x'
-/// * dy                      dx =  |   --------------------------  |  -  x'  =
-/// - ----------- x' = virtIn               \             y' + dy          /
-/// y' + dy y' = virtOut
-///
-/// Note that dy < 0 < dx.
-/// We exploit the fact that this formula is symmetric up to virtualOffset{X,Y}.
-/// We do not use L^2, but rather x' * y', to prevent potential accumulation of
-/// errors. We add a very small safety margin to compensate for potential errors
-/// in the invariant.
+/// Calculate input amount - matches Python calc_in_given_out EXACTLY
 pub fn calc_in_given_out(
     balance_in: &BigInt,
     balance_out: &BigInt,
@@ -314,54 +340,47 @@ pub fn calc_in_given_out(
     virtual_offset_in: &BigInt,
     virtual_offset_out: &BigInt,
 ) -> Result<BigInt, Error> {
-    // Check if output amount exceeds balance
+    // Check bounds - matches Python check
     if amount_out > balance_out {
         return Err(Error::XOutOfBounds);
     }
 
-    // The factors lead to a multiplicative "safety margin" between virtual offsets
-    // that is very slightly larger than 3e-18
-    let wad_plus_two = SignedFixedPoint::add(&WAD.clone(), &BigInt::from(2))?;
-    let virt_in_over = SignedFixedPoint::add(
-        balance_in,
-        &SignedFixedPoint::mul_up_mag(virtual_offset_in, &wad_plus_two)?,
-    )?;
+    // Safety margins - matches Python exactly
+    let virt_in_over = balance_in + mul_up_fixed(virtual_offset_in, &(&*WAD + 2));
+    let virt_out_under = balance_out + mul_down_fixed(virtual_offset_out, &(&*WAD - 1));
 
-    let wad_minus_one = SignedFixedPoint::sub(&WAD.clone(), &BigInt::from(1))?;
-    let virt_out_under = SignedFixedPoint::add(
-        balance_out,
-        &SignedFixedPoint::mul_down_mag(virtual_offset_out, &wad_minus_one)?,
+    // Calculate input amount - matches Python exactly
+    let amount_in = div_up_fixed(
+        &mul_up_fixed(&virt_in_over, amount_out),
+        &(&virt_out_under - amount_out),
     )?;
-
-    // Calculate input amount
-    let numerator = SignedFixedPoint::mul_up_mag(&virt_in_over, amount_out)?;
-    let denominator = SignedFixedPoint::sub(&virt_out_under, amount_out)?;
-    let amount_in = SignedFixedPoint::div_up_mag(&numerator, &denominator)?;
 
     Ok(amount_in)
 }
 
-/// Calculate the virtual offset 'a' for reserves 'x', as in (x+a)*(y+b)=L^2
+/// Calculate virtual parameter0 - matches Python calculate_virtual_parameter0
+/// EXACTLY
 pub fn calculate_virtual_parameter0(
     invariant: &BigInt,
     sqrt_beta: &BigInt,
     rounding: &Rounding,
 ) -> Result<BigInt, Error> {
     match rounding {
-        Rounding::RoundDown => SignedFixedPoint::div_down_mag(invariant, sqrt_beta),
-        Rounding::RoundUp => SignedFixedPoint::div_up_mag(invariant, sqrt_beta),
+        Rounding::RoundDown => div_down_fixed(invariant, sqrt_beta),
+        Rounding::RoundUp => div_up_fixed(invariant, sqrt_beta),
     }
 }
 
-/// Calculate the virtual offset 'b' for reserves 'y', as in (x+a)*(y+b)=L^2
+/// Calculate virtual parameter1 - matches Python calculate_virtual_parameter1
+/// EXACTLY
 pub fn calculate_virtual_parameter1(
     invariant: &BigInt,
     sqrt_alpha: &BigInt,
     rounding: &Rounding,
 ) -> Result<BigInt, Error> {
     match rounding {
-        Rounding::RoundDown => SignedFixedPoint::mul_down_mag(invariant, sqrt_alpha),
-        Rounding::RoundUp => SignedFixedPoint::mul_up_mag(invariant, sqrt_alpha),
+        Rounding::RoundDown => Ok(mul_down_fixed(invariant, sqrt_alpha)),
+        Rounding::RoundUp => Ok(mul_up_fixed(invariant, sqrt_alpha)),
     }
 }
 
@@ -369,8 +388,7 @@ pub fn calculate_virtual_parameter1(
 mod tests {
     use super::*;
 
-    /// Test parameters based on reference implementations
-    /// Using similar values to the reference Python/TypeScript tests
+    /// Test parameters matching Python reference tests
     fn create_test_params() -> (BigInt, BigInt) {
         (
             BigInt::from(900_000_000_000_000_000_u64), // sqrt_alpha = 0.9e18
@@ -383,6 +401,73 @@ mod tests {
             BigInt::from(1_000_000_000_000_000_000_u64), // 1e18
             BigInt::from(1_000_000_000_000_000_000_u64), // 1e18
         ]
+    }
+
+    #[test]
+    fn test_simple_arithmetic() {
+        let a = BigInt::from(2_000_000_000_000_000_000_u64); // 2e18
+        let b = BigInt::from(3_000_000_000_000_000_000_u64); // 3e18
+
+        let result = mul_down_fixed(&a, &b);
+        assert_eq!(result, BigInt::from(6_000_000_000_000_000_000_u64)); // 6e18
+
+        let result = div_down_fixed(&a, &b).unwrap();
+        assert_eq!(result, BigInt::from(666_666_666_666_666_666_u64)); // ~0.666e18
+    }
+
+    #[test]
+    fn test_sqrt_basic() {
+        let result = gyro_pool_math_sqrt(&BigInt::from(4_000_000_000_000_000_000_u64), 1).unwrap(); // 4e18
+        // Should be close to 2e18
+        let expected = BigInt::from(2_000_000_000_000_000_000_u64);
+        let diff = (&result - &expected).abs();
+        assert!(diff < BigInt::from(1000)); // Very small tolerance
+
+        let result = gyro_pool_math_sqrt(&BigInt::from(0), 1).unwrap();
+        assert_eq!(result, BigInt::from(0));
+    }
+
+    #[test]
+    fn test_calculate_invariant() {
+        let balances = create_test_balances();
+        let (sqrt_alpha, sqrt_beta) = create_test_params();
+
+        let result = calculate_invariant(&balances, &sqrt_alpha, &sqrt_beta, &Rounding::RoundDown);
+        assert!(result.is_ok());
+
+        let invariant = result.unwrap();
+        assert!(invariant > BigInt::from(0));
+
+        // Sanity check that it's not infinitely large
+        assert!(invariant < BigInt::from(10).pow(50));
+    }
+
+    #[test]
+    fn test_swap_functions() {
+        let balances = create_test_balances();
+        let (sqrt_alpha, sqrt_beta) = create_test_params();
+
+        let invariant =
+            calculate_invariant(&balances, &sqrt_alpha, &sqrt_beta, &Rounding::RoundDown).unwrap();
+        let virtual_offset_in =
+            calculate_virtual_parameter0(&invariant, &sqrt_beta, &Rounding::RoundDown).unwrap();
+        let virtual_offset_out =
+            calculate_virtual_parameter1(&invariant, &sqrt_alpha, &Rounding::RoundDown).unwrap();
+
+        let amount_in = BigInt::from(100_000_000_000_000_000_u64); // 0.1e18
+
+        let result = calc_out_given_in(
+            &balances[0],
+            &balances[1],
+            &amount_in,
+            &virtual_offset_in,
+            &virtual_offset_out,
+        );
+
+        assert!(result.is_ok());
+        let amount_out = result.unwrap();
+        assert!(amount_out > BigInt::from(0));
+        assert!(amount_out < balances[1]);
     }
 
     #[test]

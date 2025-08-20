@@ -24,6 +24,7 @@ use {
             balancer_v2::{
                 pool_fetching::{
                     AmplificationParameter,
+                    Gyro2CLPPoolVersion,
                     GyroEPoolVersion,
                     TokenState,
                     WeightedPoolVersion,
@@ -65,6 +66,7 @@ pub enum Liquidity {
     BalancerStable(StablePoolOrder),
     BalancerV3Stable(BalancerV3StablePoolOrder),
     BalancerGyroE(GyroEPoolOrder),
+    BalancerGyro2CLP(Gyro2CLPPoolOrder),
     BalancerV3GyroE(BalancerV3GyroEOrder),
     BalancerV3Gyro2CLP(BalancerV3Gyro2CLPOrder),
     BalancerV3ReClamm(BalancerV3ReClammOrder),
@@ -414,6 +416,35 @@ pub struct GyroEPoolOrder {
 #[derive(Clone)]
 #[cfg_attr(test, derive(Derivative))]
 #[cfg_attr(test, derivative(PartialEq))]
+pub struct Gyro2CLPPoolOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, TokenState>,
+    pub fee: Bfp,
+    pub version: Gyro2CLPPoolVersion,
+    // Gyro 2-CLP static parameters (immutable after pool creation)
+    pub sqrt_alpha: SBfp,
+    pub sqrt_beta: SBfp,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
+impl std::fmt::Debug for Gyro2CLPPoolOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Gyro2CLPPoolOrder")
+            .field("address", &self.address)
+            .field("reserves", &self.reserves)
+            .field("fee", &self.fee)
+            .field("version", &self.version)
+            .field("sqrt_alpha", &self.sqrt_alpha)
+            .field("sqrt_beta", &self.sqrt_beta)
+            // Skip the settlement_handling field since it doesn't implement Debug
+            .finish()
+    }
+}
+
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
 pub struct BalancerV3GyroEOrder {
     pub address: H160,
     pub reserves: BTreeMap<H160, V3TokenState>,
@@ -607,6 +638,14 @@ impl Settleable for BalancerV3StablePoolOrder {
 }
 
 impl Settleable for GyroEPoolOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for Gyro2CLPPoolOrder {
     type Execution = AmmOrderExecution;
 
     fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {

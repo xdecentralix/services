@@ -889,6 +889,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
         };
 
         assert_eq!(
@@ -935,6 +937,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
         };
         assert!(PoolInfo::from_graph_data(&pool, 42).is_err());
     }
@@ -978,6 +982,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
         };
         assert!(PoolInfo::from_graph_data(&pool, 42).is_err());
     }

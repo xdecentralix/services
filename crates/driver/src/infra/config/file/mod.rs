@@ -657,6 +657,10 @@ enum BalancerV2Config {
         #[serde(default)]
         gyro_e: Vec<eth::H160>,
 
+        /// The Gyro 2-CLP pool factory contract addresses.
+        #[serde(default)]
+        gyro_2clp: Vec<eth::H160>,
+
         /// Deny listed Balancer V2 pools.
         #[serde(default)]
         pool_deny_list: Vec<eth::H256>,
