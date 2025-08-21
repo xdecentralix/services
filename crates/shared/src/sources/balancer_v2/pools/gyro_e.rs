@@ -255,6 +255,7 @@ mod tests {
             d_sq: Some(SBfp::from_wei(I256::from(14000))),
             sqrt_alpha: None,
             sqrt_beta: None,
+            root3_alpha: None,
         };
 
         let pool_info = PoolInfo::from_graph_data(&pool, 1234567890).unwrap();
@@ -308,6 +309,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
+            root3_alpha: None,
         };
 
         let result = PoolInfo::from_graph_data(&pool, 1234567890);

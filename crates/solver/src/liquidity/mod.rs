@@ -25,6 +25,7 @@ use {
                 pool_fetching::{
                     AmplificationParameter,
                     Gyro2CLPPoolVersion,
+                    Gyro3CLPPoolVersion,
                     GyroEPoolVersion,
                     TokenState,
                     WeightedPoolVersion,
@@ -67,6 +68,7 @@ pub enum Liquidity {
     BalancerV3Stable(BalancerV3StablePoolOrder),
     BalancerGyroE(GyroEPoolOrder),
     BalancerGyro2CLP(Gyro2CLPPoolOrder),
+    BalancerGyro3CLP(Gyro3CLPPoolOrder),
     BalancerV3GyroE(BalancerV3GyroEOrder),
     BalancerV3Gyro2CLP(BalancerV3Gyro2CLPOrder),
     BalancerV3ReClamm(BalancerV3ReClammOrder),
@@ -430,15 +432,27 @@ pub struct Gyro2CLPPoolOrder {
 
 impl std::fmt::Debug for Gyro2CLPPoolOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Gyro2CLPPoolOrder")
-            .field("address", &self.address)
-            .field("reserves", &self.reserves)
-            .field("fee", &self.fee)
-            .field("version", &self.version)
-            .field("sqrt_alpha", &self.sqrt_alpha)
-            .field("sqrt_beta", &self.sqrt_beta)
-            // Skip the settlement_handling field since it doesn't implement Debug
-            .finish()
+        write!(f, "Gyro 2-CLP Pool AMM {:?}", self.reserves.keys())
+    }
+}
+
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
+pub struct Gyro3CLPPoolOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, TokenState>,
+    pub fee: Bfp,
+    pub version: Gyro3CLPPoolVersion,
+    // Gyro 3-CLP static parameter (immutable after pool creation)
+    pub root3_alpha: Bfp,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
+impl std::fmt::Debug for Gyro3CLPPoolOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Gyro 3-CLP Pool AMM {:?}", self.reserves.keys())
     }
 }
 
@@ -485,14 +499,11 @@ pub struct BalancerV3Gyro2CLPOrder {
 
 impl std::fmt::Debug for BalancerV3Gyro2CLPOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BalancerV3Gyro2CLPOrder")
-            .field("address", &self.address)
-            .field("reserves", &self.reserves)
-            .field("fee", &self.fee)
-            .field("version", &self.version)
-            .field("sqrt_alpha", &self.sqrt_alpha)
-            .field("sqrt_beta", &self.sqrt_beta)
-            .finish()
+        write!(
+            f,
+            "Balancer V3 Gyro 2-CLP Pool AMM {:?}",
+            self.reserves.keys()
+        )
     }
 }
 
@@ -646,6 +657,14 @@ impl Settleable for GyroEPoolOrder {
 }
 
 impl Settleable for Gyro2CLPPoolOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for Gyro3CLPPoolOrder {
     type Execution = AmmOrderExecution;
 
     fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {

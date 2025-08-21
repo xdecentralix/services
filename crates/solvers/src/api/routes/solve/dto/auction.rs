@@ -86,6 +86,7 @@ pub fn to_domain(auction: &Auction) -> Result<auction::Auction, Error> {
                 }
                 Liquidity::GyroE(liquidity) => gyro_e_pool::to_domain(liquidity),
                 Liquidity::Gyro2CLP(liquidity) => gyro_2clp_pool::to_domain(liquidity),
+                Liquidity::Gyro3CLP(liquidity) => gyro_3clp_pool::to_domain(liquidity),
                 Liquidity::LimitOrder(liquidity) => Ok(foreign_limit_order::to_domain(liquidity)),
                 Liquidity::Erc4626(liquidity) => erc4626::to_domain(liquidity),
                 Liquidity::ReClamm(liquidity) => reclamm_pool::to_domain(liquidity),
@@ -396,6 +397,46 @@ mod gyro_2clp_pool {
                     .ok_or("invalid sqrt_alpha")?,
                 sqrt_beta: conv::decimal_to_signed_rational(&pool.sqrt_beta)
                     .ok_or("invalid sqrt_beta")?,
+            }),
+        })
+    }
+}
+
+mod gyro_3clp_pool {
+    use super::*;
+
+    pub fn to_domain(pool: &Gyro3CLPPool) -> Result<liquidity::Liquidity, Error> {
+        let reserves = pool
+            .tokens
+            .iter()
+            .map(|(address, token)| {
+                Ok(liquidity::gyro_3clp::Reserve {
+                    asset: eth::Asset {
+                        token: (*address).into(),
+                        amount: token.balance.into(),
+                    },
+                    scale: liquidity::ScalingFactor::new(
+                        conv::decimal_to_rational(&token.scaling_factor)
+                            .ok_or("invalid scaling factor")?,
+                    )
+                    .ok_or("invalid scaling factor")?,
+                })
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+
+        Ok(liquidity::Liquidity {
+            id: liquidity::Id(pool.id.clone()),
+            address: pool.address,
+            gas: eth::Gas(pool.gas_estimate),
+            state: liquidity::State::Gyro3CLP(liquidity::gyro_3clp::Pool {
+                reserves: liquidity::gyro_3clp::Reserves::new(reserves)
+                    .ok_or("invalid 3-CLP reserves")?,
+                fee: conv::decimal_to_rational(&pool.fee).ok_or("invalid Gyro3CLP pool fee")?,
+                version: match pool.version {
+                    Gyro3CLPVersion::V1 => liquidity::gyro_3clp::Version::V1,
+                },
+                root3_alpha: conv::decimal_to_rational(&pool.root3_alpha)
+                    .ok_or("invalid root3_alpha")?,
             }),
         })
     }

@@ -168,6 +168,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
+            root3_alpha: None,
         };
 
         assert_eq!(

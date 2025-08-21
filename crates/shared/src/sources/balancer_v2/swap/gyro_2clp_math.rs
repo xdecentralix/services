@@ -5,11 +5,7 @@
 //! This implementation matches the Python reference EXACTLY as verified against
 //! the official balancer-maths repository.
 
-use {
-    super::error::Error,
-    num::{BigInt, Signed},
-    std::sync::LazyLock,
-};
+use {super::error::Error, num::BigInt, std::sync::LazyLock};
 
 // Core constants mirroring the Python implementation
 static WAD: LazyLock<BigInt> = LazyLock::new(|| BigInt::from(1_000_000_000_000_000_000_u64)); // 1e18
@@ -386,7 +382,7 @@ pub fn calculate_virtual_parameter1(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use {super::*, num::Signed};
 
     /// Test parameters matching Python reference tests
     fn create_test_params() -> (BigInt, BigInt) {

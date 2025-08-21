@@ -8,6 +8,8 @@ use {
             AmplificationParameter,
             Gyro2CLPPool,
             Gyro2CLPPoolVersion,
+            Gyro3CLPPool,
+            Gyro3CLPPoolVersion,
             GyroEPool,
             GyroEPoolVersion,
             StablePool,
@@ -27,6 +29,7 @@ use {
 mod error;
 pub mod fixed_point;
 pub mod gyro_2clp_math;
+pub mod gyro_3clp_math;
 pub mod gyro_e_math;
 mod math;
 pub mod signed_fixed_point;
@@ -36,6 +39,7 @@ mod weighted_math;
 const WEIGHTED_SWAP_GAS_COST: usize = 100_000;
 const STABLE_SWAP_GAS_COST: usize = 183_520;
 const GYRO_2CLP_SWAP_GAS_COST: usize = 150_000; // Moderate gas cost for 2-CLP math
+const GYRO_3CLP_SWAP_GAS_COST: usize = 160_000; // Slightly higher than 2-CLP due to 3D invariant
 const GYRO_E_SWAP_GAS_COST: usize = 200_000; // Higher gas cost due to complex elliptic curve math
 
 fn add_swap_fee_amount(amount: U256, swap_fee: Bfp) -> Result<U256, Error> {
@@ -997,6 +1001,183 @@ impl Gyro2CLPPool {
 }
 
 impl BaselineSolvable for Gyro2CLPPool {
+    async fn get_amount_out(&self, out_token: H160, input: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref().get_amount_out(out_token, input).await
+    }
+
+    async fn get_amount_in(&self, in_token: H160, output: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref().get_amount_in(in_token, output).await
+    }
+
+    async fn gas_cost(&self) -> usize {
+        self.as_pool_ref().gas_cost().await
+    }
+}
+
+/// Gyroscope 3-CLP pool data as a reference used for computing input and output
+/// amounts with three tokens.
+#[derive(Debug)]
+pub struct Gyro3CLPPoolRef<'a> {
+    pub reserves: &'a BTreeMap<H160, TokenState>,
+    pub swap_fee: Bfp,
+    pub version: Gyro3CLPPoolVersion,
+    pub root3_alpha: Bfp,
+}
+
+impl Gyro3CLPPoolRef<'_> {
+    fn get_amount_out_inner(
+        &self,
+        out_token: H160,
+        in_amount: U256,
+        in_token: H160,
+    ) -> Option<U256> {
+        // Get token reserves (must be exactly 3 tokens for 3-CLP)
+        if self.reserves.len() != 3 {
+            return None;
+        }
+
+        let in_reserves = self.reserves.get(&in_token)?;
+        let out_reserves = self.reserves.get(&out_token)?;
+
+        // Find the third token (the one that's neither input nor output)
+        let other_token = self
+            .reserves
+            .keys()
+            .find(|&&token| token != in_token && token != out_token)?;
+        let other_reserves = self.reserves.get(other_token)?;
+
+        // Apply swap fees to input amount
+        let in_amount_minus_fees = subtract_swap_fee_amount(in_amount, self.swap_fee).ok()?;
+
+        // Convert to upscaled amounts
+        let in_balance_upscaled = in_reserves.upscaled_balance().ok()?;
+        let out_balance_upscaled = out_reserves.upscaled_balance().ok()?;
+        let other_balance_upscaled = other_reserves.upscaled_balance().ok()?;
+        let in_amount_upscaled = in_reserves.upscale(in_amount_minus_fees).ok()?;
+
+        // Convert to BigInt for 3-CLP math
+        let in_balance_bigint = in_balance_upscaled.as_uint256().to_big_int();
+        let out_balance_bigint = out_balance_upscaled.as_uint256().to_big_int();
+        let other_balance_bigint = other_balance_upscaled.as_uint256().to_big_int();
+        let in_amount_bigint = in_amount_upscaled.as_uint256().to_big_int();
+        let root3_alpha_bigint = self.root3_alpha.as_uint256().to_big_int();
+
+        // Calculate invariant using official 3-CLP math
+        let current_balances = [
+            in_balance_bigint.clone(),
+            out_balance_bigint.clone(),
+            other_balance_bigint.clone(),
+        ];
+
+        // Calculate the invariant L using Newton's method (official implementation)
+        let invariant =
+            gyro_3clp_math::calculate_invariant(&current_balances, &root3_alpha_bigint).ok()?;
+
+        // Calculate output using official 3-CLP math
+        // The virtual offset IS the invariant L in the official implementation
+        let out_amount_big_int = gyro_3clp_math::calc_out_given_in(
+            &in_balance_bigint,
+            &out_balance_bigint,
+            &in_amount_bigint,
+            &invariant, // virtual_offset = invariant L
+        )
+        .ok()?;
+
+        // Convert BigInt result back to U256 and apply downscaling
+        let out_amount_bfp =
+            Bfp::from_wei(ethcontract::U256::from_dec_str(&out_amount_big_int.to_string()).ok()?);
+        let out_amount_downscaled = out_reserves.downscale_down(out_amount_bfp).ok()?;
+
+        Some(out_amount_downscaled)
+    }
+}
+
+impl BaselineSolvable for Gyro3CLPPoolRef<'_> {
+    async fn get_amount_out(
+        &self,
+        out_token: H160,
+        (in_amount, in_token): (U256, H160),
+    ) -> Option<U256> {
+        self.get_amount_out_inner(out_token, in_amount, in_token)
+    }
+
+    async fn get_amount_in(&self, in_token: H160, output: (U256, H160)) -> Option<U256> {
+        let (out_amount, out_token) = output;
+
+        // Get token reserves (must be exactly 3 tokens for 3-CLP)
+        if self.reserves.len() != 3 {
+            return None;
+        }
+
+        let in_reserves = self.reserves.get(&in_token)?;
+        let out_reserves = self.reserves.get(&out_token)?;
+
+        // Find the third token
+        let other_token = self
+            .reserves
+            .keys()
+            .find(|&&token| token != in_token && token != out_token)?;
+        let other_reserves = self.reserves.get(other_token)?;
+
+        // Convert to upscaled amounts
+        let in_balance_upscaled = in_reserves.upscaled_balance().ok()?;
+        let out_balance_upscaled = out_reserves.upscaled_balance().ok()?;
+        let other_balance_upscaled = other_reserves.upscaled_balance().ok()?;
+        let out_amount_upscaled = out_reserves.upscale(out_amount).ok()?;
+
+        // Convert to BigInt for 3-CLP math
+        let in_balance_bigint = in_balance_upscaled.as_uint256().to_big_int();
+        let out_balance_bigint = out_balance_upscaled.as_uint256().to_big_int();
+        let other_balance_bigint = other_balance_upscaled.as_uint256().to_big_int();
+        let out_amount_bigint = out_amount_upscaled.as_uint256().to_big_int();
+        let root3_alpha_bigint = self.root3_alpha.as_uint256().to_big_int();
+
+        // Calculate invariant using official 3-CLP math
+        let current_balances = [
+            in_balance_bigint.clone(),
+            out_balance_bigint.clone(),
+            other_balance_bigint.clone(),
+        ];
+
+        let invariant =
+            gyro_3clp_math::calculate_invariant(&current_balances, &root3_alpha_bigint).ok()?;
+
+        // Calculate input using official 3-CLP math
+        // The virtual offset IS the invariant L in the official implementation
+        let in_amount_big_int = gyro_3clp_math::calc_in_given_out(
+            &in_balance_bigint,
+            &out_balance_bigint,
+            &out_amount_bigint,
+            &invariant, // virtual_offset = invariant L
+        )
+        .ok()?;
+
+        // Convert result back and apply fee
+        let in_amount_bfp =
+            Bfp::from_wei(ethcontract::U256::from_dec_str(&in_amount_big_int.to_string()).ok()?);
+        let in_amount_downscaled = in_reserves.downscale_up(in_amount_bfp).ok()?;
+
+        // Apply swap fee to get final amount
+        add_swap_fee_amount(in_amount_downscaled, self.swap_fee).ok()
+    }
+
+    async fn gas_cost(&self) -> usize {
+        GYRO_3CLP_SWAP_GAS_COST
+    }
+}
+
+impl Gyro3CLPPool {
+    fn as_pool_ref(&self) -> Gyro3CLPPoolRef<'_> {
+        Gyro3CLPPoolRef {
+            reserves: &self.reserves,
+            swap_fee: self.common.swap_fee,
+            version: self.version,
+            root3_alpha: self.root3_alpha,
+        }
+    }
+}
+
+impl BaselineSolvable for Gyro3CLPPool {
     async fn get_amount_out(&self, out_token: H160, input: (U256, H160)) -> Option<U256> {
         self.as_pool_ref().get_amount_out(out_token, input).await
     }

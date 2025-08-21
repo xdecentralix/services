@@ -2,6 +2,7 @@ pub mod concentrated;
 pub mod constant_product;
 pub mod erc4626;
 pub mod gyro_2clp;
+pub mod gyro_3clp;
 pub mod gyro_e;
 mod limit_order;
 pub mod quantamm;

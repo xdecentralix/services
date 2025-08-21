@@ -1,13 +1,13 @@
-//! Module implementing Gyroscope 2-CLP pool specific indexing logic.
+//! Module implementing Gyroscope 3-CLP pool specific indexing logic.
 
 use {
     super::{FactoryIndexing, PoolIndexing, common},
     crate::sources::balancer_v2::{
         graph_api::{PoolData, PoolType},
-        swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
+        swap::fixed_point::Bfp,
     },
     anyhow::{Result, anyhow},
-    contracts::{BalancerV2Gyro2CLPPool, BalancerV2Gyro2CLPPoolFactory},
+    contracts::{BalancerV2Gyro3CLPPool, BalancerV2Gyro3CLPPoolFactory},
     ethcontract::{BlockId, H160},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
@@ -16,8 +16,7 @@ use {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PoolInfo {
     pub common: common::PoolInfo,
-    pub sqrt_alpha: SBfp,
-    pub sqrt_beta: SBfp,
+    pub root3_alpha: Bfp,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,9 +24,8 @@ pub struct PoolState {
     pub tokens: BTreeMap<H160, common::TokenState>,
     pub swap_fee: Bfp,
     pub version: Version,
-    // Gyro 2-CLP static parameters (included in PoolState for easier access)
-    pub sqrt_alpha: SBfp,
-    pub sqrt_beta: SBfp,
+    // Gyro 3-CLP static parameter (included in PoolState for easier access)
+    pub root3_alpha: Bfp,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -38,17 +36,13 @@ pub enum Version {
 
 impl PoolIndexing for PoolInfo {
     fn from_graph_data(pool: &PoolData, block_created: u64) -> Result<Self> {
-        let sqrt_alpha = pool
-            .sqrt_alpha
-            .ok_or_else(|| anyhow!("missing sqrt_alpha for pool {:?}", pool.id))?;
-        let sqrt_beta = pool
-            .sqrt_beta
-            .ok_or_else(|| anyhow!("missing sqrt_beta for pool {:?}", pool.id))?;
+        let root3_alpha = pool
+            .root3_alpha
+            .ok_or_else(|| anyhow!("missing root3_alpha for pool {:?}", pool.id))?;
 
         Ok(PoolInfo {
-            common: common::PoolInfo::for_type(PoolType::Gyro2CLP, pool, block_created)?,
-            sqrt_alpha,
-            sqrt_beta,
+            common: common::PoolInfo::for_type(PoolType::Gyro3CLP, pool, block_created)?,
+            root3_alpha,
         })
     }
 
@@ -58,29 +52,20 @@ impl PoolIndexing for PoolInfo {
 }
 
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV2Gyro2CLPPoolFactory {
+impl FactoryIndexing for BalancerV2Gyro3CLPPoolFactory {
     type PoolInfo = PoolInfo;
     type PoolState = PoolState;
 
     async fn specialize_pool_info(&self, pool: common::PoolInfo) -> Result<Self::PoolInfo> {
-        // For Gyroscope 2-CLP, we need to fetch the immutable parameters from the pool
+        // For Gyroscope 3-CLP, we need to fetch the immutable parameter from the pool
         // contract
-        let pool_contract = BalancerV2Gyro2CLPPool::at(&self.raw_instance().web3(), pool.address);
+        let pool_contract = BalancerV2Gyro3CLPPool::at(&self.raw_instance().web3(), pool.address);
 
-        let sqrt_params = pool_contract.get_sqrt_parameters().call().await?;
+        let root3_alpha = pool_contract.get_root_3_alpha().call().await?;
 
         Ok(PoolInfo {
             common: pool,
-            sqrt_alpha: SBfp::from_wei(
-                sqrt_params[0]
-                    .try_into()
-                    .map_err(|_| anyhow!("sqrt_alpha value too large for I256"))?,
-            ),
-            sqrt_beta: SBfp::from_wei(
-                sqrt_params[1]
-                    .try_into()
-                    .map_err(|_| anyhow!("sqrt_beta value too large for I256"))?,
-            ),
+            root3_alpha: Bfp::from_wei(root3_alpha),
         })
     }
 
@@ -111,9 +96,8 @@ fn pool_state(
             tokens,
             swap_fee: common.swap_fee,
             version,
-            // Pass through static parameters from PoolInfo
-            sqrt_alpha: pool_info.sqrt_alpha,
-            sqrt_beta: pool_info.sqrt_beta,
+            // Pass through static parameter from PoolInfo
+            root3_alpha: pool_info.root3_alpha,
         }))
     }
     .boxed()
@@ -123,16 +107,19 @@ fn pool_state(
 mod tests {
     use {
         super::*,
-        crate::sources::balancer_v2::graph_api::{DynamicData, Token},
-        ethcontract::{H160, I256},
+        crate::sources::balancer_v2::{
+            graph_api::{DynamicData, Token},
+            swap::fixed_point::Bfp,
+        },
+        ethcontract::H160,
     };
 
     #[test]
-    fn convert_graph_pool_to_gyro_2clp_pool_info() {
+    fn convert_graph_pool_to_gyro_3clp_pool_info() {
         let pool = PoolData {
             id: "0x1234567890123456789012345678901234567890123456789012345678901234".to_string(),
             address: H160::from_low_u64_be(1),
-            pool_type: "GYRO".to_string(),
+            pool_type: "GYRO3".to_string(),
             protocol_version: 2,
             factory: H160::from_low_u64_be(2),
             chain: crate::sources::balancer_v2::graph_api::GqlChain::MAINNET,
@@ -145,6 +132,12 @@ mod tests {
                 },
                 Token {
                     address: H160::from_low_u64_be(4),
+                    decimals: 18,
+                    weight: None,
+                    price_rate_provider: None,
+                },
+                Token {
+                    address: H160::from_low_u64_be(5),
                     decimals: 18,
                     weight: None,
                     price_rate_provider: None,
@@ -166,19 +159,17 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
-            sqrt_alpha: Some(SBfp::from_wei(I256::from(900_000_000_000_000_000i64))), /* sqrt_alpha = 0.9e18 */
-            sqrt_beta: Some(SBfp::from_wei(I256::from(1_100_000_000_000_000_000i64))), /* sqrt_beta = 1.1e18 */
-            root3_alpha: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
+            root3_alpha: Some(Bfp::from_wei(ethcontract::U256::from(
+                800_000_000_000_000_000u64,
+            ))),
         };
 
         let pool_info = PoolInfo::from_graph_data(&pool, 12345).unwrap();
         assert_eq!(
-            pool_info.sqrt_alpha,
-            SBfp::from_wei(I256::from(900_000_000_000_000_000i64))
-        );
-        assert_eq!(
-            pool_info.sqrt_beta,
-            SBfp::from_wei(I256::from(1_100_000_000_000_000_000i64))
+            pool_info.root3_alpha,
+            Bfp::from_wei(ethcontract::U256::from(800_000_000_000_000_000u64))
         );
     }
 }

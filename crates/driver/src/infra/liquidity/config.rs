@@ -206,6 +206,9 @@ pub struct BalancerV2 {
     /// Gyro 2-CLP pool factory addresses.
     pub gyro_2clp: Vec<eth::ContractAddress>,
 
+    /// Gyro 3-CLP pool factory addresses.
+    pub gyro_3clp: Vec<eth::ContractAddress>,
+
     /// Deny listed Balancer V2 pools.
     ///
     /// Since pools allow for custom controllers and logic, it is possible for
@@ -263,6 +266,9 @@ impl BalancerV2 {
             gyro_e: factory_addresses(&[contracts::BalancerV2GyroECLPPoolFactory::raw_contract()]),
             gyro_2clp: factory_addresses(&[
                 contracts::BalancerV2Gyro2CLPPoolFactory::raw_contract(),
+            ]),
+            gyro_3clp: factory_addresses(&[
+                contracts::BalancerV2Gyro3CLPPoolFactory::raw_contract(),
             ]),
             pool_deny_list: Vec::new(),
             graph_url: graph_url.clone(),

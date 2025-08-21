@@ -63,6 +63,25 @@ where
     }
 }
 
+fn deserialize_optional_bfp<'de, D>(deserializer: D) -> Result<Option<Bfp>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    match opt {
+        Some(value) => {
+            if value == "0" || value.is_empty() {
+                Ok(None)
+            } else {
+                let parsed_value = value.parse::<f64>().map_err(serde::de::Error::custom)?;
+                let scaled_value = (parsed_value * 1e18) as u64;
+                Ok(Some(Bfp::from_wei(scaled_value.into())))
+            }
+        }
+        None => Ok(None),
+    }
+}
+
 /// Balancer API v3 client for fetching pool data.
 pub struct BalancerApiClient {
     client: SubgraphClient,
@@ -226,6 +245,8 @@ pub struct PoolData {
     pub sqrt_alpha: Option<SBfp>,
     #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub sqrt_beta: Option<SBfp>,
+    #[serde(default, deserialize_with = "deserialize_optional_bfp")]
+    pub root3_alpha: Option<Bfp>,
 }
 
 /// Dynamic data for pools from Balancer API v3.
@@ -256,6 +277,7 @@ pub enum PoolType {
     LiquidityBootstrapping,
     ComposableStable,
     Gyro2CLP,
+    Gyro3CLP,
     GyroE,
 }
 
@@ -268,6 +290,7 @@ impl PoolData {
             "LIQUIDITY_BOOTSTRAPPING" => PoolType::LiquidityBootstrapping,
             "COMPOSABLE_STABLE" => PoolType::ComposableStable,
             "GYRO" => PoolType::Gyro2CLP,
+            "GYRO3" => PoolType::Gyro3CLP,
             "GYROE" => PoolType::GyroE,
             _ => panic!("Unknown pool type: {}", self.pool_type),
         }
@@ -359,6 +382,7 @@ mod pools_query {
                 dSq
                 sqrtAlpha
                 sqrtBeta
+                root3Alpha
             }
         }
     "#;
@@ -518,6 +542,7 @@ mod tests {
                         d_sq: None,
                         sqrt_alpha: None,
                         sqrt_beta: None,
+                        root3_alpha: None,
                     },
                     PoolData {
                         id: "0x1111111111111111111111111111111111111111111111111111111111111111"
@@ -559,6 +584,7 @@ mod tests {
                         d_sq: None,
                         sqrt_alpha: None,
                         sqrt_beta: None,
+                        root3_alpha: None,
                     },
                     PoolData {
                         id: "0x1111111111111111111111111111111111111111111111111111111111111111"
@@ -600,6 +626,7 @@ mod tests {
                         d_sq: None,
                         sqrt_alpha: None,
                         sqrt_beta: None,
+                        root3_alpha: None,
                     },
                     PoolData {
                         id: "0x1111111111111111111111111111111111111111111111111111111111111111"
@@ -641,6 +668,7 @@ mod tests {
                         d_sq: None,
                         sqrt_alpha: None,
                         sqrt_beta: None,
+                        root3_alpha: None,
                     },
                 ],
             }
@@ -832,6 +860,7 @@ mod tests {
                     d_sq: None,
                     sqrt_alpha: None,
                     sqrt_beta: None,
+                    root3_alpha: None,
                 },
                 PoolData {
                     id: "0x2222222222222222222222222222222222222222222222222222222222222222"
@@ -860,6 +889,7 @@ mod tests {
                     d_sq: None,
                     sqrt_alpha: None,
                     sqrt_beta: None,
+                    root3_alpha: None,
                 },
                 PoolData {
                     id: "0x3333333333333333333333333333333333333333333333333333333333333333"
@@ -888,6 +918,7 @@ mod tests {
                     d_sq: None,
                     sqrt_alpha: None,
                     sqrt_beta: None,
+                    root3_alpha: None,
                 },
             ],
         };

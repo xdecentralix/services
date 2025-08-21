@@ -40,6 +40,7 @@ macro_rules! errors_from_codes {
 errors_from_codes!(
     (AddOverflow, 0),
     (SubOverflow, 1),
+    (SubUnderflow, 2),
     (MulOverflow, 3),
     (ZeroDivision, 4),
     (DivInternal, 5),

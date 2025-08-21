@@ -168,6 +168,7 @@ pub enum Liquidity {
     ConcentratedLiquidity(ConcentratedLiquidityPool),
     GyroE(GyroEPool),
     Gyro2CLP(Gyro2CLPPool),
+    Gyro3CLP(Gyro3CLPPool),
     ReClamm(ReClammPool),
     QuantAmm(QuantAmmPool),
     LimitOrder(ForeignLimitOrder),
@@ -364,6 +365,22 @@ pub struct Gyro2CLPPool {
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Gyro3CLPPool {
+    pub id: String,
+    pub address: H160,
+    pub balancer_pool_id: H256,
+    #[serde_as(as = "HexOrDecimalU256")]
+    pub gas_estimate: U256,
+    pub tokens: HashMap<H160, Gyro3CLPReserve>,
+    pub fee: BigDecimal,
+    pub version: Gyro3CLPVersion,
+    // Gyroscope 3-CLP static parameter (immutable after pool creation)
+    pub root3_alpha: BigDecimal,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Gyro2CLPReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
@@ -373,6 +390,21 @@ pub struct Gyro2CLPReserve {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Gyro2CLPVersion {
+    V1,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Gyro3CLPReserve {
+    #[serde_as(as = "HexOrDecimalU256")]
+    pub balance: U256,
+    pub scaling_factor: BigDecimal,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Gyro3CLPVersion {
     V1,
 }
 

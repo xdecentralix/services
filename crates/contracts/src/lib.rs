@@ -300,46 +300,46 @@ mod tests {
             // only sepolia
             assert_has_deployment_address!(TestnetUniswapV2Router02 for SEPOLIA);
         }
+    }
 
-        #[test]
-        fn deployment_information() {
-            macro_rules! assert_has_deployment_information {
-                ($contract:ident for $network:expr_2021) => {{
-                    let web3 = Web3::new(ChainIdTransport($network));
-                    let instance = $contract::deployed(&web3).now_or_never().unwrap().unwrap();
-                    assert!(matches!(
-                        instance.deployment_information(),
-                        Some(DeploymentInformation::BlockNumber(_)),
-                    ));
-                }};
-            }
-
-            for network in &[MAINNET, GNOSIS, SEPOLIA, ARBITRUM_ONE] {
-                assert_has_deployment_information!(GPv2Settlement for *network);
-                assert_has_deployment_information!(BalancerV2Vault for *network);
-            }
-            for network in &[MAINNET] {
-                assert_has_deployment_information!(BalancerV2WeightedPoolFactory for *network);
-            }
-            for network in &[MAINNET, ARBITRUM_ONE] {
-                assert_has_deployment_information!(BalancerV2WeightedPool2TokensFactory for *network);
-            }
-            for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
-                assert_has_deployment_information!(BalancerV2StablePoolFactoryV2 for *network);
-            }
+    #[test]
+    fn deployment_information() {
+        macro_rules! assert_has_deployment_information {
+            ($contract:ident for $network:expr_2021) => {{
+                let web3 = Web3::new(ChainIdTransport($network));
+                let instance = $contract::deployed(&web3).now_or_never().unwrap().unwrap();
+                assert!(matches!(
+                    instance.deployment_information(),
+                    Some(DeploymentInformation::BlockNumber(_)),
+                ));
+            }};
         }
 
-        #[test]
-        fn bytecode() {
-            macro_rules! assert_has_bytecode {
-                ($contract:ty) => {{
-                    let contract = <$contract>::raw_contract();
-                    assert!(!contract.bytecode.is_empty());
-                }};
-            }
-
-            assert_has_bytecode!(support::Trader);
-            assert_has_bytecode!(support::Solver);
+        for network in &[MAINNET, GNOSIS, SEPOLIA, ARBITRUM_ONE] {
+            assert_has_deployment_information!(GPv2Settlement for *network);
+            assert_has_deployment_information!(BalancerV2Vault for *network);
         }
+        for network in &[MAINNET] {
+            assert_has_deployment_information!(BalancerV2WeightedPoolFactory for *network);
+        }
+        for network in &[MAINNET, ARBITRUM_ONE] {
+            assert_has_deployment_information!(BalancerV2WeightedPool2TokensFactory for *network);
+        }
+        for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
+            assert_has_deployment_information!(BalancerV2StablePoolFactoryV2 for *network);
+        }
+    }
+
+    #[test]
+    fn bytecode() {
+        macro_rules! assert_has_bytecode {
+            ($contract:ty) => {{
+                let contract = <$contract>::raw_contract();
+                assert!(!contract.bytecode.is_empty());
+            }};
+        }
+
+        assert_has_bytecode!(support::Trader);
+        assert_has_bytecode!(support::Solver);
     }
 }

@@ -199,7 +199,7 @@ pub async fn build_edges(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, primitive_types::U256};
+    use primitive_types::U256;
 
     #[tokio::test]
     async fn epsilon_applied_via_get_amount_in() {
