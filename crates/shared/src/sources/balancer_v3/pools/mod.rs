@@ -8,6 +8,7 @@
 //! pool types by just implementing the required `BalancerV3Factory` trait.
 
 pub mod common;
+pub mod gyro_2clp;
 pub mod gyro_e;
 pub mod quantamm;
 pub mod reclamm;
@@ -35,6 +36,7 @@ pub struct Pool {
 pub enum PoolKind {
     Weighted(weighted::PoolState),
     Stable(stable::PoolState),
+    Gyro2CLP(gyro_2clp::PoolState),
     GyroE(gyro_e::PoolState),
     ReClamm(reclamm::PoolState),
     QuantAmm(quantamm::PoolState),
@@ -52,6 +54,7 @@ macro_rules! impl_from_state {
 
 impl_from_state!(weighted::PoolState, Weighted);
 impl_from_state!(stable::PoolState, Stable);
+impl_from_state!(gyro_2clp::PoolState, Gyro2CLP);
 impl_from_state!(gyro_e::PoolState, GyroE);
 impl_from_state!(reclamm::PoolState, ReClamm);
 impl_from_state!(quantamm::PoolState, QuantAmm);

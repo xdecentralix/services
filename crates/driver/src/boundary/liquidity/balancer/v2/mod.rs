@@ -11,6 +11,8 @@ use {
     chain::Chain,
     contracts::{
         BalancerV2ComposableStablePoolFactory,
+        BalancerV2Gyro2CLPPoolFactory,
+        BalancerV2Gyro3CLPPoolFactory,
         BalancerV2GyroECLPPoolFactory,
         BalancerV2LiquidityBootstrappingPoolFactory,
         BalancerV2StablePoolFactoryV2,
@@ -38,6 +40,8 @@ use {
     std::sync::Arc,
 };
 
+pub mod gyro_2clp;
+pub mod gyro_3clp;
 pub mod gyro_e;
 pub mod stable;
 pub mod weighted;
@@ -198,6 +202,30 @@ async fn init_liquidity(
                     (
                         BalancerFactoryKind::GyroE,
                         BalancerV2GyroECLPPoolFactory::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            config
+                .gyro_2clp
+                .iter()
+                .map(|&factory| {
+                    (
+                        BalancerFactoryKind::Gyro2CLP,
+                        BalancerV2Gyro2CLPPoolFactory::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            config
+                .gyro_3clp
+                .iter()
+                .map(|&factory| {
+                    (
+                        BalancerFactoryKind::Gyro3CLP,
+                        BalancerV2Gyro3CLPPoolFactory::at(&web3, factory.into())
                             .raw_instance()
                             .clone(),
                     )

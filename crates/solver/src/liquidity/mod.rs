@@ -24,6 +24,8 @@ use {
             balancer_v2::{
                 pool_fetching::{
                     AmplificationParameter,
+                    Gyro2CLPPoolVersion,
+                    Gyro3CLPPoolVersion,
                     GyroEPoolVersion,
                     TokenState,
                     WeightedPoolVersion,
@@ -34,6 +36,7 @@ use {
             balancer_v3::{
                 pool_fetching::{
                     AmplificationParameter as V3AmplificationParameter,
+                    Gyro2CLPPoolVersion as V3Gyro2CLPPoolVersion,
                     GyroEPoolVersion as V3GyroEPoolVersion,
                     QuantAmmPoolVersion as V3QuantAmmPoolVersion,
                     QuantAmmTokenState as V3QuantAmmTokenState,
@@ -64,7 +67,10 @@ pub enum Liquidity {
     BalancerStable(StablePoolOrder),
     BalancerV3Stable(BalancerV3StablePoolOrder),
     BalancerGyroE(GyroEPoolOrder),
+    BalancerGyro2CLP(Gyro2CLPPoolOrder),
+    BalancerGyro3CLP(Gyro3CLPPoolOrder),
     BalancerV3GyroE(BalancerV3GyroEOrder),
+    BalancerV3Gyro2CLP(BalancerV3Gyro2CLPOrder),
     BalancerV3ReClamm(BalancerV3ReClammOrder),
     BalancerV3QuantAmm(BalancerV3QuantAmmOrder),
     LimitOrder(LimitOrder),
@@ -412,6 +418,47 @@ pub struct GyroEPoolOrder {
 #[derive(Clone)]
 #[cfg_attr(test, derive(Derivative))]
 #[cfg_attr(test, derivative(PartialEq))]
+pub struct Gyro2CLPPoolOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, TokenState>,
+    pub fee: Bfp,
+    pub version: Gyro2CLPPoolVersion,
+    // Gyro 2-CLP static parameters (immutable after pool creation)
+    pub sqrt_alpha: SBfp,
+    pub sqrt_beta: SBfp,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
+impl std::fmt::Debug for Gyro2CLPPoolOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Gyro 2-CLP Pool AMM {:?}", self.reserves.keys())
+    }
+}
+
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
+pub struct Gyro3CLPPoolOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, TokenState>,
+    pub fee: Bfp,
+    pub version: Gyro3CLPPoolVersion,
+    // Gyro 3-CLP static parameter (immutable after pool creation)
+    pub root3_alpha: Bfp,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
+impl std::fmt::Debug for Gyro3CLPPoolOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Gyro 3-CLP Pool AMM {:?}", self.reserves.keys())
+    }
+}
+
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
 pub struct BalancerV3GyroEOrder {
     pub address: H160,
     pub reserves: BTreeMap<H160, V3TokenState>,
@@ -433,6 +480,31 @@ pub struct BalancerV3GyroEOrder {
     pub d_sq: V3SBfp,
     #[cfg_attr(test, derivative(PartialEq = "ignore"))]
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
+pub struct BalancerV3Gyro2CLPOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, V3TokenState>,
+    pub fee: V3Bfp,
+    pub version: V3Gyro2CLPPoolVersion,
+    // Gyro 2-CLP static parameters (immutable after pool creation)
+    pub sqrt_alpha: V3SBfp,
+    pub sqrt_beta: V3SBfp,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
+impl std::fmt::Debug for BalancerV3Gyro2CLPOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Balancer V3 Gyro 2-CLP Pool AMM {:?}",
+            self.reserves.keys()
+        )
+    }
 }
 
 #[derive(Clone)]
@@ -584,7 +656,31 @@ impl Settleable for GyroEPoolOrder {
     }
 }
 
+impl Settleable for Gyro2CLPPoolOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for Gyro3CLPPoolOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
 impl Settleable for BalancerV3GyroEOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for BalancerV3Gyro2CLPOrder {
     type Execution = AmmOrderExecution;
 
     fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {

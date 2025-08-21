@@ -96,6 +96,14 @@ fn run() -> Result<()> {
             "gyrostable/gyro-pools/8e83ed6946e77cb8f438d1ce3ae615f490c27f4e/build/deployments/1/0xA87217d855EDad15d63255DB176B810b0325BDa2.json",
         )?
         .github(
+            "BalancerV2Gyro2CLPPoolFactory",
+            "gyrostable/gyro-pools/8e83ed6946e77cb8f438d1ce3ae615f490c27f4e/build/deployments/137/0xfa08Eb3A781532f47b1dd811A6cA326842EA0CB5.json",
+        )?
+        .github(
+            "BalancerV2Gyro3CLPPoolFactory",
+            "gyrostable/gyro-pools/8e83ed6946e77cb8f438d1ce3ae615f490c27f4e/build/deployments/137/0x977e8A3917DFFe582aFbb2EE5a6be3E9fa043079.json",
+        )?
+        .github(
             "BalancerV2LiquidityBootstrappingPool",
             "balancer-labs/balancer-v2-monorepo/7a643349a5ef4511234b19a33e3f18d30770cb66/pkg/deployments/tasks/20210721-liquidity-bootstrapping-pool/abi/LiquidityBootstrappingPool.json",
         )?
@@ -114,6 +122,14 @@ fn run() -> Result<()> {
         .github(
             "BalancerV2GyroECLPPool",
             "gyrostable/gyro-pools/8e83ed6946e77cb8f438d1ce3ae615f490c27f4e/build/deployments/1/0x767CB26E38beBddfd857d4Ad426d8ff5Bc0fAc2f.json",
+        )?
+        .github(
+            "BalancerV2Gyro2CLPPool",
+            "gyrostable/gyro-pools/8e83ed6946e77cb8f438d1ce3ae615f490c27f4e/build/deployments/137/0xeD6850f0400c111e49Ee3F4bEa44d19b438B4611.json",
+        )?
+        .github(
+            "BalancerV2Gyro3CLPPool",
+            "gyrostable/gyro-pools/8e83ed6946e77cb8f438d1ce3ae615f490c27f4e/build/deployments/137/0xB211043347Cb9f2dFD8b981996820E2886B0eF18.json",
         )?;
 
     // Balancer V2 contracts - ABI Only
@@ -157,6 +173,10 @@ fn run() -> Result<()> {
             "balancer/balancer-deployments/7a16f4463fb33d5f8c63118b6427b73fdb727cfc/v3/tasks/20250124-v3-gyro-eclp/artifact/GyroECLPPoolFactory.json",
         )?
         .github(
+            "BalancerV3Gyro2CLPPoolFactory",
+            "balancer/balancer-deployments/18839b81d136315c587011c135958b49272547ab/v3/tasks/20250120-v3-gyro-2clp/artifact/Gyro2CLPPoolFactory.json",
+        )?
+        .github(
             "BalancerV3ReClammPoolFactoryV2",
             "balancer/balancer-deployments/18839b81d136315c587011c135958b49272547ab/v3/tasks/20250702-v3-reclamm-pool-v2/artifact/ReClammPoolFactory.json",
         )?
@@ -179,6 +199,10 @@ fn run() -> Result<()> {
         .github(
             "BalancerV3GyroECLPPool",
             "balancer/balancer-deployments/7a16f4463fb33d5f8c63118b6427b73fdb727cfc/v3/tasks/20250124-v3-gyro-eclp/artifact/GyroECLPPool.json",
+        )?
+        .github(
+            "BalancerV3Gyro2CLPPool",
+            "balancer/balancer-deployments/18839b81d136315c587011c135958b49272547ab/v3/tasks/20250120-v3-gyro-2clp/artifact/Gyro2CLPPool.json",
         )?
         .github(
             "BalancerV3ReClammPool",

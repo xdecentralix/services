@@ -207,6 +207,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: Some(Bfp::from_wei(U256::from(100_000_000_000_000_000u128))), /* 10% */
         };
 
@@ -252,6 +254,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: Some(Bfp::from_wei(U256::from(100_000_000_000_000_000u128))),
         };
 
@@ -284,6 +288,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: None, // Missing!
         };
 

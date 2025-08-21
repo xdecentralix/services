@@ -20,6 +20,7 @@ use {
             PoolIndexing,
             PoolKind,
             common::{self, PoolInfoFetcher},
+            gyro_2clp,
             gyro_e,
             quantamm,
             reclamm,
@@ -37,6 +38,7 @@ use {
     clap::ValueEnum,
     contracts::{
         BalancerV3BatchRouter,
+        BalancerV3Gyro2CLPPoolFactory,
         BalancerV3GyroECLPPoolFactory,
         BalancerV3QuantAMMWeightedPoolFactory,
         BalancerV3ReClammPoolFactoryV2,
@@ -56,6 +58,7 @@ use {
 };
 pub use {
     common::TokenState,
+    gyro_2clp::Version as Gyro2CLPPoolVersion,
     gyro_e::Version as GyroEPoolVersion,
     quantamm::{TokenState as QuantAmmTokenState, Version as QuantAmmPoolVersion},
     reclamm::Version as ReClammPoolVersion,
@@ -129,6 +132,16 @@ impl StablePool {
             version: stable_state.version,
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Gyro2CLPPool {
+    pub common: CommonPoolState,
+    pub reserves: BTreeMap<H160, TokenState>,
+    pub version: Gyro2CLPPoolVersion,
+    // Gyro 2-CLP static parameters (immutable after pool creation)
+    pub sqrt_alpha: SBfp,
+    pub sqrt_beta: SBfp,
 }
 
 #[derive(Clone, Debug)]
@@ -227,6 +240,24 @@ impl QuantAmmPool {
     }
 }
 
+impl Gyro2CLPPool {
+    pub fn new_unpaused(pool_id: H160, gyro_2clp_state: gyro_2clp::PoolState) -> Self {
+        Gyro2CLPPool {
+            common: CommonPoolState {
+                id: pool_id,
+                address: pool_id,
+                swap_fee: gyro_2clp_state.swap_fee,
+                paused: false,
+            },
+            reserves: gyro_2clp_state.tokens.into_iter().collect(),
+            version: gyro_2clp_state.version,
+            // Static parameters from PoolState
+            sqrt_alpha: gyro_2clp_state.sqrt_alpha,
+            sqrt_beta: gyro_2clp_state.sqrt_beta,
+        }
+    }
+}
+
 impl GyroEPool {
     pub fn new_unpaused(pool_id: H160, gyro_e_state: gyro_e::PoolState) -> Self {
         GyroEPool {
@@ -261,6 +292,7 @@ impl GyroEPool {
 pub struct FetchedBalancerPools {
     pub stable_pools: Vec<StablePool>,
     pub weighted_pools: Vec<WeightedPool>,
+    pub gyro_2clp_pools: Vec<Gyro2CLPPool>,
     pub gyro_e_pools: Vec<GyroEPool>,
     pub reclamm_pools: Vec<ReClammPool>,
     pub quantamm_pools: Vec<QuantAmmPool>,
@@ -276,6 +308,11 @@ impl FetchedBalancerPools {
         );
         tokens.extend(
             self.stable_pools
+                .iter()
+                .flat_map(|pool| pool.reserves.keys().copied()),
+        );
+        tokens.extend(
+            self.gyro_2clp_pools
                 .iter()
                 .flat_map(|pool| pool.reserves.keys().copied()),
         );
@@ -322,6 +359,7 @@ pub enum BalancerFactoryKind {
     Weighted,
     Stable,
     StableV2,
+    Gyro2CLP,
     GyroE,
     ReClamm,
     QuantAmm,
@@ -336,6 +374,7 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
                 Self::QuantAmm,
@@ -345,6 +384,7 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
             ],
@@ -353,6 +393,7 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
                 Self::QuantAmm,
@@ -362,6 +403,7 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
             ],
@@ -370,6 +412,7 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
                 Self::QuantAmm,
@@ -379,6 +422,7 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
                 Self::QuantAmm,
@@ -388,6 +432,7 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
             ],
@@ -432,6 +477,7 @@ impl BalancerContracts {
                 BalancerFactoryKind::Weighted => instance!(BalancerV3WeightedPoolFactory),
                 BalancerFactoryKind::Stable => instance!(BalancerV3StablePoolFactory),
                 BalancerFactoryKind::StableV2 => instance!(BalancerV3StablePoolFactoryV2),
+                BalancerFactoryKind::Gyro2CLP => instance!(BalancerV3Gyro2CLPPoolFactory),
                 BalancerFactoryKind::GyroE => instance!(BalancerV3GyroECLPPoolFactory),
                 BalancerFactoryKind::ReClamm => instance!(BalancerV3ReClammPoolFactoryV2),
                 BalancerFactoryKind::QuantAmm => instance!(BalancerV3QuantAMMWeightedPoolFactory),
@@ -520,6 +566,9 @@ impl BalancerV3PoolFetching for BalancerPoolFetcher {
                     PoolKind::Stable(state) => fetched_pools
                         .stable_pools
                         .push(StablePool::new_unpaused(pool.id, state)),
+                    PoolKind::Gyro2CLP(state) => fetched_pools
+                        .gyro_2clp_pools
+                        .push(Gyro2CLPPool::new_unpaused(pool.id, state)),
                     PoolKind::GyroE(state) => fetched_pools
                         .gyro_e_pools
                         .push(GyroEPool::new_unpaused(pool.id, state)),
@@ -587,6 +636,9 @@ async fn create_aggregate_pool_fetcher(
             }
             BalancerFactoryKind::StableV2 => {
                 registry!(BalancerV3StablePoolFactoryV2, instance)
+            }
+            BalancerFactoryKind::Gyro2CLP => {
+                registry!(BalancerV3Gyro2CLPPoolFactory, instance)
             }
             BalancerFactoryKind::GyroE => {
                 registry!(BalancerV3GyroECLPPoolFactory, instance)

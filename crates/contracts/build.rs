@@ -1003,6 +1003,35 @@ fn main() {
                 },
             )
     });
+    generate_contract_with_config("BalancerV2Gyro2CLPPoolFactory", |builder| {
+        builder
+            .add_network(
+                ARBITRUM_ONE,
+                Network {
+                    address: addr("0x7a36527A02d96693b0AF2b70421F952816a4a088"),
+                    // <https://arbiscan.io/tx/0x17692700be398d1f9ef0a2cce6d96269f51486dfce187149dd161dc6946d3c0f>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(194367293)),
+                },
+            )
+            .add_network(
+                POLYGON,
+                Network {
+                    address: addr("0x5d8545a7330245150bE0Ce88F8afB0EDc41dFc34"),
+                    // <https://polygonscan.com/tx/0x858e060ad6048afbf16a8acdf14ea2526b30e9cdcb987a5a6e348a90a3443576>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(31556084)),
+                },
+            )
+    });
+    generate_contract_with_config("BalancerV2Gyro3CLPPoolFactory", |builder| {
+        builder.add_network(
+            POLYGON,
+            Network {
+                address: addr("0x90f08B3705208E41DbEEB37A42Fb628dD483AdDa"),
+                // <https://polygonscan.com/tx/0x9199f04b237672a06ac26faa8ab94a963a6f835546caae9e12611eade9221113>
+                deployment_information: Some(DeploymentInformation::BlockNumber(31556094)),
+            },
+        )
+    });
     generate_contract("BalancerV2WeightedPool");
     generate_contract_with_config("BalancerV2StablePool", |builder| {
         builder.add_method_alias(
@@ -1014,6 +1043,8 @@ fn main() {
     generate_contract("BalancerV2LiquidityBootstrappingPool");
     generate_contract("BalancerV2ComposableStablePool");
     generate_contract("BalancerV2GyroECLPPool");
+    generate_contract("BalancerV2Gyro2CLPPool");
+    generate_contract("BalancerV2Gyro3CLPPool");
 
     // Balancer V3 contracts
     generate_contract_with_config("BalancerV3Vault", |builder| {
@@ -1355,6 +1386,65 @@ fn main() {
                 },
             )
     });
+    generate_contract_with_config("BalancerV3Gyro2CLPPoolFactory", |builder| {
+        builder
+            .add_network(
+                ARBITRUM_ONE,
+                Network {
+                    address: addr("0x65A22Ec32c37835Ad5E77Eb6f7452Ac59E113a9F"),
+                    // <https://arbiscan.io/tx/0xe7e1d42afe1fe3412db2675fcd95a1ff11686299bb03d1dda49cf1c8ed86b28b>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(322520182)),
+                },
+            )
+            .add_network(
+                AVALANCHE,
+                Network {
+                    address: addr("0xe2fa4e1d17725e72dcdAfe943Ecf45dF4B9E285b"),
+                    // <https://snowscan.xyz/tx/0xb3fd1f08bb200e3dd9b61b4eca3f163b787a8f8bf317e4e1b3d70e27eb404a6f>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(59965891)),
+                },
+            )
+            .add_network(
+                BASE,
+                Network {
+                    address: addr("0xf5CDdF6feD9C589f1Be04899F48f9738531daD59"),
+                    // <https://basescan.org/tx/0x54fcfff9e79b2b25acad56d29daa6f89111c4a43dfd9090ca6073f91df6b0d17>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(28450062)),
+                },
+            )
+            .add_network(
+                GNOSIS,
+                Network {
+                    address: addr("0x7fA49Df302a98223d98D115fc4FCD275576f6faA"),
+                    // <https://gnosisscan.io/tx/0x6a9a7757c7808aef632b81e43c6847e987aa113623c88da5cbfea95e540e04fc>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(39369934)),
+                },
+            )
+            .add_network(
+                MAINNET,
+                Network {
+                    address: addr("0xb96524227c4B5Ab908FC3d42005FE3B07abA40E9"),
+                    // <https://etherscan.io/tx/0xaac5fd1c006e1f8c2e95d70923d6014d48f820eea19ac78248614db9bb2adbe3>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(22188963)),
+                },
+            )
+            .add_network(
+                OPTIMISM,
+                Network {
+                    address: addr("0x4b979eD48F982Ba0baA946cB69c1083eB799729c"),
+                    // <https://optimistic.etherscan.io/tx/0x98dcb158b97fc79b0b447ffc86a5cb3e7f6a536e844818a5f58fd6f4fa991252>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(134045195)),
+                },
+            )
+            .add_network(
+                SEPOLIA,
+                Network {
+                    address: addr("0x38ce8e04EBC04A39BED4b097e8C9bb8Ca74e33d8"),
+                    // <https://sepolia.etherscan.io/tx/0xf84a5a835c02b5d6746dacf721b31dadab2631d98c600167976523ae86ae2d0a>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(8042511)),
+                },
+            )
+    });
     generate_contract_with_config("BalancerV3ReClammPoolFactoryV2", |builder| {
         builder
             .add_network(
@@ -1452,6 +1542,7 @@ fn main() {
     generate_contract("BalancerV3WeightedPool");
     generate_contract("BalancerV3StablePool");
     generate_contract("BalancerV3GyroECLPPool");
+    generate_contract("BalancerV3Gyro2CLPPool");
     generate_contract("BalancerV3ReClammPool");
     generate_contract("BalancerV3QuantAMMWeightedPool");
     generate_contract("IRateProvider");

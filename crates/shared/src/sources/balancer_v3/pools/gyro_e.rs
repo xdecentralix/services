@@ -253,6 +253,8 @@ mod tests {
             w: Some(SBfp::from_wei(I256::from(12000))),
             z: Some(SBfp::from_wei(I256::from(13000))),
             d_sq: Some(SBfp::from_wei(I256::from(14000))),
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: None,
         };
 
@@ -305,6 +307,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: None,
         };
 

@@ -8,6 +8,7 @@ use {
         },
         liquidity::{
             AmmOrderExecution,
+            BalancerV3Gyro2CLPOrder,
             BalancerV3GyroEOrder,
             BalancerV3QuantAmmOrder,
             BalancerV3ReClammOrder,
@@ -64,6 +65,7 @@ impl BalancerV3Liquidity {
         Vec<BalancerV3StablePoolOrder>,
         Vec<BalancerV3WeightedProductOrder>,
         Vec<BalancerV3GyroEOrder>,
+        Vec<BalancerV3Gyro2CLPOrder>,
         Vec<BalancerV3ReClammOrder>,
         Vec<BalancerV3QuantAmmOrder>,
     )> {
@@ -141,6 +143,24 @@ impl BalancerV3Liquidity {
                 }),
             })
             .collect();
+
+        let gyro_2clp_orders: Vec<_> = pools
+            .gyro_2clp_pools
+            .into_iter()
+            .map(|pool| BalancerV3Gyro2CLPOrder {
+                address: pool.common.address,
+                reserves: pool.reserves,
+                fee: pool.common.swap_fee,
+                version: pool.version,
+                sqrt_alpha: pool.sqrt_alpha,
+                sqrt_beta: pool.sqrt_beta,
+                settlement_handling: Arc::new(SettlementHandler {
+                    pool_id: pool.common.id,
+                    inner: inner.clone(),
+                }),
+            })
+            .collect();
+
         let reclamm_orders: Vec<_> = pools
             .reclamm_pools
             .into_iter()
@@ -188,6 +208,7 @@ impl BalancerV3Liquidity {
             stable_pool_orders,
             weighted_product_orders,
             gyro_e_orders,
+            gyro_2clp_orders,
             reclamm_orders,
             quantamm_orders,
         ))
@@ -203,12 +224,14 @@ impl LiquidityCollecting for BalancerV3Liquidity {
         pairs: HashSet<TokenPair>,
         block: Block,
     ) -> Result<Vec<Liquidity>> {
-        let (stable, weighted, gyro_e, reclamm, quantamm) = self.get_orders(pairs, block).await?;
+        let (stable, weighted, gyro_e, gyro_2clp, reclamm, quantamm) =
+            self.get_orders(pairs, block).await?;
         let liquidity = stable
             .into_iter()
             .map(Liquidity::BalancerV3Stable)
             .chain(weighted.into_iter().map(Liquidity::BalancerV3Weighted))
             .chain(gyro_e.into_iter().map(Liquidity::BalancerV3GyroE))
+            .chain(gyro_2clp.into_iter().map(Liquidity::BalancerV3Gyro2CLP))
             .chain(reclamm.into_iter().map(Liquidity::BalancerV3ReClamm))
             .chain(quantamm.into_iter().map(Liquidity::BalancerV3QuantAmm))
             .collect();
@@ -292,6 +315,16 @@ impl SettlementHandling<BalancerV3StablePoolOrder> for SettlementHandler {
 }
 
 impl SettlementHandling<BalancerV3GyroEOrder> for SettlementHandler {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn encode(&self, execution: AmmOrderExecution, encoder: &mut SettlementEncoder) -> Result<()> {
+        self.inner_encode(execution, encoder)
+    }
+}
+
+impl SettlementHandling<BalancerV3Gyro2CLPOrder> for SettlementHandler {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -476,6 +509,7 @@ mod tests {
                     Ok(FetchedBalancerPools {
                         weighted_pools: weighted_pools.clone(),
                         stable_pools: vec![],
+                        gyro_2clp_pools: vec![],
                         gyro_e_pools: vec![],
                         reclamm_pools: vec![],
                         quantamm_pools: vec![],
@@ -512,11 +546,17 @@ mod tests {
             pool_fetcher: Arc::new(pool_fetcher),
             allowance_manager: Box::new(allowance_manager),
         };
-        let (_stable_orders, weighted_orders, _gyro_e_orders, _reclamm_orders, _quantamm_orders) =
-            liquidity_provider
-                .get_orders(pairs, Block::Recent)
-                .await
-                .unwrap();
+        let (
+            _stable_orders,
+            weighted_orders,
+            _gyro_e_orders,
+            _gyro_2clp_orders,
+            _reclamm_orders,
+            _quantamm_orders,
+        ) = liquidity_provider
+            .get_orders(pairs, Block::Recent)
+            .await
+            .unwrap();
 
         assert_eq!(weighted_orders.len(), 2);
 
@@ -592,6 +632,7 @@ mod tests {
                     Ok(FetchedBalancerPools {
                         weighted_pools: vec![],
                         stable_pools: vec![],
+                        gyro_2clp_pools: vec![],
                         gyro_e_pools: vec![],
                         reclamm_pools: reclamm_pools.clone(),
                         quantamm_pools: vec![],
@@ -615,11 +656,17 @@ mod tests {
             pool_fetcher: Arc::new(pool_fetcher),
             allowance_manager: Box::new(allowance_manager),
         };
-        let (_stable_orders, _weighted_orders, _gyro_e_orders, reclamm_orders, _quantamm_orders) =
-            liquidity_provider
-                .get_orders(pairs, Block::Recent)
-                .await
-                .unwrap();
+        let (
+            _stable_orders,
+            _weighted_orders,
+            _gyro_e_orders,
+            _gyro_2clp_orders,
+            reclamm_orders,
+            _quantamm_orders,
+        ) = liquidity_provider
+            .get_orders(pairs, Block::Recent)
+            .await
+            .unwrap();
 
         assert_eq!(reclamm_orders.len(), 1);
         let order = &reclamm_orders[0];

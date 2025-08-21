@@ -14,13 +14,73 @@ use {
     anyhow::{Context, Result},
     ethcontract::{H160, H256},
     reqwest::{Client, Url},
-    serde::{Deserialize, Serialize},
+    serde::{Deserialize, Deserializer, Serialize},
     serde_json::json,
     serde_with::{DisplayFromStr, serde_as},
     std::collections::HashMap,
 };
 
 const QUERY_PAGE_SIZE: usize = 100;
+
+/// Custom deserializer that converts empty strings to None for optional SBfp
+/// fields. This fixes the inconsistency in the V2 API where 2-CLP pools return
+/// empty strings instead of null for unused E-CLP parameters. Also handles
+/// automatic precision detection for high-precision decimal values.
+fn deserialize_optional_sbfp<'de, D>(deserializer: D) -> Result<Option<SBfp>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // First try to deserialize as Option<String> to handle both null and string
+    // values
+    let opt_s = Option::<String>::deserialize(deserializer)?;
+
+    match opt_s {
+        // Handle null values
+        None => Ok(None),
+        // Handle string values
+        Some(s) => {
+            // Convert empty strings to None (like null values)
+            if s.is_empty() {
+                return Ok(None);
+            }
+
+            // Parse valid decimal strings with automatic precision detection
+            // (same logic as the original SBfp::Deserialize implementation)
+            use crate::sources::balancer_v2::swap::signed_fixed_point::FixedPointPrecision;
+
+            let precision = if s.contains('.')
+                && s.split('.').nth(1).map_or(0, |decimals| decimals.len()) > 30
+            {
+                FixedPointPrecision::Extended38
+            } else {
+                FixedPointPrecision::Standard18
+            };
+
+            SBfp::from_str_with_precision(&s, precision)
+                .map(Some)
+                .map_err(serde::de::Error::custom)
+        }
+    }
+}
+
+fn deserialize_optional_bfp<'de, D>(deserializer: D) -> Result<Option<Bfp>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    match opt {
+        Some(value) => {
+            if value == "0" || value.is_empty() {
+                Ok(None)
+            } else {
+                let parsed_value = value.parse::<f64>().map_err(serde::de::Error::custom)?;
+                let scaled_value = (parsed_value * 1e18) as u64;
+                Ok(Some(Bfp::from_wei(scaled_value.into())))
+            }
+        }
+        None => Ok(None),
+    }
+}
 
 /// Balancer API v3 client for fetching pool data.
 pub struct BalancerApiClient {
@@ -74,7 +134,7 @@ impl BalancerApiClient {
                         "orderDirection" => "desc",
                         "where" => json!({
                             "chainIn": [self.chain],
-                            "poolTypeIn": ["WEIGHTED", "STABLE", "LIQUIDITY_BOOTSTRAPPING", "COMPOSABLE_STABLE", "GYROE"],
+                            "poolTypeIn": ["WEIGHTED", "STABLE", "LIQUIDITY_BOOTSTRAPPING", "COMPOSABLE_STABLE", "GYROE", "GYRO"],
                             "protocolVersionIn": [2]
                         }),
                     }),
@@ -153,34 +213,40 @@ pub struct PoolData {
     pub pool_tokens: Vec<Token>,
     pub dynamic_data: DynamicData,
     pub create_time: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub alpha: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub beta: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub c: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub s: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub lambda: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub tau_alpha_x: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub tau_alpha_y: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub tau_beta_x: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub tau_beta_y: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub u: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub v: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub w: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub z: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub d_sq: Option<SBfp>,
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
+    pub sqrt_alpha: Option<SBfp>,
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
+    pub sqrt_beta: Option<SBfp>,
+    #[serde(default, deserialize_with = "deserialize_optional_bfp")]
+    pub root3_alpha: Option<Bfp>,
 }
 
 /// Dynamic data for pools from Balancer API v3.
@@ -210,6 +276,8 @@ pub enum PoolType {
     Weighted,
     LiquidityBootstrapping,
     ComposableStable,
+    Gyro2CLP,
+    Gyro3CLP,
     GyroE,
 }
 
@@ -221,6 +289,8 @@ impl PoolData {
             "STABLE" => PoolType::Stable,
             "LIQUIDITY_BOOTSTRAPPING" => PoolType::LiquidityBootstrapping,
             "COMPOSABLE_STABLE" => PoolType::ComposableStable,
+            "GYRO" => PoolType::Gyro2CLP,
+            "GYRO3" => PoolType::Gyro3CLP,
             "GYROE" => PoolType::GyroE,
             _ => panic!("Unknown pool type: {}", self.pool_type),
         }
@@ -310,6 +380,9 @@ mod pools_query {
                 w
                 z
                 dSq
+                sqrtAlpha
+                sqrtBeta
+                root3Alpha
             }
         }
     "#;
@@ -467,6 +540,9 @@ mod tests {
                         w: None,
                         z: None,
                         d_sq: None,
+                        sqrt_alpha: None,
+                        sqrt_beta: None,
+                        root3_alpha: None,
                     },
                     PoolData {
                         id: "0x1111111111111111111111111111111111111111111111111111111111111111"
@@ -506,6 +582,9 @@ mod tests {
                         w: None,
                         z: None,
                         d_sq: None,
+                        sqrt_alpha: None,
+                        sqrt_beta: None,
+                        root3_alpha: None,
                     },
                     PoolData {
                         id: "0x1111111111111111111111111111111111111111111111111111111111111111"
@@ -545,6 +624,9 @@ mod tests {
                         w: None,
                         z: None,
                         d_sq: None,
+                        sqrt_alpha: None,
+                        sqrt_beta: None,
+                        root3_alpha: None,
                     },
                     PoolData {
                         id: "0x1111111111111111111111111111111111111111111111111111111111111111"
@@ -584,6 +666,9 @@ mod tests {
                         w: None,
                         z: None,
                         d_sq: None,
+                        sqrt_alpha: None,
+                        sqrt_beta: None,
+                        root3_alpha: None,
                     },
                 ],
             }
@@ -668,6 +753,82 @@ mod tests {
     }
 
     #[test]
+    fn decode_gyro_2clp_with_empty_string_params() {
+        use pools_query::*;
+
+        // Test that empty strings in Gyro parameters are converted to None (the actual
+        // issue we're fixing)
+        let gyro_2clp_json = json!({
+            "aggregatorPools": [
+                {
+                    "type": "GYRO",
+                    "address": "0xdac42eeb17758daa38caf9a3540c808247527ae3",
+                    "id": "0xdac42eeb17758daa38caf9a3540c808247527ae3000200000000000000000a2b",
+                    "protocolVersion": 2,
+                    "factory": "0x5555555555555555555555555555555555555555",
+                    "chain": "POLYGON",
+                    "poolTokens": [
+                        {
+                            "address": "0x3333333333333333333333333333333333333333",
+                            "decimals": 6
+                        }
+                    ],
+                    "dynamicData": { "swapEnabled": true },
+                    "createTime": 1674129549,
+                    // E-CLP parameters should be None for 2-CLP pools
+                    "alpha": "",
+                    "beta": "",
+                    "c": "",
+                    "s": "",
+                    "lambda": "",
+                    "tauAlphaX": "",
+                    "tauAlphaY": "",
+                    "tauBetaX": "",
+                    "tauBetaY": "",
+                    "u": "",
+                    "v": "",
+                    "w": "",
+                    "z": "",
+                    "dSq": "",
+                    // 2-CLP parameters should have valid values
+                    "sqrtAlpha": "0.997496867163000167",
+                    "sqrtBeta": "1.002496882788171068"
+                }
+            ]
+        });
+
+        let data: Data = serde_json::from_value(gyro_2clp_json).unwrap();
+        let pool = &data.aggregator_pools[0];
+
+        // Verify empty strings converted to None
+        assert!(pool.alpha.is_none());
+        assert!(pool.beta.is_none());
+        assert!(pool.c.is_none());
+        assert!(pool.s.is_none());
+        assert!(pool.lambda.is_none());
+        assert!(pool.tau_alpha_x.is_none());
+        assert!(pool.tau_alpha_y.is_none());
+        assert!(pool.tau_beta_x.is_none());
+        assert!(pool.tau_beta_y.is_none());
+        assert!(pool.u.is_none());
+        assert!(pool.v.is_none());
+        assert!(pool.w.is_none());
+        assert!(pool.z.is_none());
+        assert!(pool.d_sq.is_none());
+
+        // Verify valid decimal strings parsed correctly
+        assert!(pool.sqrt_alpha.is_some());
+        assert!(pool.sqrt_beta.is_some());
+
+        // Verify pool type identification
+        assert_eq!(pool.pool_type_enum(), PoolType::Gyro2CLP);
+
+        println!("Successfully parsed 2-CLP pool with empty E-CLP params:");
+        println!("  sqrtAlpha: {:?}", pool.sqrt_alpha);
+        println!("  sqrtBeta: {:?}", pool.sqrt_beta);
+    }
+
+    #[test]
     fn groups_pools_by_factory() {
         let pools = RegisteredPools {
             fetched_block_number: 42,
@@ -697,6 +858,9 @@ mod tests {
                     w: None,
                     z: None,
                     d_sq: None,
+                    sqrt_alpha: None,
+                    sqrt_beta: None,
+                    root3_alpha: None,
                 },
                 PoolData {
                     id: "0x2222222222222222222222222222222222222222222222222222222222222222"
@@ -723,6 +887,9 @@ mod tests {
                     w: None,
                     z: None,
                     d_sq: None,
+                    sqrt_alpha: None,
+                    sqrt_beta: None,
+                    root3_alpha: None,
                 },
                 PoolData {
                     id: "0x3333333333333333333333333333333333333333333333333333333333333333"
@@ -749,6 +916,9 @@ mod tests {
                     w: None,
                     z: None,
                     d_sq: None,
+                    sqrt_alpha: None,
+                    sqrt_beta: None,
+                    root3_alpha: None,
                 },
             ],
         };

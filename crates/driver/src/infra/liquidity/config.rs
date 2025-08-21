@@ -203,6 +203,12 @@ pub struct BalancerV2 {
     /// GyroE pool factory addresses.
     pub gyro_e: Vec<eth::ContractAddress>,
 
+    /// Gyro 2-CLP pool factory addresses.
+    pub gyro_2clp: Vec<eth::ContractAddress>,
+
+    /// Gyro 3-CLP pool factory addresses.
+    pub gyro_3clp: Vec<eth::ContractAddress>,
+
     /// Deny listed Balancer V2 pools.
     ///
     /// Since pools allow for custom controllers and logic, it is possible for
@@ -258,6 +264,12 @@ impl BalancerV2 {
                 contracts::BalancerV2ComposableStablePoolFactoryV6::raw_contract(),
             ]),
             gyro_e: factory_addresses(&[contracts::BalancerV2GyroECLPPoolFactory::raw_contract()]),
+            gyro_2clp: factory_addresses(&[
+                contracts::BalancerV2Gyro2CLPPoolFactory::raw_contract(),
+            ]),
+            gyro_3clp: factory_addresses(&[
+                contracts::BalancerV2Gyro3CLPPoolFactory::raw_contract(),
+            ]),
             pool_deny_list: Vec::new(),
             graph_url: graph_url.clone(),
             reinit_interval: None,
@@ -285,6 +297,9 @@ pub struct BalancerV3 {
 
     /// GyroE pool factory addresses.
     pub gyro_e: Vec<eth::ContractAddress>,
+
+    /// Gyro2CLP pool factory addresses.
+    pub gyro_2clp: Vec<eth::ContractAddress>,
 
     /// ReClamm pool factory addresses.
     pub reclamm: Vec<eth::ContractAddress>,
@@ -338,6 +353,9 @@ impl BalancerV3 {
                 contracts::BalancerV3StablePoolFactoryV2::raw_contract(),
             ]),
             gyro_e: factory_addresses(&[contracts::BalancerV3GyroECLPPoolFactory::raw_contract()]),
+            gyro_2clp: factory_addresses(&[
+                contracts::BalancerV3Gyro2CLPPoolFactory::raw_contract(),
+            ]),
             reclamm: factory_addresses(
                 &[contracts::BalancerV3ReClammPoolFactoryV2::raw_contract()],
             ),

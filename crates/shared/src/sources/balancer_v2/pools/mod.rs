@@ -9,6 +9,8 @@
 
 pub mod common;
 pub mod composable_stable;
+pub mod gyro_2clp;
+pub mod gyro_3clp;
 pub mod gyro_e;
 pub mod liquidity_bootstrapping;
 pub mod stable;
@@ -35,6 +37,8 @@ pub struct Pool {
 pub enum PoolKind {
     Weighted(weighted::PoolState),
     Stable(stable::PoolState),
+    Gyro2CLP(gyro_2clp::PoolState),
+    Gyro3CLP(gyro_3clp::PoolState),
     GyroE(gyro_e::PoolState),
 }
 
@@ -50,6 +54,8 @@ macro_rules! impl_from_state {
 
 impl_from_state!(weighted::PoolState, Weighted);
 impl_from_state!(stable::PoolState, Stable);
+impl_from_state!(gyro_2clp::PoolState, Gyro2CLP);
+impl_from_state!(gyro_3clp::PoolState, Gyro3CLP);
 impl_from_state!(gyro_e::PoolState, GyroE);
 
 #[derive(Clone, Debug, Eq, PartialEq)]

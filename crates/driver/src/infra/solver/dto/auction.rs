@@ -53,7 +53,10 @@ pub fn new(
             liquidity::Kind::BalancerV2Weighted(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3Weighted(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV2GyroE(pool) => pool.reserves.tokens().collect(),
+            liquidity::Kind::BalancerV2Gyro2CLP(pool) => pool.reserves.tokens().collect(),
+            liquidity::Kind::BalancerV2Gyro3CLP(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3GyroE(pool) => pool.reserves.tokens().collect(),
+            liquidity::Kind::BalancerV3Gyro2CLP(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3ReClamm(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3QuantAmm(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::Swapr(pool) => pool.base.reserves.iter().map(|r| r.token).collect(),
@@ -393,6 +396,71 @@ pub fn new(
                             d_sq: signed_fixed_point_to_decimal(pool.d_sq),
                         })
                     }
+                    liquidity::Kind::BalancerV2Gyro2CLP(pool) => {
+                        solvers_dto::auction::Liquidity::Gyro2CLP(
+                            solvers_dto::auction::Gyro2CLPPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.id.address().into(),
+                                balancer_pool_id: pool.id.into(),
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.asset.token.into(),
+                                            solvers_dto::auction::Gyro2CLPReserve {
+                                                balance: r.asset.amount.into(),
+                                                scaling_factor: scaling_factor_to_decimal(r.scale),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: fee_to_decimal(pool.fee),
+                                version: match pool.version {
+                                    liquidity::balancer::v2::gyro_2clp::Version::V1 => {
+                                        solvers_dto::auction::Gyro2CLPVersion::V1
+                                    }
+                                },
+                                // Convert Gyro 2-CLP static parameters to BigDecimal
+                                sqrt_alpha: signed_fixed_point_to_decimal_gyro_2clp(
+                                    pool.sqrt_alpha,
+                                ),
+                                sqrt_beta: signed_fixed_point_to_decimal_gyro_2clp(pool.sqrt_beta),
+                            },
+                        )
+                    }
+                    liquidity::Kind::BalancerV2Gyro3CLP(pool) => {
+                        solvers_dto::auction::Liquidity::Gyro3CLP(
+                            solvers_dto::auction::Gyro3CLPPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.id.address().into(),
+                                balancer_pool_id: pool.id.into(),
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.asset.token.into(),
+                                            solvers_dto::auction::Gyro3CLPReserve {
+                                                balance: r.asset.amount.into(),
+                                                scaling_factor: scaling_factor_to_decimal(r.scale),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: fee_to_decimal(pool.fee),
+                                version: match pool.version {
+                                    liquidity::balancer::v2::gyro_3clp::Version::V1 => {
+                                        solvers_dto::auction::Gyro3CLPVersion::V1
+                                    }
+                                },
+                                // Convert Gyro 3-CLP static parameter to BigDecimal
+                                root3_alpha: fixed_point_to_decimal(pool.root3_alpha),
+                            },
+                        )
+                    }
                     liquidity::Kind::BalancerV3GyroE(pool) => {
                         solvers_dto::auction::Liquidity::GyroE(solvers_dto::auction::GyroEPool {
                             id: liquidity.id.0.to_string(),
@@ -437,6 +505,47 @@ pub fn new(
                             z: signed_fixed_point_to_decimal_v3(pool.z),
                             d_sq: signed_fixed_point_to_decimal_v3(pool.d_sq),
                         })
+                    }
+                    liquidity::Kind::BalancerV3Gyro2CLP(pool) => {
+                        solvers_dto::auction::Liquidity::Gyro2CLP(
+                            solvers_dto::auction::Gyro2CLPPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.id.address().into(),
+                                balancer_pool_id: {
+                                    let pool_id_h160: eth::H160 = pool.id.into();
+                                    pool_id_h160.into()
+                                },
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.asset.token.into(),
+                                            solvers_dto::auction::Gyro2CLPReserve {
+                                                balance: r.asset.amount.into(),
+                                                scaling_factor: scaling_factor_to_decimal_v3(
+                                                    r.scale,
+                                                ),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: fee_to_decimal_v3(pool.fee),
+                                version: match pool.version {
+                                    liquidity::balancer::v3::gyro_2clp::Version::V1 => {
+                                        solvers_dto::auction::Gyro2CLPVersion::V1
+                                    }
+                                },
+                                // Convert Gyro 2-CLP static parameters to BigDecimal
+                                sqrt_alpha: signed_fixed_point_to_decimal_v3_gyro_2clp(
+                                    pool.sqrt_alpha,
+                                ),
+                                sqrt_beta: signed_fixed_point_to_decimal_v3_gyro_2clp(
+                                    pool.sqrt_beta,
+                                ),
+                            },
+                        )
                     }
                     liquidity::Kind::BalancerV3ReClamm(pool) => {
                         solvers_dto::auction::Liquidity::ReClamm(
@@ -701,8 +810,40 @@ fn signed_fixed_point_to_decimal(
     bigdecimal::BigDecimal::new(big_int, 18)
 }
 
+fn signed_fixed_point_to_decimal_gyro_2clp(
+    sfp: liquidity::balancer::v2::gyro_2clp::SignedFixedPoint,
+) -> bigdecimal::BigDecimal {
+    // Convert I256 to BigInt via string representation to handle signed values
+    // correctly
+    let i256_str = sfp.as_raw().to_string();
+    let big_int = num::BigInt::parse_bytes(i256_str.as_bytes(), 10)
+        .expect("valid I256 should parse to BigInt");
+    bigdecimal::BigDecimal::new(big_int, 18)
+}
+
+fn fixed_point_to_decimal(
+    fp: liquidity::balancer::v2::gyro_3clp::FixedPoint,
+) -> bigdecimal::BigDecimal {
+    // Convert U256 to BigInt via string representation
+    let u256_str = fp.as_raw().to_string();
+    let big_int = num::BigInt::parse_bytes(u256_str.as_bytes(), 10)
+        .expect("valid U256 should parse to BigInt");
+    bigdecimal::BigDecimal::new(big_int, 18)
+}
+
 fn signed_fixed_point_to_decimal_v3(
     sfp: liquidity::balancer::v3::gyro_e::SignedFixedPoint,
+) -> bigdecimal::BigDecimal {
+    // Convert I256 to BigInt via string representation to handle signed values
+    // correctly
+    let i256_str = sfp.as_raw().to_string();
+    let big_int = num::BigInt::parse_bytes(i256_str.as_bytes(), 10)
+        .expect("valid I256 should parse to BigInt");
+    bigdecimal::BigDecimal::new(big_int, 18)
+}
+
+fn signed_fixed_point_to_decimal_v3_gyro_2clp(
+    sfp: liquidity::balancer::v3::gyro_2clp::SignedFixedPoint,
 ) -> bigdecimal::BigDecimal {
     // Convert I256 to BigInt via string representation to handle signed values
     // correctly

@@ -721,6 +721,11 @@ mod tests {
                         // This is just to handle the exhaustive pattern
                         // matching
                     }
+                    PoolKind::Gyro2CLP(_) => {
+                        // Gyro2CLP pools are not tested in this specific test
+                        // This is just to handle the exhaustive pattern
+                        // matching
+                    }
                     PoolKind::GyroE(_) => {
                         // GyroE pools are not tested in this specific test
                         // This is just to handle the exhaustive pattern
@@ -1019,6 +1024,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: None,
         };
 
@@ -1065,6 +1072,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: None,
         };
 
@@ -1111,6 +1120,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: None,
         };
 

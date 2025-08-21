@@ -139,6 +139,9 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
+            root3_alpha: None,
         };
 
         assert!(PoolInfo::from_graph_data(&pool, 42).is_err());

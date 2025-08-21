@@ -10,13 +10,54 @@
 
 const QUERY_PAGE_SIZE: usize = 100;
 
+/// Custom deserializer that converts empty strings to None for optional SBfp
+/// fields. This ensures consistency with V2 and provides robust handling of any
+/// potential empty string issues in the V3 API response. Also handles automatic
+/// precision detection for high-precision decimal values.
+fn deserialize_optional_sbfp<'de, D>(deserializer: D) -> Result<Option<SBfp>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // First try to deserialize as Option<String> to handle both null and string
+    // values
+    let opt_s = Option::<String>::deserialize(deserializer)?;
+
+    match opt_s {
+        // Handle null values
+        None => Ok(None),
+        // Handle string values
+        Some(s) => {
+            // Convert empty strings to None (like null values)
+            if s.is_empty() {
+                return Ok(None);
+            }
+
+            // Parse valid decimal strings with automatic precision detection
+            // (same logic as the original SBfp::Deserialize implementation)
+            use crate::sources::balancer_v3::swap::signed_fixed_point::FixedPointPrecision;
+
+            let precision = if s.contains('.')
+                && s.split('.').nth(1).map_or(0, |decimals| decimals.len()) > 30
+            {
+                FixedPointPrecision::Extended38
+            } else {
+                FixedPointPrecision::Standard18
+            };
+
+            SBfp::from_str_with_precision(&s, precision)
+                .map(Some)
+                .map_err(serde::de::Error::custom)
+        }
+    }
+}
+
 use {
     super::swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     crate::subgraph::SubgraphClient,
     anyhow::{Context, Result},
     ethcontract::H160,
     reqwest::{Client, Url},
-    serde::{Deserialize, Serialize},
+    serde::{Deserialize, Deserializer, Serialize},
     serde_json::json,
     serde_with::{DisplayFromStr, serde_as},
     std::collections::HashMap,
@@ -74,7 +115,7 @@ impl BalancerApiClient {
                         "orderDirection" => "desc",
                         "where" => json!({
                             "chainIn": [self.chain],
-                             "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE", "RECLAMM", "QUANT_AMM_WEIGHTED"],
+                             "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE", "RECLAMM", "QUANT_AMM_WEIGHTED", "GYRO"],
                             "protocolVersionIn": [3] // V3 protocol
                         }),
                     }),
@@ -153,34 +194,39 @@ pub struct PoolData {
     pub pool_tokens: Vec<Token>,
     pub dynamic_data: DynamicData,
     pub create_time: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub alpha: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub beta: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub c: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub s: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub lambda: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub tau_alpha_x: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub tau_alpha_y: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub tau_beta_x: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub tau_beta_y: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub u: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub v: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub w: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub z: Option<SBfp>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub d_sq: Option<SBfp>,
+    /// Gyro 2-CLP-specific parameters
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
+    pub sqrt_alpha: Option<SBfp>,
+    #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
+    pub sqrt_beta: Option<SBfp>,
     /// QuantAMM-specific parameters
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[serde(default)]
@@ -213,6 +259,7 @@ pub enum PoolType {
     Weighted,         // BalancerV3WeightedPoolFactory
     Stable,           // BalancerV3StablePoolFactory, BalancerV3StablePoolFactoryV2
     GyroE,            // BalancerV3GyroECLPPoolFactory
+    Gyro2CLP,         // BalancerV3Gyro2CLPPoolFactory
     ReClamm,          // BalancerV3ReClammPoolFactoryV2
     QuantAmmWeighted, // BalancerV3QuantAMMWeightedPoolFactory
 }
@@ -224,6 +271,7 @@ impl PoolData {
             "WEIGHTED" => PoolType::Weighted,
             "STABLE" => PoolType::Stable,
             "GYROE" => PoolType::GyroE,
+            "GYRO" => PoolType::Gyro2CLP,
             "RECLAMM" => PoolType::ReClamm,
             "QUANT_AMM_WEIGHTED" => PoolType::QuantAmmWeighted,
             _ => panic!("Unknown pool type: {}", self.pool_type),
@@ -313,6 +361,8 @@ mod pools_query {
                 quantAmmWeightedParams {
                     maxTradeSizeRatio
                 }
+                sqrtAlpha
+                sqrtBeta
             }
         }
     "#;
@@ -366,6 +416,85 @@ mod tests {
     }
 
     #[test]
+    fn decode_gyro_pools_with_mixed_null_and_empty_params() {
+        use pools_query::*;
+
+        // Test that both null and empty strings are handled correctly in V3
+        let mixed_json = json!({
+            "aggregatorPools": [
+                {
+                    "id": "0x1111111111111111111111111111111111111111",
+                    "address": "0x1111111111111111111111111111111111111111",
+                    "type": "GYROE",
+                    "protocolVersion": 3,
+                    "factory": "0x2222222222222222222222222222222222222222",
+                    "chain": "MAINNET",
+                    "poolTokens": [
+                        {
+                            "address": "0x3333333333333333333333333333333333333333",
+                            "decimals": 18,
+                            "weight": "0.5"
+                        }
+                    ],
+                    "dynamicData": { "swapEnabled": true },
+                    "createTime": 1234567890,
+                    // E-CLP parameters with valid values
+                    "alpha": "0.7",
+                    "beta": "1.3",
+                    "c": "0.707106781186547524",
+                    "s": "0.707106781186547524",
+                    "lambda": "1",
+                    "tauAlphaX": "-0.17378533390904767196396190604716688",
+                    "tauAlphaY": "0.984783558817936807795784134267279",
+                    "tauBetaX": "0.1293391840677680520489165354049038",
+                    "tauBetaY": "0.9916004111862217323750267714375956",
+                    "u": "0.1515622589884078618346041354467426",
+                    "v": "0.9881919850020792689650338303356912",
+                    "w": "0.003408426184142462285756984496121705",
+                    "z": "-0.022223074920639809932327072642593141",
+                    "dSq": "0.9999999999999999988662409334210612",
+                    // 2-CLP parameters should be None for E-CLP pools (null in V3)
+                    "sqrtAlpha": null,
+                    "sqrtBeta": null,
+                    // QuantAMM parameter
+                    "maxTradeSizeRatio": null
+                }
+            ]
+        });
+
+        let data: Data = serde_json::from_value(mixed_json).unwrap();
+        let pool = &data.aggregator_pools[0];
+
+        // Verify E-CLP parameters parsed correctly
+        assert!(pool.alpha.is_some());
+        assert!(pool.beta.is_some());
+        assert!(pool.c.is_some());
+        assert!(pool.s.is_some());
+        assert!(pool.lambda.is_some());
+        assert!(pool.tau_alpha_x.is_some());
+        assert!(pool.tau_alpha_y.is_some());
+        assert!(pool.tau_beta_x.is_some());
+        assert!(pool.tau_beta_y.is_some());
+        assert!(pool.u.is_some());
+        assert!(pool.v.is_some());
+        assert!(pool.w.is_some());
+        assert!(pool.z.is_some());
+        assert!(pool.d_sq.is_some());
+
+        // Verify null values converted to None
+        assert!(pool.sqrt_alpha.is_none());
+        assert!(pool.sqrt_beta.is_none());
+        assert!(pool.max_trade_size_ratio.is_none());
+
+        // Verify pool type identification
+        assert_eq!(pool.pool_type_enum(), PoolType::GyroE);
+
+        println!("Successfully parsed V3 GyroE pool with null 2-CLP params:");
+        println!("  alpha: {:?}", pool.alpha);
+        println!("  sqrtAlpha: {:?}", pool.sqrt_alpha);
+    }
+
+    #[test]
     fn groups_pools_by_factory() {
         let pool1 = PoolData {
             id: "0x1111111111111111111111111111111111111111".to_string(),
@@ -391,6 +520,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: None,
         };
         let pool2 = PoolData {
@@ -419,6 +550,8 @@ mod tests {
             w: None,
             z: None,
             d_sq: None,
+            sqrt_alpha: None,
+            sqrt_beta: None,
             max_trade_size_ratio: None,
         };
         let pools = RegisteredPools {
