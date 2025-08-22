@@ -1178,8 +1178,8 @@ impl QuantAmmPoolRef<'_> {
         // Extract weights and multipliers from packed arrays (matches balancer-maths
         // pattern)
         let (weights, multipliers) = extract_weights_and_multipliers(
-            &self.first_four_weights_and_multipliers,
-            &self.second_four_weights_and_multipliers,
+            self.first_four_weights_and_multipliers,
+            self.second_four_weights_and_multipliers,
             self.reserves.len(),
         )?;
 
@@ -1249,8 +1249,8 @@ impl QuantAmmPoolRef<'_> {
         // Extract weights and multipliers from packed arrays (matches balancer-maths
         // pattern)
         let (weights, multipliers) = extract_weights_and_multipliers(
-            &self.first_four_weights_and_multipliers,
-            &self.second_four_weights_and_multipliers,
+            self.first_four_weights_and_multipliers,
+            self.second_four_weights_and_multipliers,
             self.reserves.len(),
         )?;
 

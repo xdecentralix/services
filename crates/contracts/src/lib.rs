@@ -277,7 +277,7 @@ mod tests {
                 assert_has_deployment_address!(PancakeRouter for *network);
             }
 
-            for network in &[MAINNET] {
+            for network in &[MAINNET, ARBITRUM_ONE] {
                 assert_has_deployment_address!(BalancerV2WeightedPoolFactory for *network);
             }
 
@@ -319,7 +319,7 @@ mod tests {
             assert_has_deployment_information!(GPv2Settlement for *network);
             assert_has_deployment_information!(BalancerV2Vault for *network);
         }
-        for network in &[MAINNET] {
+        for network in &[MAINNET, ARBITRUM_ONE] {
             assert_has_deployment_information!(BalancerV2WeightedPoolFactory for *network);
         }
         for network in &[MAINNET, ARBITRUM_ONE] {
