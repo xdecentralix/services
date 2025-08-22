@@ -82,6 +82,9 @@ include_contracts! {
     BalancerV3StablePool;
     BalancerV3StablePoolFactory;
     BalancerV3StablePoolFactoryV2;
+    BalancerV3StableSurgePool;
+    BalancerV3StableSurgePoolFactory;
+    BalancerV3StableSurgePoolFactoryV2;
     BalancerV3GyroECLPPool;
     BalancerV3GyroECLPPoolFactory;
     BalancerV3Gyro2CLPPool;
