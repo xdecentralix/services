@@ -82,6 +82,10 @@ include_contracts! {
     BalancerV3StablePool;
     BalancerV3StablePoolFactory;
     BalancerV3StablePoolFactoryV2;
+    BalancerV3StableSurgeHook;
+    BalancerV3StableSurgePool;
+    BalancerV3StableSurgePoolFactory;
+    BalancerV3StableSurgePoolFactoryV2;
     BalancerV3GyroECLPPool;
     BalancerV3GyroECLPPoolFactory;
     BalancerV3Gyro2CLPPool;
@@ -277,7 +281,7 @@ mod tests {
                 assert_has_deployment_address!(PancakeRouter for *network);
             }
 
-            for network in &[MAINNET] {
+            for network in &[MAINNET, ARBITRUM_ONE] {
                 assert_has_deployment_address!(BalancerV2WeightedPoolFactory for *network);
             }
 
@@ -319,7 +323,7 @@ mod tests {
             assert_has_deployment_information!(GPv2Settlement for *network);
             assert_has_deployment_information!(BalancerV2Vault for *network);
         }
-        for network in &[MAINNET] {
+        for network in &[MAINNET, ARBITRUM_ONE] {
             assert_has_deployment_information!(BalancerV2WeightedPoolFactory for *network);
         }
         for network in &[MAINNET, ARBITRUM_ONE] {

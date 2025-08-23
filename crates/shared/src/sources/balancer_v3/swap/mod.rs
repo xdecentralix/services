@@ -13,6 +13,8 @@ use {
             QuantAmmPool,
             ReClammPool,
             StablePool,
+            StableSurgePool,
+            StableTokenState,
             TokenState,
             WeightedPool,
             WeightedPoolVersion,
@@ -36,10 +38,12 @@ pub mod quantamm_math;
 pub mod reclamm_math;
 pub mod signed_fixed_point;
 mod stable_math;
+pub mod stable_surge_math;
 mod weighted_math;
 
 const WEIGHTED_SWAP_GAS_COST: usize = 100_000;
 const STABLE_SWAP_GAS_COST: usize = 183_520;
+const STABLE_SURGE_SWAP_GAS_COST: usize = 100_000;
 const GYRO_2CLP_SWAP_GAS_COST: usize = 100_000;
 const GYRO_E_SWAP_GAS_COST: usize = 100_000;
 const RECLAMM_SWAP_GAS_COST: usize = 100_000;
@@ -485,6 +489,217 @@ impl StablePool {
 }
 
 impl BaselineSolvable for StablePool {
+    async fn get_amount_out(&self, out_token: H160, input: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref().get_amount_out(out_token, input).await
+    }
+
+    async fn get_amount_in(&self, in_token: H160, output: (U256, H160)) -> Option<U256> {
+        self.as_pool_ref().get_amount_in(in_token, output).await
+    }
+
+    async fn gas_cost(&self) -> usize {
+        self.as_pool_ref().gas_cost().await
+    }
+}
+
+/// Stable surge pool data as a reference used for computing input and output
+/// amounts.
+#[derive(Debug)]
+pub struct StableSurgePoolRef<'a> {
+    pub address: H160,
+    pub reserves: &'a BTreeMap<H160, StableTokenState>,
+    pub swap_fee: Bfp,
+    pub amplification_parameter: AmplificationParameter,
+    pub surge_threshold_percentage: Bfp,
+    pub max_surge_fee_percentage: Bfp,
+}
+
+impl StableSurgePoolRef<'_> {
+    fn get_balances_with_indices(
+        &self,
+        in_token: H160,
+        out_token: H160,
+    ) -> Option<BalancesWithIndices> {
+        let mut balances = Vec::new();
+        let mut token_index_in = None;
+        let mut token_index_out = None;
+
+        for (i, (token, state)) in self.reserves.iter().enumerate() {
+            balances.push(state.upscaled_balance().ok()?);
+
+            if *token == in_token {
+                token_index_in = Some(i);
+            }
+            if *token == out_token {
+                token_index_out = Some(i);
+            }
+        }
+
+        Some(BalancesWithIndices {
+            token_index_in: token_index_in?,
+            token_index_out: token_index_out?,
+            balances,
+        })
+    }
+
+    fn regular_swap_given_in(
+        &self,
+        out_token: H160,
+        (in_amount, in_token): (U256, H160),
+    ) -> Option<U256> {
+        let in_reserves = self.reserves.get(&in_token)?;
+        let out_reserves = self.reserves.get(&out_token)?;
+
+        let in_amount_upscaled = in_reserves.upscale(in_amount).ok()?;
+        let balances_info = self.get_balances_with_indices(in_token, out_token)?;
+
+        // Create StableSurgePoolState for the calculation
+        let pool_state = stable_surge_math::StableSurgePoolState {
+            amplification_parameter: self
+                .amplification_parameter
+                .with_base(U256::from(1000))
+                .unwrap(),
+            balances: balances_info.balances.clone(),
+
+            swap_fee: self.swap_fee,
+            surge_threshold_percentage: self.surge_threshold_percentage,
+            max_surge_fee_percentage: self.max_surge_fee_percentage,
+        };
+
+        // Calculate swap with surge fee logic
+        let result = pool_state
+            .calc_out_given_in_with_surge(
+                balances_info.token_index_in,
+                balances_info.token_index_out,
+                in_amount_upscaled,
+            )
+            .ok()?;
+
+        out_reserves.downscale_down(result.amount_calculated).ok()
+    }
+
+    fn regular_swap_given_out(
+        &self,
+        in_token: H160,
+        (out_amount, out_token): (U256, H160),
+    ) -> Option<U256> {
+        let in_reserves = self.reserves.get(&in_token)?;
+        let out_reserves = self.reserves.get(&out_token)?;
+
+        let out_amount_upscaled = out_reserves.upscale(out_amount).ok()?;
+        let balances_info = self.get_balances_with_indices(in_token, out_token)?;
+
+        // Create StableSurgePoolState for the calculation
+        let pool_state = stable_surge_math::StableSurgePoolState {
+            amplification_parameter: self
+                .amplification_parameter
+                .with_base(U256::from(1000))
+                .unwrap(),
+            balances: balances_info.balances.clone(),
+
+            swap_fee: self.swap_fee,
+            surge_threshold_percentage: self.surge_threshold_percentage,
+            max_surge_fee_percentage: self.max_surge_fee_percentage,
+        };
+
+        // Calculate swap with surge fee logic
+        let result = pool_state
+            .calc_in_given_out_with_surge(
+                balances_info.token_index_in,
+                balances_info.token_index_out,
+                out_amount_upscaled,
+            )
+            .ok()?;
+
+        in_reserves.downscale_up(result.amount_calculated).ok()
+    }
+
+    /// Comes from `_swapWithBpt`:
+    /// https://etherscan.io/address/0xf9ac7B9dF2b3454E841110CcE5550bD5AC6f875F#code#F2#L301
+    fn swap_with_bpt(&self) -> Option<U256> {
+        // TODO: We currently do not implement swapping with BPT for stable surge pools.
+        None
+    }
+
+    fn get_amount_out_inner(
+        &self,
+        out_token: H160,
+        in_amount: U256,
+        in_token: H160,
+    ) -> Option<U256> {
+        if in_token == self.address || out_token == self.address {
+            self.swap_with_bpt()
+        } else {
+            self.regular_swap_given_in(out_token, (in_amount, in_token))
+        }
+    }
+
+    /// See [`StablePoolRef::reserves_without_bpt`].
+    pub fn reserves_without_bpt(&self) -> impl Iterator<Item = (H160, TokenState)> + '_ {
+        self.reserves
+            .iter()
+            .filter(|(token, _)| **token != self.address)
+            .map(|(token, state)| {
+                (
+                    *token,
+                    TokenState {
+                        balance: state.balance,
+                        scaling_factor: state.scaling_factor,
+                        rate: state.rate,
+                    },
+                )
+            })
+    }
+}
+
+impl BaselineSolvable for StableSurgePoolRef<'_> {
+    async fn get_amount_out(
+        &self,
+        out_token: H160,
+        (in_amount, in_token): (U256, H160),
+    ) -> Option<U256> {
+        self.get_amount_out_inner(out_token, in_amount, in_token)
+    }
+
+    async fn get_amount_in(
+        &self,
+        in_token: H160,
+        (out_amount, out_token): (U256, H160),
+    ) -> Option<U256> {
+        if in_token == self.address || out_token == self.address {
+            self.swap_with_bpt()
+        } else {
+            let in_amount = self.regular_swap_given_out(in_token, (out_amount, out_token))?;
+            converge_in_amount(in_amount, out_amount, |x| {
+                self.get_amount_out_inner(out_token, x, in_token)
+            })
+        }
+    }
+
+    async fn gas_cost(&self) -> usize {
+        STABLE_SURGE_SWAP_GAS_COST
+    }
+}
+
+impl StableSurgePool {
+    fn as_pool_ref(&self) -> StableSurgePoolRef<'_> {
+        StableSurgePoolRef {
+            address: self.common.address,
+            reserves: &self.reserves,
+            swap_fee: self.common.swap_fee,
+            amplification_parameter: self.amplification_parameter,
+            surge_threshold_percentage: self.surge_threshold_percentage,
+            max_surge_fee_percentage: self.max_surge_fee_percentage,
+        }
+    }
+
+    /// See [`StableSurgePoolRef::reserves_without_bpt`].
+    pub fn reserves_without_bpt(&self) -> Vec<(H160, TokenState)> {
+        self.as_pool_ref().reserves_without_bpt().collect()
+    }
+}
+
+impl BaselineSolvable for StableSurgePool {
     async fn get_amount_out(&self, out_token: H160, input: (U256, H160)) -> Option<U256> {
         self.as_pool_ref().get_amount_out(out_token, input).await
     }
@@ -1178,8 +1393,8 @@ impl QuantAmmPoolRef<'_> {
         // Extract weights and multipliers from packed arrays (matches balancer-maths
         // pattern)
         let (weights, multipliers) = extract_weights_and_multipliers(
-            &self.first_four_weights_and_multipliers,
-            &self.second_four_weights_and_multipliers,
+            self.first_four_weights_and_multipliers,
+            self.second_four_weights_and_multipliers,
             self.reserves.len(),
         )?;
 
@@ -1249,8 +1464,8 @@ impl QuantAmmPoolRef<'_> {
         // Extract weights and multipliers from packed arrays (matches balancer-maths
         // pattern)
         let (weights, multipliers) = extract_weights_and_multipliers(
-            &self.first_four_weights_and_multipliers,
-            &self.second_four_weights_and_multipliers,
+            self.first_four_weights_and_multipliers,
+            self.second_four_weights_and_multipliers,
             self.reserves.len(),
         )?;
 

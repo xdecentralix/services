@@ -48,6 +48,7 @@ impl FixedPointPrecision {
     /// Determine precision based on GyroECLP parameter name
     /// Use this helper to identify which precision level to use for specific
     /// parameters
+    #[allow(clippy::wildcard_in_or_patterns)]
     pub fn for_gyro_eclp_param(param_name: &str) -> Self {
         match param_name {
             // High-precision parameters that use 38-decimal scaling
@@ -399,14 +400,14 @@ impl SignedFixedPoint {
         if !(a == &BigInt::from(0) || Self::floor_div(&product, a) == *b) {
             return Err(Error::MulOverflow);
         }
-        Ok(Self::floor_div(&product, &*ONE_18))
+        Ok(Self::floor_div(&product, &ONE_18))
     }
 
     /// Multiply with downward magnitude rounding (unchecked)
     /// Equivalent to Python: mul_down_mag_u(a, b)
     pub fn mul_down_mag_u(a: &BigInt, b: &BigInt) -> BigInt {
         let product = a * b;
-        let abs_result = Self::floor_div(&product.abs(), &*ONE_18);
+        let abs_result = Self::floor_div(&product.abs(), &ONE_18);
         if product < BigInt::from(0) {
             -abs_result
         } else {
@@ -426,9 +427,9 @@ impl SignedFixedPoint {
         }
 
         if product > BigInt::from(0) {
-            Ok(Self::floor_div(&(&product - 1), &*ONE_18) + 1)
+            Ok(Self::floor_div(&(&product - 1), &ONE_18) + 1)
         } else if product < BigInt::from(0) {
-            Ok(Self::floor_div(&(&product + 1), &*ONE_18) - 1)
+            Ok(Self::floor_div(&(&product + 1), &ONE_18) - 1)
         } else {
             Ok(BigInt::from(0))
         }
@@ -439,9 +440,9 @@ impl SignedFixedPoint {
     pub fn mul_up_mag_u(a: &BigInt, b: &BigInt) -> BigInt {
         let product = a * b;
         if product > BigInt::from(0) {
-            Self::floor_div(&(&product - 1), &*ONE_18) + 1
+            Self::floor_div(&(&product - 1), &ONE_18) + 1
         } else if product < BigInt::from(0) {
-            Self::floor_div(&(&product + 1), &*ONE_18) - 1
+            Self::floor_div(&(&product + 1), &ONE_18) - 1
         } else {
             BigInt::from(0)
         }
@@ -548,13 +549,13 @@ impl SignedFixedPoint {
             return Err(Error::MulOverflow);
         }
 
-        Ok(Self::floor_div(&product, &*ONE_38))
+        Ok(Self::floor_div(&product, &ONE_38))
     }
 
     /// Multiply with extra precision (unchecked)
     /// Equivalent to Python: mul_xp_u(a, b)
     pub fn mul_xp_u(a: &BigInt, b: &BigInt) -> BigInt {
-        Self::floor_div(&(a * b), &*ONE_38)
+        Self::floor_div(&(a * b), &ONE_38)
     }
 
     /// Divide with extra precision
@@ -587,7 +588,7 @@ impl SignedFixedPoint {
     /// Multiply with extra precision, convert to normal precision with downward
     /// rounding Equivalent to Python: mul_down_xp_to_np(a, b)
     pub fn mul_down_xp_to_np(a: &BigInt, b: &BigInt) -> Result<BigInt, Error> {
-        let b1 = Self::floor_div(b, &*E_19);
+        let b1 = Self::floor_div(b, &E_19);
         let prod1 = a * &b1;
         if !(a == &BigInt::from(0) || Self::floor_div(&prod1, a) == b1) {
             return Err(Error::MulOverflow);
@@ -601,33 +602,33 @@ impl SignedFixedPoint {
 
         if prod1 >= BigInt::from(0) && prod2 >= BigInt::from(0) {
             Ok(Self::floor_div(
-                &(&prod1 + Self::floor_div(&prod2, &*E_19)),
-                &*E_19,
+                &(&prod1 + Self::floor_div(&prod2, &E_19)),
+                &E_19,
             ))
         } else {
-            Ok(Self::floor_div(&(&prod1 + Self::floor_div(&prod2, &*E_19) + 1), &*E_19) - 1)
+            Ok(Self::floor_div(&(&prod1 + Self::floor_div(&prod2, &E_19) + 1), &E_19) - 1)
         }
     }
 
     /// Multiply with extra precision, convert to normal precision with downward
     /// rounding (unchecked) Equivalent to Python: mul_down_xp_to_np_u(a, b)
     pub fn mul_down_xp_to_np_u(a: &BigInt, b: &BigInt) -> BigInt {
-        let b1 = Self::floor_div(b, &*E_19);
+        let b1 = Self::floor_div(b, &E_19);
         let b2 = b % &*E_19;
         let prod1 = a * &b1;
         let prod2 = a * &b2;
 
         if prod1 >= BigInt::from(0) && prod2 >= BigInt::from(0) {
-            Self::floor_div(&(&prod1 + Self::floor_div(&prod2, &*E_19)), &*E_19)
+            Self::floor_div(&(&prod1 + Self::floor_div(&prod2, &E_19)), &E_19)
         } else {
-            Self::floor_div(&(&prod1 + Self::floor_div(&prod2, &*E_19) + 1), &*E_19) - 1
+            Self::floor_div(&(&prod1 + Self::floor_div(&prod2, &E_19) + 1), &E_19) - 1
         }
     }
 
     /// Multiply with extra precision, convert to normal precision with upward
     /// rounding Equivalent to Python: mul_up_xp_to_np(a, b)
     pub fn mul_up_xp_to_np(a: &BigInt, b: &BigInt) -> Result<BigInt, Error> {
-        let b1 = Self::floor_div(b, &*E_19);
+        let b1 = Self::floor_div(b, &E_19);
         let prod1 = a * &b1;
         if !(a == &BigInt::from(0) || Self::floor_div(&prod1, a) == b1) {
             return Err(Error::MulOverflow);
@@ -641,18 +642,18 @@ impl SignedFixedPoint {
 
         if prod1 <= BigInt::from(0) && prod2 <= BigInt::from(0) {
             Ok(Self::floor_div(
-                &(&prod1 + Self::floor_div(&prod2, &*E_19)),
-                &*E_19,
+                &(&prod1 + Self::floor_div(&prod2, &E_19)),
+                &E_19,
             ))
         } else {
-            Ok(Self::floor_div(&(&prod1 + Self::floor_div(&prod2, &*E_19) - 1), &*E_19) + 1)
+            Ok(Self::floor_div(&(&prod1 + Self::floor_div(&prod2, &E_19) - 1), &E_19) + 1)
         }
     }
 
     /// Multiply with extra precision, convert to normal precision with upward
     /// rounding (unchecked) Equivalent to Python: mul_up_xp_to_np_u(a, b)
     pub fn mul_up_xp_to_np_u(a: &BigInt, b: &BigInt) -> BigInt {
-        let b1 = Self::floor_div(b, &*E_19);
+        let b1 = Self::floor_div(b, &E_19);
         let b2 = b % &*E_19;
         let prod1 = a * &b1;
         let prod2 = a * &b2;
@@ -668,9 +669,9 @@ impl SignedFixedPoint {
         }
 
         if prod1 <= BigInt::from(0) && prod2 <= BigInt::from(0) {
-            trunc_div(&(&prod1 + trunc_div(&prod2, &*E_19)), &*E_19)
+            trunc_div(&(&prod1 + trunc_div(&prod2, &E_19)), &E_19)
         } else {
-            trunc_div(&(&prod1 + trunc_div(&prod2, &*E_19) - 1), &*E_19) + 1
+            trunc_div(&(&prod1 + trunc_div(&prod2, &E_19) - 1), &E_19) + 1
         }
     }
 

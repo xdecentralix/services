@@ -25,6 +25,7 @@ use {
             quantamm,
             reclamm,
             stable,
+            stable_surge,
             weighted,
         },
         swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
@@ -44,6 +45,8 @@ use {
         BalancerV3ReClammPoolFactoryV2,
         BalancerV3StablePoolFactory,
         BalancerV3StablePoolFactoryV2,
+        BalancerV3StableSurgePoolFactory,
+        BalancerV3StableSurgePoolFactoryV2,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
     },
@@ -130,6 +133,35 @@ impl StablePool {
             reserves: stable_state.tokens.into_iter().collect(),
             amplification_parameter: stable_state.amplification_parameter,
             version: stable_state.version,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct StableSurgePool {
+    pub common: CommonPoolState,
+    pub reserves: BTreeMap<H160, StableTokenState>,
+    pub amplification_parameter: AmplificationParameter,
+    pub version: StablePoolVersion,
+    // StableSurge hook parameters
+    pub surge_threshold_percentage: Bfp,
+    pub max_surge_fee_percentage: Bfp,
+}
+
+impl StableSurgePool {
+    pub fn new_unpaused(pool_id: H160, state: stable_surge::PoolState) -> Self {
+        StableSurgePool {
+            common: CommonPoolState {
+                id: pool_id,
+                address: pool_id, // V3 pools are contract addresses
+                swap_fee: state.swap_fee,
+                paused: false,
+            },
+            reserves: state.tokens.into_iter().collect(),
+            amplification_parameter: state.amplification_parameter,
+            version: state.version,
+            surge_threshold_percentage: state.surge_threshold_percentage,
+            max_surge_fee_percentage: state.max_surge_fee_percentage,
         }
     }
 }
@@ -291,6 +323,7 @@ impl GyroEPool {
 #[derive(Default)]
 pub struct FetchedBalancerPools {
     pub stable_pools: Vec<StablePool>,
+    pub stable_surge_pools: Vec<StableSurgePool>,
     pub weighted_pools: Vec<WeightedPool>,
     pub gyro_2clp_pools: Vec<Gyro2CLPPool>,
     pub gyro_e_pools: Vec<GyroEPool>,
@@ -308,6 +341,11 @@ impl FetchedBalancerPools {
         );
         tokens.extend(
             self.stable_pools
+                .iter()
+                .flat_map(|pool| pool.reserves.keys().copied()),
+        );
+        tokens.extend(
+            self.stable_surge_pools
                 .iter()
                 .flat_map(|pool| pool.reserves.keys().copied()),
         );
@@ -359,6 +397,8 @@ pub enum BalancerFactoryKind {
     Weighted,
     Stable,
     StableV2,
+    StableSurge,
+    StableSurgeV2,
     Gyro2CLP,
     GyroE,
     ReClamm,
@@ -374,6 +414,8 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::StableSurge,
+                Self::StableSurgeV2,
                 Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
@@ -384,6 +426,8 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::StableSurge,
+                Self::StableSurgeV2,
                 Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
@@ -393,6 +437,8 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::StableSurge,
+                Self::StableSurgeV2,
                 Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
@@ -403,6 +449,8 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::StableSurge,
+                Self::StableSurgeV2,
                 Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
@@ -412,6 +460,8 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::StableSurge,
+                Self::StableSurgeV2,
                 Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
@@ -422,6 +472,8 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::StableSurge,
+                Self::StableSurgeV2,
                 Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
@@ -432,6 +484,8 @@ impl BalancerFactoryKind {
                 Self::Weighted,
                 Self::Stable,
                 Self::StableV2,
+                Self::StableSurge,
+                Self::StableSurgeV2,
                 Self::Gyro2CLP,
                 Self::GyroE,
                 Self::ReClamm,
@@ -477,6 +531,8 @@ impl BalancerContracts {
                 BalancerFactoryKind::Weighted => instance!(BalancerV3WeightedPoolFactory),
                 BalancerFactoryKind::Stable => instance!(BalancerV3StablePoolFactory),
                 BalancerFactoryKind::StableV2 => instance!(BalancerV3StablePoolFactoryV2),
+                BalancerFactoryKind::StableSurge => instance!(BalancerV3StableSurgePoolFactory),
+                BalancerFactoryKind::StableSurgeV2 => instance!(BalancerV3StableSurgePoolFactoryV2),
                 BalancerFactoryKind::Gyro2CLP => instance!(BalancerV3Gyro2CLPPoolFactory),
                 BalancerFactoryKind::GyroE => instance!(BalancerV3GyroECLPPoolFactory),
                 BalancerFactoryKind::ReClamm => instance!(BalancerV3ReClammPoolFactoryV2),
@@ -566,6 +622,9 @@ impl BalancerV3PoolFetching for BalancerPoolFetcher {
                     PoolKind::Stable(state) => fetched_pools
                         .stable_pools
                         .push(StablePool::new_unpaused(pool.id, state)),
+                    PoolKind::StableSurge(state) => fetched_pools
+                        .stable_surge_pools
+                        .push(StableSurgePool::new_unpaused(pool.id, state)),
                     PoolKind::Gyro2CLP(state) => fetched_pools
                         .gyro_2clp_pools
                         .push(Gyro2CLPPool::new_unpaused(pool.id, state)),
@@ -636,6 +695,12 @@ async fn create_aggregate_pool_fetcher(
             }
             BalancerFactoryKind::StableV2 => {
                 registry!(BalancerV3StablePoolFactoryV2, instance)
+            }
+            BalancerFactoryKind::StableSurge => {
+                registry!(BalancerV3StableSurgePoolFactory, instance)
+            }
+            BalancerFactoryKind::StableSurgeV2 => {
+                registry!(BalancerV3StableSurgePoolFactoryV2, instance)
             }
             BalancerFactoryKind::Gyro2CLP => {
                 registry!(BalancerV3Gyro2CLPPoolFactory, instance)

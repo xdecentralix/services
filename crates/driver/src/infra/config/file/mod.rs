@@ -725,6 +725,14 @@ enum BalancerV3Config {
         #[serde(default)]
         stable_v2: Vec<eth::H160>,
 
+        /// The StableSurge pool factory contract addresses.
+        #[serde(default)]
+        stable_surge: Vec<eth::H160>,
+
+        /// The StableSurge pool factory v2 contract addresses.
+        #[serde(default)]
+        stable_surge_v2: Vec<eth::H160>,
+
         /// The GyroE pool factory contract addresses.
         #[serde(default)]
         gyro_e: Vec<eth::H160>,

@@ -8,6 +8,7 @@ pub mod gyro_e;
 pub mod quantamm;
 pub mod reclamm;
 pub mod stable;
+pub mod stable_surge;
 pub mod weighted;
 
 /// A Balancer V3 pool ID.

@@ -114,6 +114,7 @@ impl BalancerApiClient {
                         "orderBy" => "totalLiquidity",
                         "orderDirection" => "desc",
                         "where" => json!({
+                            "includeHooks": "STABLE_SURGE",
                             "chainIn": [self.chain],
                              "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE", "RECLAMM", "QUANT_AMM_WEIGHTED", "GYRO"],
                             "protocolVersionIn": [3] // V3 protocol
@@ -231,6 +232,33 @@ pub struct PoolData {
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[serde(default)]
     pub max_trade_size_ratio: Option<Bfp>,
+    /// Hook configuration for the pool (matches GraphQL nested structure)
+    #[serde(default)]
+    pub hook: Option<HookConfig>,
+}
+
+/// Hook configuration that matches the GraphQL response structure.
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HookConfig {
+    pub address: H160,
+    #[serde(default)]
+    pub params: Option<HookParams>,
+}
+
+/// Hook parameters for different hook types.
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HookParams {
+    /// StableSurge hook parameters
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub max_surge_fee_percentage: Option<Bfp>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub surge_threshold_percentage: Option<Bfp>,
 }
 
 /// Dynamic data for pools from Balancer V3 API.
@@ -363,6 +391,15 @@ mod pools_query {
                 }
                 sqrtAlpha
                 sqrtBeta
+                hook {
+                    address
+                    params {
+                        ... on StableSurgeHookParams {
+                            maxSurgeFeePercentage
+                            surgeThresholdPercentage
+                        }
+                    }
+                }
             }
         }
     "#;
@@ -399,7 +436,8 @@ mod tests {
                     "dynamicData": {
                         "swapEnabled": true
                     },
-                    "createTime": 1234567890
+                    "createTime": 1234567890,
+                    "hook": null
                 }
             ]
         }"#;
@@ -457,7 +495,9 @@ mod tests {
                     "sqrtAlpha": null,
                     "sqrtBeta": null,
                     // QuantAMM parameter
-                    "maxTradeSizeRatio": null
+                    "maxTradeSizeRatio": null,
+                    // Hook configuration
+                    "hook": null
                 }
             ]
         });
@@ -495,6 +535,65 @@ mod tests {
     }
 
     #[test]
+    fn decode_stable_surge_hook_data() {
+        let json = r#"{
+            "aggregatorPools": [
+                {
+                    "id": "0x1111111111111111111111111111111111111111",
+                    "address": "0x1111111111111111111111111111111111111111",
+                    "type": "STABLE",
+                    "protocolVersion": 3,
+                    "factory": "0x2222222222222222222222222222222222222222",
+                    "chain": "MAINNET",
+                    "poolTokens": [
+                        {
+                            "address": "0x3333333333333333333333333333333333333333",
+                            "decimals": 18,
+                            "weight": null
+                        }
+                    ],
+                    "dynamicData": {
+                        "swapEnabled": true
+                    },
+                    "createTime": 1234567890,
+                    "hook": {
+                        "address": "0x4444444444444444444444444444444444444444",
+                        "params": {
+                            "maxSurgeFeePercentage": "0.95",
+                            "surgeThresholdPercentage": "0.3"
+                        }
+                    }
+                }
+            ]
+        }"#;
+
+        let data: pools_query::Data = serde_json::from_str(json).unwrap();
+        assert_eq!(data.aggregator_pools.len(), 1);
+        let pool = &data.aggregator_pools[0];
+
+        // Verify pool basic data
+        assert_eq!(pool.pool_type_enum(), PoolType::Stable);
+        assert!(pool.swap_enabled());
+
+        // Verify hook data using direct field access (consistent with other pool types)
+        assert!(pool.hook.is_some());
+        let hook = pool.hook.as_ref().unwrap();
+        assert_eq!(hook.address, H160([0x44; 20]));
+
+        // Verify StableSurge parameters using direct field access
+        assert!(hook.params.is_some());
+        let params = hook.params.as_ref().unwrap();
+        assert_eq!(
+            params.max_surge_fee_percentage.unwrap(),
+            "0.95".parse::<Bfp>().unwrap()
+        );
+        assert_eq!(
+            params.surge_threshold_percentage.unwrap(),
+            "0.3".parse::<Bfp>().unwrap()
+        );
+    }
+
+    #[test]
     fn groups_pools_by_factory() {
         let pool1 = PoolData {
             id: "0x1111111111111111111111111111111111111111".to_string(),
@@ -523,6 +622,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: None,
+            hook: None,
         };
         let pool2 = PoolData {
             id: "0x2222222222222222222222222222222222222222".to_string(),
@@ -553,6 +653,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: None,
+            hook: None,
         };
         let pools = RegisteredPools {
             fetched_block_number: 0,

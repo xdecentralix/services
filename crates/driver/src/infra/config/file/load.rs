@@ -353,6 +353,8 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         weighted,
                         stable,
                         stable_v2,
+                        stable_surge,
+                        stable_surge_v2,
                         gyro_e,
                         gyro_2clp,
                         reclamm,
@@ -370,6 +372,14 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                             .collect(),
                         stable: stable.into_iter().map(eth::ContractAddress::from).collect(),
                         stable_v2: stable_v2
+                            .into_iter()
+                            .map(eth::ContractAddress::from)
+                            .collect(),
+                        stable_surge: stable_surge
+                            .into_iter()
+                            .map(eth::ContractAddress::from)
+                            .collect(),
+                        stable_surge_v2: stable_surge_v2
                             .into_iter()
                             .map(eth::ContractAddress::from)
                             .collect(),

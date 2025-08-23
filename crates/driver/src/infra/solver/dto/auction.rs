@@ -50,6 +50,7 @@ pub fn new(
             liquidity::Kind::UniswapV3(pool) => vec![pool.tokens.get().0, pool.tokens.get().1],
             liquidity::Kind::BalancerV2Stable(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3Stable(pool) => pool.reserves.tokens().collect(),
+            liquidity::Kind::BalancerV3StableSurge(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV2Weighted(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV3Weighted(pool) => pool.reserves.tokens().collect(),
             liquidity::Kind::BalancerV2GyroE(pool) => pool.reserves.tokens().collect(),
@@ -696,6 +697,50 @@ pub fn new(
                             },
                         )
                     }
+                    liquidity::Kind::BalancerV3StableSurge(pool) => {
+                        // StableSurge pools use dynamic fees based on pool imbalance
+                        // External solvers receive surge parameters to make informed routing
+                        // decisions
+                        solvers_dto::auction::Liquidity::StableSurge(
+                            solvers_dto::auction::StableSurgePool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.id.address().into(),
+                                balancer_pool_id: {
+                                    let pool_id_h160: eth::H160 = pool.id.into();
+                                    pool_id_h160.into()
+                                },
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.asset.token.into(),
+                                            solvers_dto::auction::StableReserve {
+                                                balance: r.asset.amount.into(),
+                                                scaling_factor: scaling_factor_to_decimal_v3(
+                                                    r.scale,
+                                                ),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                amplification_parameter: rational_to_big_decimal(
+                                    &num::BigRational::new(
+                                        pool.amplification_parameter.factor().to_big_int(),
+                                        pool.amplification_parameter.precision().to_big_int(),
+                                    ),
+                                ),
+                                fee: fee_to_decimal_v3(pool.fee),
+                                surge_threshold_percentage: surge_threshold_to_decimal_v3(
+                                    pool.surge_threshold_percentage.clone(),
+                                ),
+                                max_surge_fee_percentage: max_surge_fee_to_decimal_v3(
+                                    pool.max_surge_fee_percentage.clone(),
+                                ),
+                            },
+                        )
+                    }
                 })
             })
             .collect(),
@@ -775,6 +820,18 @@ fn fee_to_decimal(fee: liquidity::balancer::v2::Fee) -> bigdecimal::BigDecimal {
 
 fn fee_to_decimal_v3(fee: liquidity::balancer::v3::Fee) -> bigdecimal::BigDecimal {
     bigdecimal::BigDecimal::new(fee.as_raw().to_big_int(), 18)
+}
+
+fn surge_threshold_to_decimal_v3(
+    surge_threshold: liquidity::balancer::v3::stable_surge::SurgeThresholdPercentage,
+) -> bigdecimal::BigDecimal {
+    bigdecimal::BigDecimal::new(surge_threshold.value().to_big_int(), 18)
+}
+
+fn max_surge_fee_to_decimal_v3(
+    max_surge_fee: liquidity::balancer::v3::stable_surge::MaxSurgeFeePercentage,
+) -> bigdecimal::BigDecimal {
+    bigdecimal::BigDecimal::new(max_surge_fee.value().to_big_int(), 18)
 }
 
 fn weight_to_decimal(weight: liquidity::balancer::v2::weighted::Weight) -> bigdecimal::BigDecimal {

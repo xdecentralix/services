@@ -256,6 +256,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: None,
+            hook: None,
         };
 
         let pool_info = PoolInfo::from_graph_data(&pool, 1234567890).unwrap();
@@ -310,6 +311,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: None,
+            hook: None,
         };
 
         let result = PoolInfo::from_graph_data(&pool, 1234567890);

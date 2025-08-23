@@ -13,6 +13,7 @@ pub mod gyro_e;
 pub mod quantamm;
 pub mod reclamm;
 pub mod stable;
+pub mod stable_surge;
 pub mod weighted;
 
 use {
@@ -36,6 +37,7 @@ pub struct Pool {
 pub enum PoolKind {
     Weighted(weighted::PoolState),
     Stable(stable::PoolState),
+    StableSurge(stable_surge::PoolState),
     Gyro2CLP(gyro_2clp::PoolState),
     GyroE(gyro_e::PoolState),
     ReClamm(reclamm::PoolState),
@@ -54,6 +56,7 @@ macro_rules! impl_from_state {
 
 impl_from_state!(weighted::PoolState, Weighted);
 impl_from_state!(stable::PoolState, Stable);
+impl_from_state!(stable_surge::PoolState, StableSurge);
 impl_from_state!(gyro_2clp::PoolState, Gyro2CLP);
 impl_from_state!(gyro_e::PoolState, GyroE);
 impl_from_state!(reclamm::PoolState, ReClamm);

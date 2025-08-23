@@ -1327,6 +1327,108 @@ fn main() {
                 },
             )
     });
+    generate_contract_with_config("BalancerV3StableSurgePoolFactory", |builder| {
+        builder
+            .add_network(
+                ARBITRUM_ONE,
+                Network {
+                    address: addr("0x86e67E115f96DF37239E0479441303De0de7bc2b"),
+                    // <https://arbiscan.io/tx/0x43eb1a286d4a06c767d780c3e7437f8f5cec1552b20d5fb717bb24f09c693924>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(303403113)),
+                },
+            )
+            .add_network(
+                BASE,
+                Network {
+                    address: addr("0x4fb47126Fa83A8734991E41B942Ac29A3266C968"),
+                    // <https://basescan.org/tx/0x38e5a884249f6afea6113cae9167a20f63ac1f6409edbf9da9d206ba4878f50a>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(26049433)),
+                },
+            )
+            .add_network(
+                GNOSIS,
+                Network {
+                    address: addr("0x268E2EE1413D768b6e2dc3F5a4ddc9Ae03d9AF42"),
+                    // <https://gnosisscan.io/tx/0x05cbac83d6d1d75b5205a9ab6497acbbc48c33516f444ff0a70fb52e8185a11f>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(38432088)),
+                },
+            )
+            .add_network(
+                MAINNET,
+                Network {
+                    address: addr("0xD53F5d8d926fb2a0f7Be614B16e649B8aC102D83"),
+                    // <https://etherscan.io/tx/0xea86300610bd6a6782395053c4f9cd5e428f4219a6416bc5b7bf6ea2c3998567>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(21791079)),
+                },
+            )
+            .add_network(
+                SEPOLIA,
+                Network {
+                    address: addr("0xD516c344413B4282dF1E4082EAE6B1081F3b1932"),
+                    // <https://sepolia.etherscan.io/tx/0x813ed66325fdac564b4a4eeb9bb99058c0d82096325803cbe5319a473c0e00f0>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(7655004)),
+                },
+            )
+    });
+    generate_contract_with_config("BalancerV3StableSurgePoolFactoryV2", |builder| {
+        builder
+            .add_network(
+                ARBITRUM_ONE,
+                Network {
+                    address: addr("0x201efd508c8DfE9DE1a13c2452863A78CB2a86Cc"),
+                    // <https://arbiscan.io/tx/0xf0c872096b38df7396bdd796c7c44a8e073d10058a730d2393fecbceab7ae3e5>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(322937794)),
+                },
+            )
+            .add_network(
+                AVALANCHE,
+                Network {
+                    address: addr("0x18CC3C68A5e64b40c846Aa6E45312cbcBb94f71b"),
+                    // <https://snowscan.xyz/tx/0xa0d0795a93be94c92c7b5b7ab117a328e9183ee6387b5e5b7ddc5e7ded72abd0>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(59966276)),
+                },
+            )
+            .add_network(
+                BASE,
+                Network {
+                    address: addr("0x8e3fEaAB11b7B351e3EA1E01247Ab6ccc847dD52"),
+                    // <https://basescan.org/tx/0x49603904b270ff5ce8efdc395a8c004683dcf64b1f75ae5b82461b40cd627041>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(28502516)),
+                },
+            )
+            .add_network(
+                GNOSIS,
+                Network {
+                    address: addr("0x45fB5aF0a1aD80Ea16C803146eb81844D9972373"),
+                    // <https://gnosisscan.io/tx/0x317fd60d689b5146b9d9c93ef11fbe4a2caec8af69d8c05ed620033a27cf1a7f>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(39390487)),
+                },
+            )
+            .add_network(
+                MAINNET,
+                Network {
+                    address: addr("0x355bD33F0033066BB3DE396a6d069be57353AD95"),
+                    // <https://etherscan.io/tx/0x7bd8f7b3744accd6595a5f6048f3165e4d60dd6ea951e5dd0c882bf193fd70c8>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(22197594)),
+                },
+            )
+            .add_network(
+                OPTIMISM,
+                Network {
+                    address: addr("0x3BEb058DE1A25dd24223fd9e1796df8589429AcE"),
+                    // <https://optimistic.etherscan.io/tx/0x896531d84d833de10a86562a20a7cec4c40cb63fec2ea5691d75a7b3ae16ff10>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(134097700)),
+                },
+            )
+            .add_network(
+                SEPOLIA,
+                Network {
+                    address: addr("0x2f1d6F4C40047dC122cA7e46B0D1eC27739BFc66"),
+                    // <https://sepolia.etherscan.io/tx/0xb342f8518d64d9bb3f2436b369aa0dda8f3aadb46aa1c3228fa321519431a199>
+                    deployment_information: Some(DeploymentInformation::BlockNumber(8050826)),
+                },
+            )
+    });
     generate_contract_with_config("BalancerV3GyroECLPPoolFactory", |builder| {
         builder
             .add_network(
@@ -1541,6 +1643,8 @@ fn main() {
     });
     generate_contract("BalancerV3WeightedPool");
     generate_contract("BalancerV3StablePool");
+    generate_contract("BalancerV3StableSurgePool");
+    generate_contract("BalancerV3StableSurgeHook");
     generate_contract("BalancerV3GyroECLPPool");
     generate_contract("BalancerV3Gyro2CLPPool");
     generate_contract("BalancerV3ReClammPool");

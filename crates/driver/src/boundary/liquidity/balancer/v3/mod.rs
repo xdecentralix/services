@@ -16,6 +16,8 @@ use {
         BalancerV3QuantAMMWeightedPoolFactory,
         BalancerV3StablePoolFactory,
         BalancerV3StablePoolFactoryV2,
+        BalancerV3StableSurgePoolFactory,
+        BalancerV3StableSurgePoolFactoryV2,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
         GPv2Settlement,
@@ -44,6 +46,7 @@ pub mod gyro_e;
 pub mod quantamm;
 pub mod reclamm;
 pub mod stable;
+pub mod stable_surge;
 pub mod weighted;
 
 /// Maps a Chain to the corresponding GqlChain for Balancer V3 API.
@@ -169,6 +172,30 @@ async fn init_liquidity(
                     (
                         BalancerFactoryKind::StableV2,
                         BalancerV3StablePoolFactoryV2::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            config
+                .stable_surge
+                .iter()
+                .map(|&factory| {
+                    (
+                        BalancerFactoryKind::StableSurge,
+                        BalancerV3StableSurgePoolFactory::at(&web3, factory.into())
+                            .raw_instance()
+                            .clone(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            config
+                .stable_surge_v2
+                .iter()
+                .map(|&factory| {
+                    (
+                        BalancerFactoryKind::StableSurgeV2,
+                        BalancerV3StableSurgePoolFactoryV2::at(&web3, factory.into())
                             .raw_instance()
                             .clone(),
                     )

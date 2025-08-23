@@ -210,6 +210,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: Some(Bfp::from_wei(U256::from(100_000_000_000_000_000u128))), /* 10% */
+            hook: None,
         };
 
         assert_eq!(
@@ -257,6 +258,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: Some(Bfp::from_wei(U256::from(100_000_000_000_000_000u128))),
+            hook: None,
         };
 
         assert!(PoolInfo::from_graph_data(&pool, 42).is_err());
@@ -291,6 +293,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: None, // Missing!
+            hook: None,
         };
 
         assert!(PoolInfo::from_graph_data(&pool, 42).is_err());

@@ -180,6 +180,18 @@ fn run() -> Result<()> {
             "BalancerV3ReClammPoolFactoryV2",
             "balancer/balancer-deployments/18839b81d136315c587011c135958b49272547ab/v3/tasks/20250702-v3-reclamm-pool-v2/artifact/ReClammPoolFactory.json",
         )?
+        .github(
+            "BalancerV3StableSurgePoolFactory",
+            "balancer/balancer-deployments/6c09a56033f2072cfac8823105df24e08dac812c/v3/deprecated/20250121-v3-stable-surge/artifact/StableSurgePoolFactory.json",
+        )?
+        .github(
+            "BalancerV3StableSurgePoolFactoryV2",
+            "balancer/balancer-deployments/6c09a56033f2072cfac8823105df24e08dac812c/v3/tasks/20250404-v3-stable-surge-pool-factory-v2/artifact/StableSurgePoolFactory.json",
+        )?
+        .github(
+            "BalancerV3StableSurgeHook",
+            "balancer/balancer-deployments/6c09a56033f2072cfac8823105df24e08dac812c/v3/tasks/20250403-v3-stable-surge-hook-v2/artifact/StableSurgeHook.json",
+        )?
         .manual(
             "BalancerV3QuantAMMWeightedPoolFactory",
             "Manually vendored ABI for Quant AMM Weighted Pool Factory contract",
@@ -195,6 +207,10 @@ fn run() -> Result<()> {
         .github(
             "BalancerV3StablePool",
             "balancer/balancer-deployments/48cb2fcbf17769f09c4ed905613b04db7707cfde/v3/deprecated/20241205-v3-stable-pool/artifact/StablePool.json",
+        )?
+        .github(
+            "BalancerV3StableSurgePool",
+            "balancer/balancer-deployments/6c09a56033f2072cfac8823105df24e08dac812c/v3/deprecated/20250121-v3-stable-surge/artifact/StablePool.json",
         )?
         .github(
             "BalancerV3GyroECLPPool",
