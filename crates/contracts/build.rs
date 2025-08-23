@@ -1644,6 +1644,7 @@ fn main() {
     generate_contract("BalancerV3WeightedPool");
     generate_contract("BalancerV3StablePool");
     generate_contract("BalancerV3StableSurgePool");
+    generate_contract("BalancerV3StableSurgeHook");
     generate_contract("BalancerV3GyroECLPPool");
     generate_contract("BalancerV3Gyro2CLPPool");
     generate_contract("BalancerV3ReClammPool");

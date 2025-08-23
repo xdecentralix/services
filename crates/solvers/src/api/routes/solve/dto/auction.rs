@@ -91,6 +91,7 @@ pub fn to_domain(auction: &Auction) -> Result<auction::Auction, Error> {
                 Liquidity::Erc4626(liquidity) => erc4626::to_domain(liquidity),
                 Liquidity::ReClamm(liquidity) => reclamm_pool::to_domain(liquidity),
                 Liquidity::QuantAmm(liquidity) => quant_amm_pool::to_domain(liquidity),
+                Liquidity::StableSurge(liquidity) => stable_surge_pool::to_domain(liquidity),
             })
             .try_collect()?,
         gas_price: auction::GasPrice(eth::Ether(auction.effective_gas_price)),
@@ -492,6 +493,51 @@ mod reclamm_pool {
                 .ok_or("invalid end_fourth_root_price_ratio")?,
                 price_ratio_update_start_time: pool.price_ratio_update_start_time,
                 price_ratio_update_end_time: pool.price_ratio_update_end_time,
+            }),
+        })
+    }
+}
+
+mod stable_surge_pool {
+    use super::*;
+    pub fn to_domain(pool: &StableSurgePool) -> Result<liquidity::Liquidity, Error> {
+        // External solvers receive StableSurge pool data but convert them to regular
+        // stable pools for their own pathfinding. They use the current
+        // effective fee from the DTO, not the dynamic surge calculations (which
+        // happen in the internal solver/driver).
+        let reserves = {
+            let mut entries = pool
+                .tokens
+                .iter()
+                .map(|(address, token)| {
+                    Ok(liquidity::stable::Reserve {
+                        asset: eth::Asset {
+                            token: eth::TokenAddress(*address),
+                            amount: token.balance,
+                        },
+                        scale: conv::decimal_to_rational(&token.scaling_factor)
+                            .and_then(liquidity::ScalingFactor::new)
+                            .ok_or("invalid token scaling factor")?,
+                    })
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
+
+            // Sort by token address (stable pools require sorted tokens)
+            entries.sort_unstable_by_key(|reserve| reserve.asset.token);
+
+            liquidity::stable::Reserves::new(entries)
+                .ok_or("duplicate stable surge token addresses")?
+        };
+
+        Ok(liquidity::Liquidity {
+            id: liquidity::Id(pool.id.clone()),
+            address: pool.address,
+            gas: eth::Gas(pool.gas_estimate),
+            state: liquidity::State::Stable(liquidity::stable::Pool {
+                reserves,
+                amplification_parameter: conv::decimal_to_rational(&pool.amplification_parameter)
+                    .ok_or("invalid amplification parameter")?,
+                fee: conv::decimal_to_rational(&pool.fee).ok_or("invalid stable surge pool fee")?,
             }),
         })
     }

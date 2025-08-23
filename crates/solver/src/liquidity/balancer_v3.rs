@@ -13,6 +13,7 @@ use {
             BalancerV3QuantAmmOrder,
             BalancerV3ReClammOrder,
             BalancerV3StablePoolOrder,
+            BalancerV3StableSurgePoolOrder,
             BalancerV3WeightedProductOrder,
             Liquidity,
             SettlementHandling,
@@ -63,6 +64,7 @@ impl BalancerV3Liquidity {
         block: Block,
     ) -> Result<(
         Vec<BalancerV3StablePoolOrder>,
+        Vec<BalancerV3StableSurgePoolOrder>,
         Vec<BalancerV3WeightedProductOrder>,
         Vec<BalancerV3GyroEOrder>,
         Vec<BalancerV3Gyro2CLPOrder>,
@@ -108,6 +110,24 @@ impl BalancerV3Liquidity {
                 fee: pool.common.swap_fee,
                 amplification_parameter: pool.amplification_parameter,
                 version: pool.version,
+                settlement_handling: Arc::new(SettlementHandler {
+                    pool_id: pool.common.id,
+                    inner: inner.clone(),
+                }),
+            })
+            .collect();
+
+        let stable_surge_pool_orders: Vec<_> = pools
+            .stable_surge_pools
+            .into_iter()
+            .map(|pool| BalancerV3StableSurgePoolOrder {
+                address: pool.common.address,
+                reserves: pool.reserves,
+                fee: pool.common.swap_fee,
+                amplification_parameter: pool.amplification_parameter,
+                version: pool.version,
+                surge_threshold_percentage: pool.surge_threshold_percentage,
+                max_surge_fee_percentage: pool.max_surge_fee_percentage,
                 settlement_handling: Arc::new(SettlementHandler {
                     pool_id: pool.common.id,
                     inner: inner.clone(),
@@ -206,6 +226,7 @@ impl BalancerV3Liquidity {
 
         Ok((
             stable_pool_orders,
+            stable_surge_pool_orders,
             weighted_product_orders,
             gyro_e_orders,
             gyro_2clp_orders,
@@ -224,11 +245,16 @@ impl LiquidityCollecting for BalancerV3Liquidity {
         pairs: HashSet<TokenPair>,
         block: Block,
     ) -> Result<Vec<Liquidity>> {
-        let (stable, weighted, gyro_e, gyro_2clp, reclamm, quantamm) =
+        let (stable, stable_surge, weighted, gyro_e, gyro_2clp, reclamm, quantamm) =
             self.get_orders(pairs, block).await?;
         let liquidity = stable
             .into_iter()
             .map(Liquidity::BalancerV3Stable)
+            .chain(
+                stable_surge
+                    .into_iter()
+                    .map(Liquidity::BalancerV3StableSurge),
+            )
             .chain(weighted.into_iter().map(Liquidity::BalancerV3Weighted))
             .chain(gyro_e.into_iter().map(Liquidity::BalancerV3GyroE))
             .chain(gyro_2clp.into_iter().map(Liquidity::BalancerV3Gyro2CLP))
@@ -305,6 +331,16 @@ impl SettlementHandling<BalancerV3WeightedProductOrder> for SettlementHandler {
 }
 
 impl SettlementHandling<BalancerV3StablePoolOrder> for SettlementHandler {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn encode(&self, execution: AmmOrderExecution, encoder: &mut SettlementEncoder) -> Result<()> {
+        self.inner_encode(execution, encoder)
+    }
+}
+
+impl SettlementHandling<BalancerV3StableSurgePoolOrder> for SettlementHandler {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -509,6 +545,7 @@ mod tests {
                     Ok(FetchedBalancerPools {
                         weighted_pools: weighted_pools.clone(),
                         stable_pools: vec![],
+                        stable_surge_pools: vec![],
                         gyro_2clp_pools: vec![],
                         gyro_e_pools: vec![],
                         reclamm_pools: vec![],
@@ -548,6 +585,7 @@ mod tests {
         };
         let (
             _stable_orders,
+            _stable_surge_orders,
             weighted_orders,
             _gyro_e_orders,
             _gyro_2clp_orders,
@@ -632,6 +670,7 @@ mod tests {
                     Ok(FetchedBalancerPools {
                         weighted_pools: vec![],
                         stable_pools: vec![],
+                        stable_surge_pools: vec![],
                         gyro_2clp_pools: vec![],
                         gyro_e_pools: vec![],
                         reclamm_pools: reclamm_pools.clone(),
@@ -658,6 +697,7 @@ mod tests {
         };
         let (
             _stable_orders,
+            _stable_surge_orders,
             _weighted_orders,
             _gyro_e_orders,
             _gyro_2clp_orders,

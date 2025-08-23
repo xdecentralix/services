@@ -41,6 +41,7 @@ impl Interaction {
                     liquidity::Kind::UniswapV3(pool) => pool.router.into(),
                     liquidity::Kind::BalancerV2Stable(pool) => pool.vault.into(),
                     liquidity::Kind::BalancerV3Stable(pool) => pool.batch_router.into(),
+                    liquidity::Kind::BalancerV3StableSurge(pool) => pool.batch_router.into(),
                     liquidity::Kind::BalancerV2Weighted(pool) => pool.vault.into(),
                     liquidity::Kind::BalancerV3Weighted(pool) => pool.batch_router.into(),
                     liquidity::Kind::BalancerV2GyroE(pool) => pool.vault.into(),
@@ -69,6 +70,7 @@ impl Interaction {
                     | liquidity::Kind::BalancerV3Gyro2CLP(_)
                     | liquidity::Kind::BalancerV3ReClamm(_)
                     | liquidity::Kind::BalancerV3QuantAmm(_)
+                    | liquidity::Kind::BalancerV3StableSurge(_)
                     | liquidity::Kind::Swapr(_)
                     | liquidity::Kind::ZeroEx(_) => vec![
                         eth::Allowance {

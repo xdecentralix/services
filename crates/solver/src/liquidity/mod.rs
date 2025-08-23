@@ -66,6 +66,7 @@ pub enum Liquidity {
     BalancerV3Weighted(BalancerV3WeightedProductOrder),
     BalancerStable(StablePoolOrder),
     BalancerV3Stable(BalancerV3StablePoolOrder),
+    BalancerV3StableSurge(BalancerV3StableSurgePoolOrder),
     BalancerGyroE(GyroEPoolOrder),
     BalancerGyro2CLP(Gyro2CLPPoolOrder),
     BalancerGyro3CLP(Gyro3CLPPoolOrder),
@@ -385,6 +386,22 @@ pub struct BalancerV3StablePoolOrder {
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
 }
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(Derivative))]
+#[cfg_attr(test, derivative(PartialEq))]
+pub struct BalancerV3StableSurgePoolOrder {
+    pub address: H160,
+    pub reserves: BTreeMap<H160, V3StableTokenState>,
+    pub fee: V3Bfp,
+    pub amplification_parameter: V3AmplificationParameter,
+    pub version: V3StablePoolVersion,
+    // StableSurge hook parameters
+    pub surge_threshold_percentage: V3Bfp,
+    pub max_surge_fee_percentage: V3Bfp,
+    #[cfg_attr(test, derivative(PartialEq = "ignore"))]
+    pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
+}
+
 /// Gyroscope E-CLP (Elliptic Constant Liquidity Pool) automated market maker
 /// with elliptic invariant curve and configurable parameters for improved
 /// capital efficiency
@@ -573,6 +590,16 @@ impl std::fmt::Debug for BalancerV3StablePoolOrder {
     }
 }
 
+impl std::fmt::Debug for BalancerV3StableSurgePoolOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Balancer V3 StableSurge Pool AMM {:?}",
+            self.reserves.keys()
+        )
+    }
+}
+
 impl std::fmt::Debug for GyroEPoolOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Gyro E-CLP Pool AMM {:?}", self.reserves.keys())
@@ -641,6 +668,14 @@ impl Settleable for StablePoolOrder {
 }
 
 impl Settleable for BalancerV3StablePoolOrder {
+    type Execution = AmmOrderExecution;
+
+    fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {
+        &*self.settlement_handling
+    }
+}
+
+impl Settleable for BalancerV3StableSurgePoolOrder {
     type Execution = AmmOrderExecution;
 
     fn settlement_handling(&self) -> &dyn SettlementHandling<Self> {

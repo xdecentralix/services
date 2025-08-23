@@ -174,6 +174,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: None,
+            hook: None,
         };
 
         assert_eq!(
@@ -237,6 +238,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: None,
+            hook: None,
         };
 
         assert!(PoolInfo::from_graph_data(&pool, 42).is_err());

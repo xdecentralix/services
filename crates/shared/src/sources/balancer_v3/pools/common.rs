@@ -721,6 +721,12 @@ mod tests {
                         // This is just to handle the exhaustive pattern
                         // matching
                     }
+                    PoolKind::StableSurge(_) => {
+                        // StableSurge pools are not tested in this specific
+                        // test This is just to handle
+                        // the exhaustive pattern
+                        // matching
+                    }
                     PoolKind::Gyro2CLP(_) => {
                         // Gyro2CLP pools are not tested in this specific test
                         // This is just to handle the exhaustive pattern
@@ -1027,6 +1033,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: None,
+            hook: None,
         };
 
         let pool_info = PoolInfo::from_graph_data(&pool, 42).unwrap();
@@ -1075,6 +1082,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: None,
+            hook: None,
         };
 
         let result = PoolInfo::from_graph_data(&pool, 42);
@@ -1123,6 +1131,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: None,
+            hook: None,
         };
 
         let result = PoolInfo::from_graph_data(&pool, 42);

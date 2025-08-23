@@ -188,6 +188,10 @@ fn run() -> Result<()> {
             "BalancerV3StableSurgePoolFactoryV2",
             "balancer/balancer-deployments/6c09a56033f2072cfac8823105df24e08dac812c/v3/tasks/20250404-v3-stable-surge-pool-factory-v2/artifact/StableSurgePoolFactory.json",
         )?
+        .github(
+            "BalancerV3StableSurgeHook",
+            "balancer/balancer-deployments/6c09a56033f2072cfac8823105df24e08dac812c/v3/tasks/20250403-v3-stable-surge-hook-v2/artifact/StableSurgeHook.json",
+        )?
         .manual(
             "BalancerV3QuantAMMWeightedPoolFactory",
             "Manually vendored ABI for Quant AMM Weighted Pool Factory contract",

@@ -181,6 +181,7 @@ mod tests {
             sqrt_alpha: None,
             sqrt_beta: None,
             max_trade_size_ratio: None,
+            hook: None,
         };
 
         assert_eq!(

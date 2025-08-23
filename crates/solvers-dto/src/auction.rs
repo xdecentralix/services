@@ -171,6 +171,7 @@ pub enum Liquidity {
     Gyro3CLP(Gyro3CLPPool),
     ReClamm(ReClammPool),
     QuantAmm(QuantAmmPool),
+    StableSurge(StableSurgePool),
     LimitOrder(ForeignLimitOrder),
     Erc4626(Erc4626Edge),
 }
@@ -248,6 +249,24 @@ pub struct StableReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StableSurgePool {
+    pub id: String,
+    pub address: H160,
+    pub balancer_pool_id: H256,
+    #[serde_as(as = "HexOrDecimalU256")]
+    pub gas_estimate: U256,
+    pub tokens: HashMap<H160, StableReserve>,
+    pub amplification_parameter: BigDecimal,
+    pub fee: BigDecimal,
+    /// Percentage threshold above which surge fees are applied
+    pub surge_threshold_percentage: BigDecimal,
+    /// Maximum additional fee percentage that can be applied
+    pub max_surge_fee_percentage: BigDecimal,
 }
 
 #[serde_as]
