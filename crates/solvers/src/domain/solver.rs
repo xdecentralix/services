@@ -71,7 +71,7 @@ struct Inner {
     native_token_price_estimation_amount: eth::U256,
 
     /// If provided, the solver can rely on Uniswap V3 LPs
-    uni_v3_quoter_v2: Option<contracts::UniswapV3QuoterV2>,
+    uni_v3_quoter_v2: Option<Arc<contracts::UniswapV3QuoterV2>>,
     /// If provided, ERC4626 baseline quoting will be enabled using this Web3.
     /// If not provided but `uni_v3_quoter_v2` is, its Web3 will be reused.
     erc4626_web3: Option<shared::ethrpc::Web3>,
@@ -85,6 +85,7 @@ impl Solver {
                 let web3 = ethrpc::web3(Default::default(), Default::default(), &url, "baseline");
                 contracts::UniswapV3QuoterV2::deployed(&web3)
                     .await
+                    .map(Arc::new)
                     .inspect_err(|err| {
                         tracing::warn!(?err, "Failed to load UniswapV3QuoterV2 contract");
                     })
@@ -169,7 +170,7 @@ impl Inner {
             &self.weth,
             &self.base_tokens,
             &auction.liquidity,
-            self.uni_v3_quoter_v2.as_ref(),
+            self.uni_v3_quoter_v2.clone(),
             self.erc4626_web3.as_ref(),
         );
 
