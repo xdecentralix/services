@@ -39,7 +39,7 @@ pub enum PoolKind {
     Stable(stable::PoolState),
     Gyro2CLP(gyro_2clp::PoolState),
     Gyro3CLP(gyro_3clp::PoolState),
-    GyroE(gyro_e::PoolState),
+    GyroE(Box<gyro_e::PoolState>),
 }
 
 macro_rules! impl_from_state {
@@ -56,7 +56,13 @@ impl_from_state!(weighted::PoolState, Weighted);
 impl_from_state!(stable::PoolState, Stable);
 impl_from_state!(gyro_2clp::PoolState, Gyro2CLP);
 impl_from_state!(gyro_3clp::PoolState, Gyro3CLP);
-impl_from_state!(gyro_e::PoolState, GyroE);
+
+// Manual implementation for GyroE to use Box
+impl From<gyro_e::PoolState> for PoolKind {
+    fn from(state: gyro_e::PoolState) -> Self {
+        Self::GyroE(Box::new(state))
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Balancer pool status.

@@ -1579,6 +1579,50 @@ impl BaselineSolvable for QuantAmmPool {
     }
 }
 
+/// Extract weights and multipliers from packed arrays.
+/// This matches the getFirstFourWeightsAndMultipliers and
+/// getSecondFourWeightsAndMultipliers pattern from balancer-maths.
+fn extract_weights_and_multipliers(
+    first_four: &[I256],
+    second_four: &[I256],
+    num_tokens: usize,
+) -> Option<(Vec<I256>, Vec<I256>)> {
+    let mut weights = Vec::new();
+    let mut multipliers = Vec::new();
+
+    // Process first four tokens (matches balancer-maths
+    // getFirstFourWeightsAndMultipliers)
+    let first_token_count = std::cmp::min(4, num_tokens);
+    for i in 0..first_token_count {
+        if i < first_four.len() / 2 {
+            weights.push(first_four[i]);
+            if i + first_token_count < first_four.len() {
+                multipliers.push(first_four[i + first_token_count]);
+            } else {
+                multipliers.push(I256::zero());
+            }
+        }
+    }
+
+    // Process remaining tokens if any (matches balancer-maths
+    // getSecondFourWeightsAndMultipliers)
+    if num_tokens > 4 {
+        let remaining_count = num_tokens - 4;
+        for i in 0..remaining_count {
+            if i < second_four.len() / 2 {
+                weights.push(second_four[i]);
+                if i + remaining_count < second_four.len() {
+                    multipliers.push(second_four[i + remaining_count]);
+                } else {
+                    multipliers.push(I256::zero());
+                }
+            }
+        }
+    }
+
+    Some((weights, multipliers))
+}
+
 #[cfg(test)]
 mod tests {
     use {super::*, crate::sources::balancer_v3::pool_fetching::CommonPoolState};
@@ -1818,48 +1862,4 @@ mod tests {
         let res_out = pool.get_amount_in(usdc, (amount_out, dai)).await;
         assert_eq!(res_out.unwrap(), amount_in.into());
     }
-}
-
-/// Extract weights and multipliers from packed arrays.
-/// This matches the getFirstFourWeightsAndMultipliers and
-/// getSecondFourWeightsAndMultipliers pattern from balancer-maths.
-fn extract_weights_and_multipliers(
-    first_four: &[I256],
-    second_four: &[I256],
-    num_tokens: usize,
-) -> Option<(Vec<I256>, Vec<I256>)> {
-    let mut weights = Vec::new();
-    let mut multipliers = Vec::new();
-
-    // Process first four tokens (matches balancer-maths
-    // getFirstFourWeightsAndMultipliers)
-    let first_token_count = std::cmp::min(4, num_tokens);
-    for i in 0..first_token_count {
-        if i < first_four.len() / 2 {
-            weights.push(first_four[i]);
-            if i + first_token_count < first_four.len() {
-                multipliers.push(first_four[i + first_token_count]);
-            } else {
-                multipliers.push(I256::zero());
-            }
-        }
-    }
-
-    // Process remaining tokens if any (matches balancer-maths
-    // getSecondFourWeightsAndMultipliers)
-    if num_tokens > 4 {
-        let remaining_count = num_tokens - 4;
-        for i in 0..remaining_count {
-            if i < second_four.len() / 2 {
-                weights.push(second_four[i]);
-                if i + remaining_count < second_four.len() {
-                    multipliers.push(second_four[i + remaining_count]);
-                } else {
-                    multipliers.push(I256::zero());
-                }
-            }
-        }
-    }
-
-    Some((weights, multipliers))
 }

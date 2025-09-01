@@ -153,7 +153,7 @@ impl StableSurgePoolState {
         let surge_multiplier = self.div_down_fixed_bfp(&imbalance_excess, &threshold_complement)?;
         let dynamic_fee_increase = self.mul_down_fixed_bfp(&fee_difference, &surge_multiplier)?;
 
-        Ok(self.swap_fee.add(dynamic_fee_increase)?)
+        self.swap_fee.add(dynamic_fee_increase)
     }
 
     /// Calculate imbalance percentage for a list of balances - EXACTLY from
@@ -277,6 +277,7 @@ mod tests {
 
     /// Helper function to create a stable surge pool with proper scaling - like
     /// create_stable_pool_with
+    #[allow(clippy::too_many_arguments)]
     fn create_stable_surge_pool_with(
         tokens: Vec<H160>,
         raw_balances: Vec<U256>,

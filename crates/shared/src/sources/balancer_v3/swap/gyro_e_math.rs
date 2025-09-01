@@ -830,6 +830,7 @@ pub fn calc_min_aty_a_chix_sq_plus_aty_sq(
 
 /// Solve the quadratic equation for swap calculations
 /// Complete implementation matching Python solve_quadratic_swap
+#[allow(clippy::too_many_arguments)]
 pub fn solve_quadratic_swap(
     lambda: &BigInt,
     x: &BigInt,
@@ -3021,7 +3022,7 @@ mod tests {
                         } else if error_pct < 0.01 {
                             // 0.01% tolerance
                             println!("   Pass: Good - Error < 0.01%");
-                        } else if error_pct >= 0.99 && error_pct <= 1.02 {
+                        } else if (0.99..=1.02).contains(&error_pct) {
                             // Expected ~1% difference due to swap fees
                             println!(
                                 "   Pass: EXPECTED - ~{:.3}% difference due to 1% swap fees in \
@@ -3084,7 +3085,7 @@ mod tests {
                         } else if error_pct < 0.01 {
                             // 0.01% tolerance
                             println!("   Pass: Good - Error < 0.01%");
-                        } else if error_pct >= 0.99 && error_pct <= 1.02 {
+                        } else if (0.99..=1.02).contains(&error_pct) {
                             // Expected ~1% difference due to swap fees
                             println!(
                                 "   Pass: EXPECTED - ~{:.3}% difference due to 1% swap fees in \

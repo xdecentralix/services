@@ -605,7 +605,7 @@ impl BalancerPoolFetching for BalancerPoolFetcher {
                         .push(Gyro3CLPPool::new_unpaused(pool.id, state)),
                     PoolKind::GyroE(state) => fetched_pools
                         .gyro_e_pools
-                        .push(GyroEPool::new_unpaused(pool.id, state)),
+                        .push(GyroEPool::new_unpaused(pool.id, *state)),
                 }
                 fetched_pools
             },

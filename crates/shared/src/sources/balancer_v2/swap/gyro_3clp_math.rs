@@ -164,7 +164,7 @@ pub fn calculate_cubic_starting_point(cubic_terms: &CubicTerms) -> Result<(BigIn
     };
 
     let l0 = mul_up_fixed(&lplus, &factor);
-    let l_lower = mul_up_fixed(&lplus, &*L_VS_LPLUS_MIN);
+    let l_lower = mul_up_fixed(&lplus, &L_VS_LPLUS_MIN);
 
     Ok((l_lower, l0))
 }
@@ -197,7 +197,7 @@ pub fn run_newton_iteration(
         }
 
         if iteration >= INVARIANT_MIN_ITERATIONS
-            && &delta_abs >= &(&delta_abs_prev / INVARIANT_SHRINKING_FACTOR_PER_STEP)
+            && delta_abs >= (&delta_abs_prev / INVARIANT_SHRINKING_FACTOR_PER_STEP)
         {
             return Ok(root_est);
         }
@@ -207,7 +207,7 @@ pub fn run_newton_iteration(
         if delta_is_pos {
             root_est = &root_est + &delta_abs;
         } else {
-            if &root_est < &delta_abs {
+            if root_est < delta_abs {
                 return Err(Error::StableInvariantDidntConverge);
             }
             let new_root_est = &root_est - &delta_abs;

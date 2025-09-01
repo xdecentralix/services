@@ -179,7 +179,6 @@ fn pool_state(
         let tokens = common
             .tokens
             .into_iter()
-            .map(|(address, common_state)| (address, common_state))
             .collect();
 
         Ok(Some(PoolState {

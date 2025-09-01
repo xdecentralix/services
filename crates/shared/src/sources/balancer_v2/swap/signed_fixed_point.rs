@@ -177,8 +177,8 @@ impl SBfp {
         precision: FixedPointPrecision,
     ) -> Result<Self, anyhow::Error> {
         // Handle negative sign
-        let (is_negative, s) = if s.starts_with('-') {
-            (true, &s[1..])
+        let (is_negative, s) = if let Some(stripped) = s.strip_prefix('-') {
+            (true, stripped)
         } else {
             (false, s)
         };
