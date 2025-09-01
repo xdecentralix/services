@@ -1,6 +1,7 @@
 #![allow(clippy::let_unit_value)]
 
 pub use ethcontract;
+pub mod alloy;
 pub mod errors;
 use {
     anyhow::{Result, anyhow, bail},
@@ -126,7 +127,6 @@ include_contracts! {
     IZeroEx;
     PancakeRouter;
     Permit2;
-    ChainalysisOracle;
     SushiSwapRouter;
     SwaprRouter;
     TestnetUniswapV2Router02;
