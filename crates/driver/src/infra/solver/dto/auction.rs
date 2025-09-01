@@ -356,46 +356,48 @@ pub fn new(
                         )
                     }
                     liquidity::Kind::BalancerV2GyroE(pool) => {
-                        solvers_dto::auction::Liquidity::GyroE(solvers_dto::auction::GyroEPool {
-                            id: liquidity.id.0.to_string(),
-                            address: pool.id.address().into(),
-                            balancer_pool_id: pool.id.into(),
-                            gas_estimate: liquidity.gas.into(),
-                            tokens: pool
-                                .reserves
-                                .iter()
-                                .map(|r| {
-                                    (
-                                        r.asset.token.into(),
-                                        solvers_dto::auction::GyroEReserve {
-                                            balance: r.asset.amount.into(),
-                                            scaling_factor: scaling_factor_to_decimal(r.scale),
-                                        },
-                                    )
-                                })
-                                .collect(),
-                            fee: fee_to_decimal(pool.fee),
-                            version: match pool.version {
-                                liquidity::balancer::v2::gyro_e::Version::V1 => {
-                                    solvers_dto::auction::GyroEVersion::V1
-                                }
+                        solvers_dto::auction::Liquidity::GyroE(Box::new(
+                            solvers_dto::auction::GyroEPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.id.address().into(),
+                                balancer_pool_id: pool.id.into(),
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.asset.token.into(),
+                                            solvers_dto::auction::GyroEReserve {
+                                                balance: r.asset.amount.into(),
+                                                scaling_factor: scaling_factor_to_decimal(r.scale),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: fee_to_decimal(pool.fee),
+                                version: match pool.version {
+                                    liquidity::balancer::v2::gyro_e::Version::V1 => {
+                                        solvers_dto::auction::GyroEVersion::V1
+                                    }
+                                },
+                                // Convert all Gyro E-CLP static parameters to BigDecimal
+                                params_alpha: signed_fixed_point_to_decimal(pool.params_alpha),
+                                params_beta: signed_fixed_point_to_decimal(pool.params_beta),
+                                params_c: signed_fixed_point_to_decimal(pool.params_c),
+                                params_s: signed_fixed_point_to_decimal(pool.params_s),
+                                params_lambda: signed_fixed_point_to_decimal(pool.params_lambda),
+                                tau_alpha_x: signed_fixed_point_to_decimal(pool.tau_alpha_x),
+                                tau_alpha_y: signed_fixed_point_to_decimal(pool.tau_alpha_y),
+                                tau_beta_x: signed_fixed_point_to_decimal(pool.tau_beta_x),
+                                tau_beta_y: signed_fixed_point_to_decimal(pool.tau_beta_y),
+                                u: signed_fixed_point_to_decimal(pool.u),
+                                v: signed_fixed_point_to_decimal(pool.v),
+                                w: signed_fixed_point_to_decimal(pool.w),
+                                z: signed_fixed_point_to_decimal(pool.z),
+                                d_sq: signed_fixed_point_to_decimal(pool.d_sq),
                             },
-                            // Convert all Gyro E-CLP static parameters to BigDecimal
-                            params_alpha: signed_fixed_point_to_decimal(pool.params_alpha),
-                            params_beta: signed_fixed_point_to_decimal(pool.params_beta),
-                            params_c: signed_fixed_point_to_decimal(pool.params_c),
-                            params_s: signed_fixed_point_to_decimal(pool.params_s),
-                            params_lambda: signed_fixed_point_to_decimal(pool.params_lambda),
-                            tau_alpha_x: signed_fixed_point_to_decimal(pool.tau_alpha_x),
-                            tau_alpha_y: signed_fixed_point_to_decimal(pool.tau_alpha_y),
-                            tau_beta_x: signed_fixed_point_to_decimal(pool.tau_beta_x),
-                            tau_beta_y: signed_fixed_point_to_decimal(pool.tau_beta_y),
-                            u: signed_fixed_point_to_decimal(pool.u),
-                            v: signed_fixed_point_to_decimal(pool.v),
-                            w: signed_fixed_point_to_decimal(pool.w),
-                            z: signed_fixed_point_to_decimal(pool.z),
-                            d_sq: signed_fixed_point_to_decimal(pool.d_sq),
-                        })
+                        ))
                     }
                     liquidity::Kind::BalancerV2Gyro2CLP(pool) => {
                         solvers_dto::auction::Liquidity::Gyro2CLP(
@@ -463,49 +465,53 @@ pub fn new(
                         )
                     }
                     liquidity::Kind::BalancerV3GyroE(pool) => {
-                        solvers_dto::auction::Liquidity::GyroE(solvers_dto::auction::GyroEPool {
-                            id: liquidity.id.0.to_string(),
-                            address: pool.id.address().into(),
-                            balancer_pool_id: {
-                                let pool_id_h160: eth::H160 = pool.id.into();
-                                pool_id_h160.into()
+                        solvers_dto::auction::Liquidity::GyroE(Box::new(
+                            solvers_dto::auction::GyroEPool {
+                                id: liquidity.id.0.to_string(),
+                                address: pool.id.address().into(),
+                                balancer_pool_id: {
+                                    let pool_id_h160: eth::H160 = pool.id.into();
+                                    pool_id_h160.into()
+                                },
+                                gas_estimate: liquidity.gas.into(),
+                                tokens: pool
+                                    .reserves
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.asset.token.into(),
+                                            solvers_dto::auction::GyroEReserve {
+                                                balance: r.asset.amount.into(),
+                                                scaling_factor: scaling_factor_to_decimal_v3(
+                                                    r.scale,
+                                                ),
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                                fee: fee_to_decimal_v3(pool.fee),
+                                version: match pool.version {
+                                    liquidity::balancer::v3::gyro_e::Version::V1 => {
+                                        solvers_dto::auction::GyroEVersion::V1
+                                    }
+                                },
+                                // Convert all Gyro E-CLP static parameters to BigDecimal
+                                params_alpha: signed_fixed_point_to_decimal_v3(pool.params_alpha),
+                                params_beta: signed_fixed_point_to_decimal_v3(pool.params_beta),
+                                params_c: signed_fixed_point_to_decimal_v3(pool.params_c),
+                                params_s: signed_fixed_point_to_decimal_v3(pool.params_s),
+                                params_lambda: signed_fixed_point_to_decimal_v3(pool.params_lambda),
+                                tau_alpha_x: signed_fixed_point_to_decimal_v3(pool.tau_alpha_x),
+                                tau_alpha_y: signed_fixed_point_to_decimal_v3(pool.tau_alpha_y),
+                                tau_beta_x: signed_fixed_point_to_decimal_v3(pool.tau_beta_x),
+                                tau_beta_y: signed_fixed_point_to_decimal_v3(pool.tau_beta_y),
+                                u: signed_fixed_point_to_decimal_v3(pool.u),
+                                v: signed_fixed_point_to_decimal_v3(pool.v),
+                                w: signed_fixed_point_to_decimal_v3(pool.w),
+                                z: signed_fixed_point_to_decimal_v3(pool.z),
+                                d_sq: signed_fixed_point_to_decimal_v3(pool.d_sq),
                             },
-                            gas_estimate: liquidity.gas.into(),
-                            tokens: pool
-                                .reserves
-                                .iter()
-                                .map(|r| {
-                                    (
-                                        r.asset.token.into(),
-                                        solvers_dto::auction::GyroEReserve {
-                                            balance: r.asset.amount.into(),
-                                            scaling_factor: scaling_factor_to_decimal_v3(r.scale),
-                                        },
-                                    )
-                                })
-                                .collect(),
-                            fee: fee_to_decimal_v3(pool.fee),
-                            version: match pool.version {
-                                liquidity::balancer::v3::gyro_e::Version::V1 => {
-                                    solvers_dto::auction::GyroEVersion::V1
-                                }
-                            },
-                            // Convert all Gyro E-CLP static parameters to BigDecimal
-                            params_alpha: signed_fixed_point_to_decimal_v3(pool.params_alpha),
-                            params_beta: signed_fixed_point_to_decimal_v3(pool.params_beta),
-                            params_c: signed_fixed_point_to_decimal_v3(pool.params_c),
-                            params_s: signed_fixed_point_to_decimal_v3(pool.params_s),
-                            params_lambda: signed_fixed_point_to_decimal_v3(pool.params_lambda),
-                            tau_alpha_x: signed_fixed_point_to_decimal_v3(pool.tau_alpha_x),
-                            tau_alpha_y: signed_fixed_point_to_decimal_v3(pool.tau_alpha_y),
-                            tau_beta_x: signed_fixed_point_to_decimal_v3(pool.tau_beta_x),
-                            tau_beta_y: signed_fixed_point_to_decimal_v3(pool.tau_beta_y),
-                            u: signed_fixed_point_to_decimal_v3(pool.u),
-                            v: signed_fixed_point_to_decimal_v3(pool.v),
-                            w: signed_fixed_point_to_decimal_v3(pool.w),
-                            z: signed_fixed_point_to_decimal_v3(pool.z),
-                            d_sq: signed_fixed_point_to_decimal_v3(pool.d_sq),
-                        })
+                        ))
                     }
                     liquidity::Kind::BalancerV3Gyro2CLP(pool) => {
                         solvers_dto::auction::Liquidity::Gyro2CLP(

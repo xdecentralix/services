@@ -86,11 +86,7 @@ fn pool_state(
 ) -> BoxFuture<'static, Result<Option<PoolState>>> {
     async move {
         let common = common.await;
-        let tokens = common
-            .tokens
-            .into_iter()
-            .map(|(address, common_state)| (address, common_state))
-            .collect();
+        let tokens = common.tokens.into_iter().collect();
 
         Ok(Some(PoolState {
             tokens,

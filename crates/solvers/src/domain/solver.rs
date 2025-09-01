@@ -81,8 +81,8 @@ impl Solver {
     /// Creates a new baseline solver for the specified configuration.
     pub async fn new(config: Config) -> Self {
         let uni_v3_quoter_v2 = match config.uni_v3_node_url {
-            Some(url) => {
-                let web3 = ethrpc::web3(Default::default(), Default::default(), &url, "baseline");
+            Some(ref url) => {
+                let web3 = ethrpc::web3(Default::default(), Default::default(), url, "baseline");
                 contracts::UniswapV3QuoterV2::deployed(&web3)
                     .await
                     .map(Arc::new)
@@ -96,14 +96,19 @@ impl Solver {
 
         // Configure ERC4626 Web3 from dedicated URL if present; else reuse Uniswap V3
         // Web3 if present
-        let erc4626_web3 = match (config.erc4626_node_url, &uni_v3_quoter_v2) {
+        let erc4626_web3 = match (config.erc4626_node_url, &config.uni_v3_node_url) {
             (Some(url), _) => Some(ethrpc::web3(
                 Default::default(),
                 Default::default(),
                 &url,
                 "erc4626",
             )),
-            (None, Some(quoter)) => Some(quoter.raw_instance().web3()),
+            (None, Some(url)) => Some(ethrpc::web3(
+                Default::default(),
+                Default::default(),
+                url,
+                "erc4626",
+            )),
             (None, None) => None,
         };
 

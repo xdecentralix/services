@@ -176,7 +176,7 @@ fn compute_virtual_balances_updating_price_ratio(
         current_fourth_root_price_ratio.mul_down(current_fourth_root_price_ratio)?;
 
     // Determine which token is undervalued (rarer)
-    let (balance_undervalued, balance_overvalued, last_undervalued, last_overvalued) =
+    let (balance_undervalued, _balance_overvalued, last_undervalued, last_overvalued) =
         if is_pool_above_center {
             (
                 balances_scaled18[0],
@@ -244,17 +244,14 @@ fn compute_virtual_balances_updating_price_range(
         virtual_balance_b,
     )?)?;
 
-    let (mut v_undervalued, mut v_overvalued, b_undervalued, b_overvalued) = if is_pool_above_center
-    {
+    let (mut v_overvalued, b_undervalued, b_overvalued) = if is_pool_above_center {
         (
-            virtual_balance_a,
             virtual_balance_b,
             balances_scaled18[0],
             balances_scaled18[1],
         )
     } else {
         (
-            virtual_balance_b,
             virtual_balance_a,
             balances_scaled18[1],
             balances_scaled18[0],
@@ -277,7 +274,7 @@ fn compute_virtual_balances_updating_price_range(
         .sub(Bfp::one())?
         .mul_down(v_overvalued)?
         .sub(b_overvalued)?;
-    v_undervalued = Bfp::from_wei(
+    let v_undervalued = Bfp::from_wei(
         big_int_to_u256(&(va_num36 / u256_to_big_int(&va_den.as_uint256())))
             .map_err(|_| Error::MulOverflow)?,
     );
@@ -304,12 +301,7 @@ fn compute_price_range(
     virtual_balance_a: Bfp,
     virtual_balance_b: Bfp,
 ) -> Result<(Bfp, Bfp), Error> {
-    let invariant = compute_invariant(
-        balances_scaled18,
-        virtual_balance_a,
-        virtual_balance_b,
-        Rounding::Down,
-    )?;
+    let invariant = compute_invariant(balances_scaled18, virtual_balance_a, virtual_balance_b)?;
     // minPrice = Vb^2 / invariant (single-step integer division to match TS/Py)
     let vb_big: BigInt = u256_to_big_int(&virtual_balance_b.as_uint256());
     let inv_big: BigInt = u256_to_big_int(&invariant);
@@ -373,24 +365,14 @@ fn compute_centeredness(
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-enum Rounding {
-    Down,
-    Up,
-}
-
 fn compute_invariant(
     balances_scaled18: &[Bfp; 2],
     virtual_balance_a: Bfp,
     virtual_balance_b: Bfp,
-    rounding: Rounding,
 ) -> Result<U256, Error> {
     let a = balances_scaled18[0].add(virtual_balance_a)?;
     let b = balances_scaled18[1].add(virtual_balance_b)?;
-    let prod = match rounding {
-        Rounding::Down => a.mul_down(b)?,
-        Rounding::Up => a.mul_up(b)?,
-    };
+    let prod = a.mul_down(b)?;
     Ok(prod.as_uint256())
 }
 

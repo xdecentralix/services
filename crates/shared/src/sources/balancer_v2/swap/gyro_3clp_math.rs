@@ -19,10 +19,6 @@ static WAD: LazyLock<BigInt> = LazyLock::new(|| BigInt::from(1_000_000_000_000_0
 // Official constants from Gyro3CLPMath.sol
 static MAX_BALANCES: LazyLock<BigInt> =
     LazyLock::new(|| BigInt::from(1_000_000_000_000_000_000_000_000_000_000_u128)); // 1e29
-static MIN_ROOT_3_ALPHA: LazyLock<BigInt> =
-    LazyLock::new(|| BigInt::from(158_740_105_196_819_970_u64)); // 0.15874010519681997e18
-static MAX_ROOT_3_ALPHA: LazyLock<BigInt> =
-    LazyLock::new(|| BigInt::from(999_966_665_555_493_800_u64)); // 0.9999666655554938e18
 static L_THRESHOLD_SIMPLE_NUMERICS: LazyLock<BigInt> =
     LazyLock::new(|| BigInt::from(20_000_000_000_000_000_000_000_000_000_000_u128)); // 2e31
 static L_MAX: LazyLock<BigInt> =

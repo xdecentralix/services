@@ -166,7 +166,7 @@ pub enum Liquidity {
     WeightedProduct(WeightedProductPool),
     Stable(StablePool),
     ConcentratedLiquidity(ConcentratedLiquidityPool),
-    GyroE(GyroEPool),
+    GyroE(Box<GyroEPool>),
     Gyro2CLP(Gyro2CLPPool),
     Gyro3CLP(Gyro3CLPPool),
     ReClamm(ReClammPool),

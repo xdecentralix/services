@@ -1,6 +1,6 @@
 use {
     crate::{
-        boundary::{self, Result},
+        boundary::Result,
         domain::{eth, liquidity},
         infra::blockchain::Ethereum,
     },
@@ -40,7 +40,7 @@ pub async fn maybe_collector(eth: &Ethereum) -> AnyResult<Vec<Box<dyn LiquidityC
     let config_dir = chain_to_config_dir(&chain);
     let primary_path = format!("configs/{}/erc4626.toml", config_dir);
     let fallback_path = format!("../{}", primary_path);
-    let web3 = boundary::web3(eth);
+    let web3 = eth.web3().clone();
     let settlement = eth.contracts().settlement().clone();
     let registry: Erc4626Registry = match shared::sources::erc4626::registry::registry_from_file(
         std::path::Path::new(&primary_path),
