@@ -169,14 +169,14 @@ mod tests {
     #[tokio::test]
     async fn collecting_results_filters_paused_pools_and_contract_errors() {
         let results = vec![
-            Ok(PoolStatus::Active(Pool {
+            Ok(PoolStatus::Active(Box::new(Pool {
                 id: Default::default(),
                 kind: PoolKind::Weighted(weighted::PoolState {
                     tokens: Default::default(),
                     swap_fee: Bfp::zero(),
                     version: Default::default(),
                 }),
-            })),
+            }))),
             Ok(PoolStatus::Paused),
             Err(testing_contract_error().into()),
         ];

@@ -606,6 +606,60 @@ mod uniswap_v3 {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct ManualBalancerV2Config {
+    /// Addresses of Balancer V2 compatible vault contract.
+    vault: eth::H160,
+
+    /// The weighted pool factory contract addresses.
+    #[serde(default)]
+    weighted: Vec<eth::H160>,
+
+    /// The weighted pool factory v3+ contract addresses.
+    #[serde(default)]
+    weighted_v3plus: Vec<eth::H160>,
+
+    /// The stable pool factory contract addresses.
+    #[serde(default)]
+    stable: Vec<eth::H160>,
+
+    /// The liquidity bootstrapping pool factory contract addresses.
+    ///
+    /// These are weighted pools with dynamic weights for initial token
+    /// offerings.
+    #[serde(default)]
+    liquidity_bootstrapping: Vec<eth::H160>,
+
+    /// The composable stable pool factory contract addresses.
+    #[serde(default)]
+    composable_stable: Vec<eth::H160>,
+
+    /// The GyroE pool factory contract addresses.
+    #[serde(default)]
+    gyro_e: Vec<eth::H160>,
+
+    /// The Gyro 2-CLP pool factory contract addresses.
+    #[serde(default)]
+    gyro_2clp: Vec<eth::H160>,
+
+    /// The Gyro 3-CLP pool factory contract addresses.
+    #[serde(default)]
+    gyro_3clp: Vec<eth::H160>,
+
+    /// Deny listed Balancer V2 pools.
+    #[serde(default)]
+    pool_deny_list: Vec<eth::H256>,
+
+    /// The URL used to connect to balancer v2 subgraph client.
+    graph_url: Url,
+
+    /// How often the liquidity source should be reinitialized to get
+    /// access to new pools.
+    #[serde(with = "humantime_serde", default = "default_reinit_interval")]
+    reinit_interval: Option<Duration>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 #[serde(untagged, deny_unknown_fields)]
 enum BalancerV2Config {
     #[serde(rename_all = "kebab-case")]
@@ -626,63 +680,74 @@ enum BalancerV2Config {
     },
 
     #[serde(rename_all = "kebab-case")]
-    Manual {
-        /// Addresses of Balancer V2 compatible vault contract.
-        vault: eth::H160,
-
-        /// The weighted pool factory contract addresses.
-        #[serde(default)]
-        weighted: Vec<eth::H160>,
-
-        /// The weighted pool factory v3+ contract addresses.
-        #[serde(default)]
-        weighted_v3plus: Vec<eth::H160>,
-
-        /// The stable pool factory contract addresses.
-        #[serde(default)]
-        stable: Vec<eth::H160>,
-
-        /// The liquidity bootstrapping pool factory contract addresses.
-        ///
-        /// These are weighted pools with dynamic weights for initial token
-        /// offerings.
-        #[serde(default)]
-        liquidity_bootstrapping: Vec<eth::H160>,
-
-        /// The composable stable pool factory contract addresses.
-        #[serde(default)]
-        composable_stable: Vec<eth::H160>,
-
-        /// The GyroE pool factory contract addresses.
-        #[serde(default)]
-        gyro_e: Vec<eth::H160>,
-
-        /// The Gyro 2-CLP pool factory contract addresses.
-        #[serde(default)]
-        gyro_2clp: Vec<eth::H160>,
-
-        /// The Gyro 3-CLP pool factory contract addresses.
-        #[serde(default)]
-        gyro_3clp: Vec<eth::H160>,
-
-        /// Deny listed Balancer V2 pools.
-        #[serde(default)]
-        pool_deny_list: Vec<eth::H256>,
-
-        /// The URL used to connect to balancer v2 subgraph client.
-        graph_url: Url,
-
-        /// How often the liquidity source should be reinitialized to get
-        /// access to new pools.
-        #[serde(with = "humantime_serde", default = "default_reinit_interval")]
-        reinit_interval: Option<Duration>,
-    },
+    Manual(Box<ManualBalancerV2Config>),
 }
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 enum BalancerV2Preset {
     BalancerV2,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct ManualBalancerV3Config {
+    /// Addresses of Balancer V3 compatible vault contract.
+    vault: eth::H160,
+
+    /// Addresses of Balancer V3 compatible batch router contract.
+    batch_router: eth::H160,
+
+    /// The weighted pool factory contract addresses.
+    #[serde(default)]
+    weighted: Vec<eth::H160>,
+
+    /// The stable pool factory contract addresses.
+    #[serde(default)]
+    stable: Vec<eth::H160>,
+
+    /// The stable pool factory v2 contract addresses.
+    #[serde(default)]
+    stable_v2: Vec<eth::H160>,
+
+    /// The StableSurge pool factory contract addresses.
+    #[serde(default)]
+    stable_surge: Vec<eth::H160>,
+
+    /// The StableSurge pool factory v2 contract addresses.
+    #[serde(default)]
+    stable_surge_v2: Vec<eth::H160>,
+
+    /// The GyroE pool factory contract addresses.
+    #[serde(default)]
+    gyro_e: Vec<eth::H160>,
+
+    /// The Gyro2CLP pool factory contract addresses (only supported on
+    /// Balancer V3).
+    #[serde(default)]
+    gyro_2clp: Vec<eth::H160>,
+
+    /// The ReClamm pool factory contract addresses (only supported on
+    /// Balancer V3).
+    #[serde(default)]
+    reclamm: Vec<eth::H160>,
+
+    /// The QuantAMM pool factory contract addresses (only supported on
+    /// Balancer V3).
+    #[serde(default)]
+    quantamm: Vec<eth::H160>,
+
+    /// Deny listed Balancer V3 pools.
+    #[serde(default)]
+    pool_deny_list: Vec<eth::H160>,
+
+    /// The URL used to connect to balancer v3 subgraph client.
+    graph_url: Url,
+
+    /// How often the liquidity source should be reinitialized to get
+    /// access to new pools.
+    #[serde(with = "humantime_serde", default = "default_reinit_interval")]
+    reinit_interval: Option<Duration>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -705,65 +770,7 @@ enum BalancerV3Config {
         reinit_interval: Option<Duration>,
     },
 
-    #[serde(rename_all = "kebab-case")]
-    Manual {
-        /// Addresses of Balancer V3 compatible vault contract.
-        vault: eth::H160,
-
-        /// Addresses of Balancer V3 compatible batch router contract.
-        batch_router: eth::H160,
-
-        /// The weighted pool factory contract addresses.
-        #[serde(default)]
-        weighted: Vec<eth::H160>,
-
-        /// The stable pool factory contract addresses.
-        #[serde(default)]
-        stable: Vec<eth::H160>,
-
-        /// The stable pool factory v2 contract addresses.
-        #[serde(default)]
-        stable_v2: Vec<eth::H160>,
-
-        /// The StableSurge pool factory contract addresses.
-        #[serde(default)]
-        stable_surge: Vec<eth::H160>,
-
-        /// The StableSurge pool factory v2 contract addresses.
-        #[serde(default)]
-        stable_surge_v2: Vec<eth::H160>,
-
-        /// The GyroE pool factory contract addresses.
-        #[serde(default)]
-        gyro_e: Vec<eth::H160>,
-
-        /// The Gyro2CLP pool factory contract addresses (only supported on
-        /// Balancer V3).
-        #[serde(default)]
-        gyro_2clp: Vec<eth::H160>,
-
-        /// The ReClamm pool factory contract addresses (only supported on
-        /// Balancer V3).
-        #[serde(default)]
-        reclamm: Vec<eth::H160>,
-
-        /// The QuantAMM pool factory contract addresses (only supported on
-        /// Balancer V3).
-        #[serde(default)]
-        quantamm: Vec<eth::H160>,
-
-        /// Deny listed Balancer V3 pools.
-        #[serde(default)]
-        pool_deny_list: Vec<eth::H160>,
-
-        /// The URL used to connect to balancer v3 subgraph client.
-        graph_url: Url,
-
-        /// How often the liquidity source should be reinitialized to get
-        /// access to new pools.
-        #[serde(with = "humantime_serde", default = "default_reinit_interval")]
-        reinit_interval: Option<Duration>,
-    },
+    Manual(Box<ManualBalancerV3Config>),
 }
 
 #[derive(Clone, Debug, Deserialize)]

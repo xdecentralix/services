@@ -258,6 +258,7 @@ fn to_boundary_liquidity(
                         })
                 }
                 liquidity::State::GyroE(pool) => {
+                    let pool = pool.as_ref();
                     if let Some(boundary_pool) =
                         boundary::liquidity::gyro_e::to_boundary_pool(liquidity.address, pool)
                     {
@@ -267,7 +268,7 @@ fn to_boundary_liquidity(
                                 OnchainLiquidity {
                                     id: liquidity.id.clone(),
                                     token_pair,
-                                    source: LiquiditySource::GyroE(boundary_pool.clone()),
+                                    source: LiquiditySource::GyroE(Box::new(boundary_pool.clone())),
                                 },
                             );
                         }
@@ -386,7 +387,7 @@ enum LiquiditySource {
     ConstantProduct(boundary::liquidity::constant_product::Pool),
     WeightedProduct(boundary::liquidity::weighted_product::Pool),
     Stable(boundary::liquidity::stable::Pool),
-    GyroE(boundary::liquidity::gyro_e::Pool),
+    GyroE(Box<boundary::liquidity::gyro_e::Pool>),
     Gyro2CLP(boundary::liquidity::gyro_2clp::Pool),
     Gyro3CLP(boundary::liquidity::gyro_3clp::Pool),
     ReClamm(boundary::liquidity::reclamm::Pool),

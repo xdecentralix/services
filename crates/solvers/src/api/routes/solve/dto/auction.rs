@@ -310,7 +310,7 @@ mod gyro_e_pool {
             id: liquidity::Id(pool.id.clone()),
             address: pool.address,
             gas: eth::Gas(pool.gas_estimate),
-            state: liquidity::State::GyroE(liquidity::gyro_e::Pool {
+            state: liquidity::State::GyroE(Box::new(liquidity::gyro_e::Pool {
                 reserves,
                 fee: conv::decimal_to_rational(&pool.fee).ok_or("invalid GyroE pool fee")?,
                 version: match pool.version {
@@ -341,7 +341,7 @@ mod gyro_e_pool {
                 w: conv::decimal_to_signed_rational(&pool.w).ok_or("invalid w")?,
                 z: conv::decimal_to_signed_rational(&pool.z).ok_or("invalid z")?,
                 d_sq: conv::decimal_to_signed_rational(&pool.d_sq).ok_or("invalid d_sq")?,
-            }),
+            })),
         })
     }
 }
@@ -401,7 +401,7 @@ mod gyro_3clp_pool {
                 Ok(liquidity::gyro_3clp::Reserve {
                     asset: eth::Asset {
                         token: (*address).into(),
-                        amount: token.balance.into(),
+                        amount: token.balance,
                     },
                     scale: liquidity::ScalingFactor::new(
                         conv::decimal_to_rational(&token.scaling_factor)

@@ -50,14 +50,14 @@ impl FixedPointPrecision {
     /// parameters
     pub fn for_gyro_eclp_param(param_name: &str) -> Self {
         match param_name {
-            // High-precision parameters that use 38-decimal scaling
             "tauAlphaX" | "tauAlphaY" | "tauBetaX" | "tauBetaY" | "u" | "v" | "w" | "z" | "dSq" => {
                 Self::Extended38
             }
-
-            // Standard parameters that use 18-decimal scaling
-            "paramsAlpha" | "paramsBeta" | "paramsC" | "paramsS" | "paramsLambda" | _ => {
+            "paramsAlpha" | "paramsBeta" | "paramsC" | "paramsS" | "paramsLambda" => {
                 Self::Standard18
+            }
+            _ => {
+                Self::Standard18 // Default for unknown parameters
             }
         }
     }
@@ -134,12 +134,14 @@ impl SBfp {
     }
 
     /// Perform signed addition using SignedFixedPoint
+    #[allow(clippy::should_implement_trait)]
     pub fn add(self, other: Self) -> Result<Self, Error> {
         let result = SignedFixedPoint::add(&self.to_big_int(), &other.to_big_int())?;
         Self::from_big_int(&result)
     }
 
     /// Perform signed subtraction using SignedFixedPoint
+    #[allow(clippy::should_implement_trait)]
     pub fn sub(self, other: Self) -> Result<Self, Error> {
         let result = SignedFixedPoint::sub(&self.to_big_int(), &other.to_big_int())?;
         Self::from_big_int(&result)

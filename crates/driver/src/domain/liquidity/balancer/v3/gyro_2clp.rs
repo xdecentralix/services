@@ -85,12 +85,12 @@ impl Reserves {
     }
 
     /// Returns an iterator over the token reserves.
-    pub fn iter(&self) -> impl Iterator<Item = &Reserve> + ExactSizeIterator + Clone + '_ {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &Reserve> + Clone + '_ {
         self.0.iter()
     }
 
     /// Returns an iterator over the token reserves by value.
-    pub fn iter_copied(&self) -> impl Iterator<Item = Reserve> + ExactSizeIterator + Clone + '_ {
+    pub fn iter_copied(&self) -> impl ExactSizeIterator<Item = Reserve> + Clone + '_ {
         self.0.iter().copied()
     }
 

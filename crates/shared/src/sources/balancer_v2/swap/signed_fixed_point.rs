@@ -135,12 +135,14 @@ impl SBfp {
     }
 
     /// Perform signed addition using SignedFixedPoint
+    #[allow(clippy::should_implement_trait)]
     pub fn add(self, other: Self) -> Result<Self, Error> {
         let result = SignedFixedPoint::add(&self.to_big_int(), &other.to_big_int())?;
         Self::from_big_int(&result)
     }
 
     /// Perform signed subtraction using SignedFixedPoint
+    #[allow(clippy::should_implement_trait)]
     pub fn sub(self, other: Self) -> Result<Self, Error> {
         let result = SignedFixedPoint::sub(&self.to_big_int(), &other.to_big_int())?;
         Self::from_big_int(&result)

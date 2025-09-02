@@ -277,52 +277,63 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         }
                         .expect("no Balancer V2 preset for current network")
                     },
-                    file::BalancerV2Config::Manual {
-                        vault,
-                        weighted,
-                        weighted_v3plus,
-                        stable,
-                        liquidity_bootstrapping,
-                        composable_stable,
-                        gyro_e,
-                        gyro_2clp,
-                        gyro_3clp,
-                        pool_deny_list,
-                        graph_url,
-                        reinit_interval,
-                        ..
-                    } => liquidity::config::BalancerV2 {
-                        vault: vault.into(),
-                        weighted: weighted
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        weighted_v3plus: weighted_v3plus
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        stable: stable.into_iter().map(eth::ContractAddress::from).collect(),
-                        liquidity_bootstrapping: liquidity_bootstrapping
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        composable_stable: composable_stable
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        gyro_e: gyro_e.into_iter().map(eth::ContractAddress::from).collect(),
-                        gyro_2clp: gyro_2clp
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        gyro_3clp: gyro_3clp
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        pool_deny_list: pool_deny_list.clone(),
-                        graph_url,
-                        reinit_interval,
-                    },
+                    file::BalancerV2Config::Manual(manual_config) => {
+                        let manual_config = manual_config.as_ref();
+                        liquidity::config::BalancerV2 {
+                            vault: manual_config.vault.into(),
+                            weighted: manual_config
+                                .weighted
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            weighted_v3plus: manual_config
+                                .weighted_v3plus
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            stable: manual_config
+                                .stable
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            liquidity_bootstrapping: manual_config
+                                .liquidity_bootstrapping
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            composable_stable: manual_config
+                                .composable_stable
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            gyro_e: manual_config
+                                .gyro_e
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            gyro_2clp: manual_config
+                                .gyro_2clp
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            gyro_3clp: manual_config
+                                .gyro_3clp
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            pool_deny_list: manual_config.pool_deny_list.clone(),
+                            graph_url: manual_config.graph_url.clone(),
+                            reinit_interval: manual_config.reinit_interval,
+                        }
+                    }
                 })
                 .collect(),
             balancer_v3: config
@@ -347,59 +358,77 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         }
                         .expect("no Balancer V3 preset for current network")
                     },
-                    file::BalancerV3Config::Manual {
-                        vault,
-                        batch_router,
-                        weighted,
-                        stable,
-                        stable_v2,
-                        stable_surge,
-                        stable_surge_v2,
-                        gyro_e,
-                        gyro_2clp,
-                        reclamm,
-                        quantamm,
-                        pool_deny_list,
-                        graph_url,
-                        reinit_interval,
-                        ..
-                    } => liquidity::config::BalancerV3 {
-                        vault: vault.into(),
-                        batch_router: batch_router.into(),
-                        weighted: weighted
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        stable: stable.into_iter().map(eth::ContractAddress::from).collect(),
-                        stable_v2: stable_v2
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        stable_surge: stable_surge
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        stable_surge_v2: stable_surge_v2
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        gyro_e: gyro_e.into_iter().map(eth::ContractAddress::from).collect(),
-                        gyro_2clp: gyro_2clp
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        reclamm: reclamm
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        quantamm: quantamm
-                            .into_iter()
-                            .map(eth::ContractAddress::from)
-                            .collect(),
-                        pool_deny_list: pool_deny_list.clone(),
-                        graph_url,
-                        reinit_interval,
-                    },
+                    file::BalancerV3Config::Manual(manual_config) => {
+                        let file::ManualBalancerV3Config {
+                            vault,
+                            batch_router,
+                            weighted,
+                            stable,
+                            stable_v2,
+                            stable_surge,
+                            stable_surge_v2,
+                            gyro_e,
+                            gyro_2clp,
+                            reclamm,
+                            quantamm,
+                            pool_deny_list,
+                            graph_url,
+                            reinit_interval,
+                        } = manual_config.as_ref();
+
+                        liquidity::config::BalancerV3 {
+                            vault: (*vault).into(),
+                            batch_router: (*batch_router).into(),
+                            weighted: weighted
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            stable: stable
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            stable_v2: stable_v2
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            stable_surge: stable_surge
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            stable_surge_v2: stable_surge_v2
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            gyro_e: gyro_e
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            gyro_2clp: gyro_2clp
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            reclamm: reclamm
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            quantamm: quantamm
+                                .iter()
+                                .cloned()
+                                .map(eth::ContractAddress::from)
+                                .collect(),
+                            pool_deny_list: pool_deny_list.clone(),
+                            graph_url: graph_url.clone(),
+                            reinit_interval: *reinit_interval,
+                        }
+                    }
                 })
                 .collect(),
             zeroex: config

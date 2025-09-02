@@ -85,7 +85,7 @@ impl LiquidityCollecting for Erc4626LiquiditySource {
                     // Build wrap or unwrap order shell; exact amounts will be computed by route
                     // realization.
                     if pair.get() == (edge.asset, edge.vault) {
-                        out.push(Liquidity::Erc4626(Erc4626Order {
+                        out.push(Liquidity::Erc4626(Box::new(Erc4626Order {
                             tokens: pair,
                             wrap: Some(Erc4626WrapOrder {
                                 vault: contracts::IERC4626::at(&self.web3, edge.vault),
@@ -95,9 +95,9 @@ impl LiquidityCollecting for Erc4626LiquiditySource {
                                 settlement: self.settlement.clone(),
                             }),
                             unwrap: None,
-                        }));
+                        })));
                     } else if pair.get() == (edge.vault, edge.asset) {
-                        out.push(Liquidity::Erc4626(Erc4626Order {
+                        out.push(Liquidity::Erc4626(Box::new(Erc4626Order {
                             tokens: pair,
                             wrap: None,
                             unwrap: Some(Erc4626UnwrapOrder {
@@ -105,7 +105,7 @@ impl LiquidityCollecting for Erc4626LiquiditySource {
                                 assets_out: U256::zero(),
                                 settlement: self.settlement.clone(),
                             }),
-                        }));
+                        })));
                     }
                 }
             }

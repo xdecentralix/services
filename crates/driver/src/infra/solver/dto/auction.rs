@@ -176,8 +176,8 @@ pub fn new(
             .collect(),
         liquidity: liquidity
             .iter()
-            .filter_map(|liquidity| {
-                Some(match &liquidity.kind {
+            .map(|liquidity| {
+                match &liquidity.kind {
                     liquidity::Kind::UniswapV2(pool) => {
                         solvers_dto::auction::Liquidity::ConstantProduct(
                             solvers_dto::auction::ConstantProductPool {
@@ -747,7 +747,7 @@ pub fn new(
                             },
                         )
                     }
-                })
+                }
             })
             .collect(),
         tokens,

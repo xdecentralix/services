@@ -42,12 +42,12 @@ pub fn to_boundary_pool(address: H160, pool: &liquidity::quantamm::Pool) -> Opti
         first_four_weights_and_multipliers: pool
             .first_four_weights_and_multipliers
             .iter()
-            .map(|ratio| to_signed_i256(ratio))
+            .map(to_signed_i256)
             .collect::<Option<_>>()?,
         second_four_weights_and_multipliers: pool
             .second_four_weights_and_multipliers
             .iter()
-            .map(|ratio| to_signed_i256(ratio))
+            .map(to_signed_i256)
             .collect::<Option<_>>()?,
         last_update_time: pool.last_update_time,
         last_interop_time: pool.last_interop_time,

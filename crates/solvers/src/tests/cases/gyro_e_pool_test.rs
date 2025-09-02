@@ -317,8 +317,8 @@ pub async fn test_gyro_e_swap(input: SwapTestInput) -> Result<SwapTestResult, St
                 token
                     .balance
                     .as_ref()
+                    .cloned()
                     .ok_or_else(|| format!("Balance missing for token {}", token.address))
-                    .map(|b| b.clone())
             })
             .collect();
         token_balances?
@@ -421,7 +421,7 @@ pub async fn test_gyro_e_swap(input: SwapTestInput) -> Result<SwapTestResult, St
     )?;
 
     // Convert balances using exact upscaled_balance() method (like baseline solver)
-    let balances_bfp = vec![
+    let balances_bfp = [
         token_0_state.upscaled_balance()?,
         token_1_state.upscaled_balance()?,
     ];
@@ -1054,8 +1054,8 @@ mod tests {
             Ok(swap_result) => {
                 println!("🎉 SUCCESS! Real Gyroscope E-CLP swap calculation:");
                 println!("Pool: {} (Gnosis Chain)", swap_result.input_token);
-                println!("Input Token:  {} ({})", swap_result.input_token, "Token 0");
-                println!("Output Token: {} ({})", swap_result.output_token, "Token 1");
+                println!("Input Token:  {} (Token 0)", swap_result.input_token);
+                println!("Output Token: {} (Token 1)", swap_result.output_token);
                 println!(
                     "Input Amount:  {} wei ({} tokens)",
                     swap_result.input_amount, swap_result.input_amount_human
@@ -1240,14 +1240,14 @@ mod tests {
 
         // Apply rate providers to get effective balances
         let effective_balance_0 = parse_balance_to_wei_with_rate(
-            &pool_data.pool_tokens[0].balance.as_ref().unwrap(),
+            pool_data.pool_tokens[0].balance.as_ref().unwrap(),
             pool_data.pool_tokens[0].decimals,
             rate_provider_rate_0,
         )
         .unwrap();
 
         let effective_balance_1 = parse_balance_to_wei_with_rate(
-            &pool_data.pool_tokens[1].balance.as_ref().unwrap(),
+            pool_data.pool_tokens[1].balance.as_ref().unwrap(),
             pool_data.pool_tokens[1].decimals,
             rate_provider_rate_1,
         )

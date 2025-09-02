@@ -39,7 +39,7 @@ pub enum PoolKind {
     Stable(stable::PoolState),
     StableSurge(stable_surge::PoolState),
     Gyro2CLP(gyro_2clp::PoolState),
-    GyroE(gyro_e::PoolState),
+    GyroE(Box<gyro_e::PoolState>),
     ReClamm(reclamm::PoolState),
     QuantAmm(quantamm::PoolState),
 }
@@ -58,14 +58,19 @@ impl_from_state!(weighted::PoolState, Weighted);
 impl_from_state!(stable::PoolState, Stable);
 impl_from_state!(stable_surge::PoolState, StableSurge);
 impl_from_state!(gyro_2clp::PoolState, Gyro2CLP);
-impl_from_state!(gyro_e::PoolState, GyroE);
+// Manual implementation for GyroE to use Box
+impl From<gyro_e::PoolState> for PoolKind {
+    fn from(state: gyro_e::PoolState) -> Self {
+        Self::GyroE(Box::new(state))
+    }
+}
 impl_from_state!(reclamm::PoolState, ReClamm);
 impl_from_state!(quantamm::PoolState, QuantAmm);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Balancer V3 pool status.
 pub enum PoolStatus {
-    Active(Pool),
+    Active(Box<Pool>),
     Paused,
     Disabled,
 }
@@ -74,7 +79,7 @@ impl PoolStatus {
     /// Returns the inner pool data if it is active, `None` otherwise.
     pub fn active(self) -> Option<Pool> {
         match self {
-            Self::Active(pool) => Some(pool),
+            Self::Active(pool) => Some(*pool),
             _ => None,
         }
     }

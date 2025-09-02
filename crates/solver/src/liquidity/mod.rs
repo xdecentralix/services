@@ -76,7 +76,7 @@ pub enum Liquidity {
     BalancerV3QuantAmm(BalancerV3QuantAmmOrder),
     LimitOrder(LimitOrder),
     Concentrated(ConcentratedLiquidity),
-    Erc4626(erc4626::Erc4626Order),
+    Erc4626(Box<erc4626::Erc4626Order>),
 }
 
 /// A trait associating some liquidity model to how it is executed and encoded

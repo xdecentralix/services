@@ -239,10 +239,10 @@ where
                 None => return Ok(PoolStatus::Disabled),
             };
 
-            Ok(PoolStatus::Active(Pool {
+            Ok(PoolStatus::Active(Box::new(Pool {
                 id: pool_id,
                 kind: pool_state.into(),
-            }))
+            })))
         }
         .boxed()
     }
@@ -710,8 +710,9 @@ mod tests {
 
         match pool_status {
             PoolStatus::Active(pool) => {
+                let pool = pool.as_ref();
                 assert_eq!(pool.id, pool_info.common.address);
-                match pool.kind {
+                match &pool.kind {
                     PoolKind::Weighted(state) => {
                         assert_eq!(state.tokens.len(), 2);
                         assert_eq!(state.swap_fee, bfp_v3!("0.003"));

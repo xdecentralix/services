@@ -67,7 +67,7 @@ impl BaselineSolvable for Edge {
         }
     }
 
-    fn gas_cost(&self) -> impl std::future::Future<Output = usize> + Send {
-        async { 90_000usize }
+    async fn gas_cost(&self) -> usize {
+        90_000usize
     }
 }

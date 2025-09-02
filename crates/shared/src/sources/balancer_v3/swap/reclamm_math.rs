@@ -23,6 +23,7 @@ pub struct PriceRatioState {
 
 /// Computes current virtual balances and whether they changed due to either
 /// price ratio update or out-of-range centeredness drift.
+#[allow(clippy::too_many_arguments)]
 pub fn compute_current_virtual_balances(
     current_timestamp: u64,
     balances_scaled18: &[Bfp; 2],

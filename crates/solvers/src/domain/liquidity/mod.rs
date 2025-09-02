@@ -34,7 +34,7 @@ pub enum State {
     WeightedProduct(weighted_product::Pool),
     Stable(stable::Pool),
     Concentrated(concentrated::Pool),
-    GyroE(gyro_e::Pool),
+    GyroE(Box<gyro_e::Pool>),
     Gyro2CLP(gyro_2clp::Pool),
     Gyro3CLP(gyro_3clp::Pool),
     BalancerV3ReClamm(reclamm::Pool),

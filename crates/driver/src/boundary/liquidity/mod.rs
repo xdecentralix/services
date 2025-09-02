@@ -201,7 +201,7 @@ impl Fetcher {
                     Liquidity::BalancerV3StableSurge(pool) => balancer::v3::stable_surge::to_domain(id, pool),
                     Liquidity::LimitOrder(pool) => zeroex::to_domain(id, pool),
                     Liquidity::Concentrated(pool) => uniswap::v3::to_domain(id, pool),
-                    Liquidity::Erc4626(order) => erc4626::to_domain(id, order),
+                    Liquidity::Erc4626(order) => erc4626::to_domain(id, *order),
                 }
                 // Ignore "bad" liquidity - this allows the driver to continue
                 // solving with the other good stuff.
