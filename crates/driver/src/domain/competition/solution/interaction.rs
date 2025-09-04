@@ -55,7 +55,7 @@ impl Interaction {
                     liquidity::Kind::BalancerV3ReClamm(pool) => pool.batch_router.into(),
                     liquidity::Kind::BalancerV3QuantAmm(pool) => pool.batch_router.into(),
                     liquidity::Kind::Swapr(pool) => pool.base.router.into(),
-                    liquidity::Kind::ZeroEx(pool) => pool.zeroex.address().into(),
+                    liquidity::Kind::ZeroEx(pool) => pool.zeroex.address().into_legacy(),
                     liquidity::Kind::Erc4626(edge) => edge.tokens.1.0.into(),
                 };
                 match &interaction.liquidity.kind {
@@ -69,7 +69,7 @@ impl Interaction {
                             vec![
                                 eth::Allowance {
                                     token: interaction.input.token,
-                                    spender: address,
+                                    spender: address.into(),
                                     amount: interaction.input.amount.into(),
                                 }
                                 .into(),
@@ -88,7 +88,7 @@ impl Interaction {
                         vec![
                             eth::Allowance {
                                 token: interaction.input.token,
-                                spender: address,
+                                spender: address.into(),
                                 amount: eth::U256::max_value(),
                             }
                             .into(),

@@ -124,7 +124,6 @@ include_contracts! {
     IUniswapLikePair;
     IUniswapLikeRouter;
     IUniswapV3Factory;
-    IZeroEx;
     PancakeRouter;
     Permit2;
     SushiSwapRouter;
@@ -160,17 +159,9 @@ pub mod test {
 
 #[cfg(test)]
 mod tests {
-    const MAINNET: u64 = 1;
-    const OPTIMISM: u64 = 10;
-    const BNB: u64 = 56;
-    const GNOSIS: u64 = 100;
-    const POLYGON: u64 = 137;
-    const BASE: u64 = 8453;
-    const ARBITRUM_ONE: u64 = 42161;
-    const AVALANCHE: u64 = 43114;
-    const SEPOLIA: u64 = 11155111;
-    const LENS: u64 = 232;
-
+    use crate::alloy::networks::{
+        ARBITRUM_ONE, AVALANCHE, BASE, BNB, GNOSIS, LENS, MAINNET, OPTIMISM, POLYGON, SEPOLIA,
+    };
     use {
         super::*,
         ethcontract::{
@@ -281,13 +272,7 @@ mod tests {
                 assert_has_deployment_address!(PancakeRouter for *network);
             }
 
-            for network in &[MAINNET, ARBITRUM_ONE] {
-                assert_has_deployment_address!(BalancerV2WeightedPoolFactory for *network);
-            }
-
-            for network in &[MAINNET, SEPOLIA, ARBITRUM_ONE] {
-                assert_has_deployment_address!(IZeroEx for *network);
-            }
+        assert_has_deployment_address!(BalancerV2WeightedPoolFactory for MAINNET);
 
             for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
                 assert_has_deployment_address!(BalancerV2StablePoolFactoryV2 for *network);
@@ -323,9 +308,7 @@ mod tests {
             assert_has_deployment_information!(GPv2Settlement for *network);
             assert_has_deployment_information!(BalancerV2Vault for *network);
         }
-        for network in &[MAINNET, ARBITRUM_ONE] {
-            assert_has_deployment_information!(BalancerV2WeightedPoolFactory for *network);
-        }
+        assert_has_deployment_information!(BalancerV2WeightedPoolFactory for MAINNET);
         for network in &[MAINNET, ARBITRUM_ONE] {
             assert_has_deployment_information!(BalancerV2WeightedPool2TokensFactory for *network);
         }

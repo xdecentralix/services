@@ -8,6 +8,7 @@ use {
         },
         util::conv::{rational_to_big_decimal, u256::U256Ext},
     },
+    ethrpc::alloy::conversions::IntoLegacy,
     std::collections::HashSet,
     tracing::Instrument,
 };
@@ -576,7 +577,7 @@ fn convert_domain_to_dto(
         liquidity::Kind::ZeroEx(limit_order) => Ok(solvers_dto::auction::Liquidity::LimitOrder(
             solvers_dto::auction::ForeignLimitOrder {
                 id: liquidity.id.0.to_string(),
-                address: limit_order.zeroex.address(),
+                address: limit_order.zeroex.address().into_legacy(),
                 gas_estimate: liquidity.gas.0.into(),
                 hash: Default::default(),
                 maker_token: limit_order.order.maker_token,
