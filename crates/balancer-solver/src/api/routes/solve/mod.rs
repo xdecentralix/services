@@ -12,7 +12,21 @@ pub async fn solve(
     axum::response::Json<Response<dto::Solutions>>,
 ) {
     let handle_request = async {
-        let auction = match dto::auction::into_domain(auction) {
+        let liquidity_client = state.liquidity_client();
+        
+        // Get base tokens and protocols from solver configuration if available
+        let base_tokens = {
+            let tokens: Vec<_> = state.base_tokens().iter().map(|t| t.0).collect();
+            if tokens.is_empty() { None } else { Some(tokens) }
+        };
+        let protocols = state.protocols();
+        
+        let auction = match dto::auction::into_domain(
+            auction, 
+            liquidity_client, 
+            base_tokens.as_deref(),
+            protocols.as_deref()
+        ).await {
             Ok(value) => value,
             Err(err) => {
                 tracing::warn!(?err, "invalid auction");

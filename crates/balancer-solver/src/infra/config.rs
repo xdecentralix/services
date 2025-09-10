@@ -58,6 +58,36 @@ struct Config {
     /// routing. If unset, we fall back to `uni_v3_node_url` if present. If
     /// both are unset, ERC4626 baseline routing is disabled.
     erc4626_node_url: Option<Url>,
+
+    /// Configuration for independent liquidity fetching
+    liquidity: Option<LiquidityConfig>,
+}
+
+/// Configuration for the liquidity client
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct LiquidityConfig {
+    /// URL of the liquidity-driver instance
+    pub driver_url: String,
+    
+    /// Request timeout in milliseconds
+    #[serde(default = "default_timeout_ms")]
+    pub timeout_ms: u64,
+    
+    /// Protocols to fetch liquidity from
+    #[serde(default = "default_protocols")]
+    pub protocols: Vec<String>,
+}
+
+fn default_timeout_ms() -> u64 {
+    5000
+}
+
+fn default_protocols() -> Vec<String> {
+    vec![
+        "balancer_v2".to_string(),
+        "uniswap_v2".to_string(),
+    ]
 }
 
 /// Load the driver configuration from a TOML file.
@@ -96,6 +126,7 @@ pub async fn load(path: &Path) -> solver::Config {
         native_token_price_estimation_amount: config.native_token_price_estimation_amount,
         uni_v3_node_url: config.uni_v3_node_url,
         erc4626_node_url: config.erc4626_node_url,
+        liquidity_client_config: config.liquidity,
     }
 }
 

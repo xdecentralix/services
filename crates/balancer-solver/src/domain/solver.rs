@@ -38,6 +38,7 @@ pub struct Config {
     pub native_token_price_estimation_amount: eth::U256,
     pub uni_v3_node_url: Option<Url>,
     pub erc4626_node_url: Option<Url>,
+    pub liquidity_client_config: Option<crate::infra::config::LiquidityConfig>,
 }
 
 struct Inner {
@@ -75,6 +76,9 @@ struct Inner {
     /// If provided, ERC4626 baseline quoting will be enabled using this Web3.
     /// If not provided but `uni_v3_quoter_v2` is, its Web3 will be reused.
     erc4626_web3: Option<shared::ethrpc::Web3>,
+    
+    /// Optional liquidity client for fetching liquidity from external API
+    liquidity_client: Option<crate::infra::liquidity_client::LiquidityClient>,
 }
 
 impl Solver {
@@ -112,6 +116,14 @@ impl Solver {
             (None, None) => None,
         };
 
+        // Create liquidity client if configured
+        let liquidity_client = config.liquidity_client_config.as_ref().map(|lc_config| {
+            crate::infra::liquidity_client::LiquidityClient::new(
+                lc_config.driver_url.clone(),
+                std::time::Duration::from_millis(lc_config.timeout_ms),
+            )
+        });
+
         Self(Arc::new(Inner {
             weth: config.weth,
             base_tokens: config.base_tokens.into_iter().collect(),
@@ -121,7 +133,29 @@ impl Solver {
             native_token_price_estimation_amount: config.native_token_price_estimation_amount,
             uni_v3_quoter_v2,
             erc4626_web3,
+            liquidity_client,
         }))
+    }
+
+    /// Returns a reference to the liquidity client if configured
+    pub fn liquidity_client(&self) -> Option<&crate::infra::liquidity_client::LiquidityClient> {
+        self.0.liquidity_client.as_ref()
+    }
+    
+    /// Returns the base tokens configured for this solver
+    pub fn base_tokens(&self) -> &HashSet<eth::TokenAddress> {
+        &self.0.base_tokens
+    }
+    
+    /// Returns the protocols configured for liquidity fetching
+    pub fn protocols(&self) -> Option<Vec<String>> {
+        self.0.liquidity_client.as_ref().map(|_| {
+            // For now return default protocols - this could be made configurable
+            vec![
+                "balancer_v2".to_string(),
+                "uniswap_v2".to_string(),
+            ]
+        })
     }
 
     /// Solves the specified auction, returning a vector of all possible

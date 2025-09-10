@@ -2,15 +2,88 @@ use {
     crate::{
         api::routes::Error,
         domain::{auction, eth, liquidity, order},
+        infra::liquidity_client::{LiquidityClient, LiquidityRequest},
         util::conv,
     },
     bigdecimal::{FromPrimitive, ToPrimitive},
     itertools::Itertools,
     solvers_dto::auction::*,
+    std::collections::HashSet,
 };
 
+/// Extract token pairs from auction orders for liquidity fetching
+/// This creates comprehensive routing pairs including base tokens
+fn extract_token_pairs_from_auction(
+    auction: &Auction,
+    base_tokens: Option<&[eth::H160]>,
+) -> Vec<(eth::H160, eth::H160)> {
+    let mut result = HashSet::new();
+
+    // Extract direct pairs from orders
+    for order in &auction.orders {
+        if order.sell_token != order.buy_token {
+            let pair = if order.sell_token < order.buy_token {
+                (order.sell_token, order.buy_token)
+            } else {
+                (order.buy_token, order.sell_token)
+            };
+            result.insert(pair);
+        }
+    }
+
+    // Expand with base token pairs if base tokens are provided
+    if let Some(base_tokens) = base_tokens {
+        let base_token_set: HashSet<_> = base_tokens.iter().copied().collect();
+        
+        // For each pair, add connections to base tokens
+        let original_pairs: Vec<_> = result.iter().copied().collect();
+        for (token_a, token_b) in original_pairs {
+            // Add pairs between each token and all base tokens
+            for &base_token in &base_token_set {
+                if base_token != token_a {
+                    let pair = if base_token < token_a {
+                        (base_token, token_a)
+                    } else {
+                        (token_a, base_token)
+                    };
+                    result.insert(pair);
+                }
+                if base_token != token_b {
+                    let pair = if base_token < token_b {
+                        (base_token, token_b)
+                    } else {
+                        (token_b, base_token)
+                    };
+                    result.insert(pair);
+                }
+            }
+        }
+
+        // Add all base token pairs (for routing between base tokens)
+        let base_tokens_vec: Vec<_> = base_token_set.iter().copied().collect();
+        for (i, &token_a) in base_tokens_vec.iter().enumerate() {
+            for &token_b in &base_tokens_vec[i + 1..] {
+                let pair = if token_a < token_b {
+                    (token_a, token_b)
+                } else {
+                    (token_b, token_a)
+                };
+                result.insert(pair);
+            }
+        }
+    }
+
+    result.into_iter().collect()
+}
+
 /// Converts a data transfer object into its domain object representation.
-pub fn into_domain(auction: Auction) -> Result<auction::Auction, Error> {
+/// If liquidity_client is provided and auction has empty liquidity, fetches independently.
+pub async fn into_domain(
+    auction: Auction, 
+    liquidity_client: Option<&LiquidityClient>,
+    base_tokens: Option<&[eth::H160]>,
+    protocols: Option<&[String]>,
+) -> Result<auction::Auction, Error> {
     Ok(auction::Auction {
         id: match auction.id {
             Some(id) => auction::Id::Solve(id),
@@ -70,33 +143,103 @@ pub fn into_domain(auction: Auction) -> Result<auction::Auction, Error> {
                     }),
             })
             .collect(),
-        liquidity: auction
-            .liquidity
-            .iter()
-            .map(|liquidity| match liquidity {
-                Liquidity::ConstantProduct(liquidity) => {
-                    constant_product_pool::to_domain(liquidity)
+        liquidity: {
+            if auction.liquidity.is_empty() && liquidity_client.is_some() {
+                // Fetch liquidity independently from the liquidity-driver API
+                let client = liquidity_client.unwrap();
+                let token_pairs = extract_token_pairs_from_auction(&auction, base_tokens);
+                
+                tracing::info!(
+                    auction_id = auction.id,
+                    pairs_count = token_pairs.len(),
+                    "Auction has empty liquidity - fetching from liquidity-driver API"
+                );
+                
+                // Use the auction deadline to estimate a reasonable block number
+                // This is approximate but better than 0
+                let estimated_block_number = match auction.deadline.timestamp() {
+                    ts if ts > 0 => {
+                        // Rough estimate: ~12 seconds per block on Ethereum
+                        let current_time = chrono::Utc::now().timestamp();
+                        let blocks_in_future = (ts - current_time).max(0) / 12;
+                        // Add current estimated block (rough estimate)
+                        18_000_000u64 + blocks_in_future as u64
+                    }
+                    _ => 18_000_000u64, // Fallback to reasonable mainnet block number
+                };
+                
+                let request = LiquidityRequest {
+                    auction_id: auction.id.unwrap_or(0) as u64,
+                    tokens: auction.tokens.keys().copied().collect(),
+                    token_pairs,
+                    block_number: estimated_block_number,
+                    protocols: protocols
+                        .map(|p| p.to_vec())
+                        .unwrap_or_else(|| vec![
+                            "balancer_v2".to_string(),
+                            "uniswap_v2".to_string(),
+                        ]),
+                };
+                
+                match client.fetch_liquidity(request).await {
+                    Ok(response) => {
+                        tracing::info!(
+                            auction_id = auction.id,
+                            liquidity_count = response.liquidity.len(),
+                            "Successfully fetched liquidity from API"
+                        );
+                        
+                        // Process the fetched liquidity
+                        response.liquidity
+                            .iter()
+                            .map(|liquidity| convert_dto_liquidity_to_domain(liquidity))
+                            .try_collect()?
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            auction_id = auction.id,
+                            error = ?e,
+                            "Failed to fetch liquidity from API - continuing with empty liquidity"
+                        );
+                        Vec::new() // Graceful degradation
+                    }
                 }
-                Liquidity::WeightedProduct(liquidity) => {
-                    weighted_product_pool::to_domain(liquidity)
-                }
-                Liquidity::Stable(liquidity) => stable_pool::to_domain(liquidity),
-                Liquidity::ConcentratedLiquidity(liquidity) => {
-                    concentrated_liquidity_pool::to_domain(liquidity)
-                }
-                Liquidity::GyroE(liquidity) => gyro_e_pool::to_domain(liquidity),
-                Liquidity::Gyro2CLP(liquidity) => gyro_2clp_pool::to_domain(liquidity),
-                Liquidity::Gyro3CLP(liquidity) => gyro_3clp_pool::to_domain(liquidity),
-                Liquidity::LimitOrder(liquidity) => Ok(foreign_limit_order::to_domain(liquidity)),
-                Liquidity::Erc4626(liquidity) => erc4626::to_domain(liquidity),
-                Liquidity::ReClamm(liquidity) => reclamm_pool::to_domain(liquidity),
-                Liquidity::QuantAmm(liquidity) => quant_amm_pool::to_domain(liquidity),
-                Liquidity::StableSurge(liquidity) => stable_surge_pool::to_domain(liquidity),
-            })
-            .try_collect()?,
+            } else {
+                // Use existing embedded liquidity
+                auction
+                    .liquidity
+                    .iter()
+                    .map(|liquidity| convert_dto_liquidity_to_domain(liquidity))
+                    .try_collect()?
+            }
+        },
         gas_price: auction::GasPrice(eth::Ether(auction.effective_gas_price)),
         deadline: auction::Deadline(auction.deadline),
     })
+}
+
+/// Helper function to convert DTO liquidity to domain liquidity
+fn convert_dto_liquidity_to_domain(liquidity: &Liquidity) -> Result<liquidity::Liquidity, Error> {
+    match liquidity {
+        Liquidity::ConstantProduct(liquidity) => {
+            constant_product_pool::to_domain(liquidity)
+        }
+        Liquidity::WeightedProduct(liquidity) => {
+            weighted_product_pool::to_domain(liquidity)
+        }
+        Liquidity::Stable(liquidity) => stable_pool::to_domain(liquidity),
+        Liquidity::ConcentratedLiquidity(liquidity) => {
+            concentrated_liquidity_pool::to_domain(liquidity)
+        }
+        Liquidity::GyroE(liquidity) => gyro_e_pool::to_domain(liquidity),
+        Liquidity::Gyro2CLP(liquidity) => gyro_2clp_pool::to_domain(liquidity),
+        Liquidity::Gyro3CLP(liquidity) => gyro_3clp_pool::to_domain(liquidity),
+        Liquidity::LimitOrder(liquidity) => Ok(foreign_limit_order::to_domain(liquidity)),
+        Liquidity::Erc4626(liquidity) => erc4626::to_domain(liquidity),
+        Liquidity::ReClamm(liquidity) => reclamm_pool::to_domain(liquidity),
+        Liquidity::QuantAmm(liquidity) => quant_amm_pool::to_domain(liquidity),
+        Liquidity::StableSurge(liquidity) => stable_surge_pool::to_domain(liquidity),
+    }
 }
 
 mod erc4626 {
