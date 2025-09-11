@@ -29,7 +29,7 @@ use {
         swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     },
     crate::{
-        ethrpc::{Web3, Web3Transport},     
+        ethrpc::{Web3, Web3Transport},
         recent_block_cache::{Block, CacheConfig},
         token_info::TokenInfoFetching,
     },
@@ -452,8 +452,12 @@ pub struct BalancerContracts {
 }
 
 impl BalancerContracts {
-    pub async fn try_new(web3_provider: &Web3, factory_kinds: Vec<BalancerFactoryKind>) -> Result<Self> {
-        let web3_client = ethrpc::instrumented::instrument_with_label(web3_provider, "balancerV2".into());
+    pub async fn try_new(
+        web3_provider: &Web3,
+        factory_kinds: Vec<BalancerFactoryKind>,
+    ) -> Result<Self> {
+        let web3_client =
+            ethrpc::instrumented::instrument_with_label(web3_provider, "balancerV2".into());
         let vault = BalancerV2Vault::Instance::deployed(&web3_client.alloy)
             .await
             .context("Cannot retrieve balancer vault")?;

@@ -433,7 +433,7 @@ mod tests {
             transports::mock::Asserter,
         },
         anyhow::bail,
-        ethcontract::{transport::DynTransport, U256},
+        ethcontract::{U256, transport::DynTransport},
         ethrpc::mock::MockTransport,
         maplit::{btreemap, hashmap},
         mockall::predicate,
