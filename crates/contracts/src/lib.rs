@@ -72,7 +72,6 @@ include_contracts! {
     BalancerV3ReClammPoolFactoryV2;
     BalancerV3QuantAMMWeightedPoolFactory;
     BalancerV3QuantAMMWeightedPool;
-    BaoswapRouter;
     CowAmm;
     CowAmmConstantProductFactory;
     CowAmmLegacyHelper;
@@ -264,9 +263,8 @@ mod tests {
                 assert_has_deployment_address!(SwaprRouter for *network);
             }
 
-            // only gnosis
-            assert_has_deployment_address!(BaoswapRouter for GNOSIS);
-            assert_has_deployment_address!(HoneyswapRouter for GNOSIS);
+        // only gnosis
+        assert_has_deployment_address!(HoneyswapRouter for GNOSIS);
 
             // only sepolia
             assert_has_deployment_address!(TestnetUniswapV2Router02 for SEPOLIA);
