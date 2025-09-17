@@ -1033,7 +1033,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: None,
+            quant_amm_weighted_params: None,
             hook: None,
         };
 
@@ -1082,7 +1082,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: None,
+            quant_amm_weighted_params: None,
             hook: None,
         };
 
@@ -1131,7 +1131,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: None,
+            quant_amm_weighted_params: None,
             hook: None,
         };
 

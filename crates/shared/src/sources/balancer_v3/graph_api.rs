@@ -532,7 +532,7 @@ mod tests {
         // Verify null values converted to None
         assert!(pool.sqrt_alpha.is_none());
         assert!(pool.sqrt_beta.is_none());
-        assert!(pool.max_trade_size_ratio.is_none());
+        assert!(pool.quant_amm_weighted_params.is_none());
 
         // Verify pool type identification
         assert_eq!(pool.pool_type_enum(), PoolType::GyroE);
@@ -629,7 +629,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: None,
+            quant_amm_weighted_params: None,
             hook: None,
         };
         let pool2 = PoolData {
@@ -660,7 +660,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: None,
+            quant_amm_weighted_params: None,
             hook: None,
         };
         let pools = RegisteredPools {
