@@ -168,7 +168,13 @@ pub type TokenState = common::TokenState;
 mod tests {
     use {
         super::*,
-        crate::sources::balancer_v3::graph_api::{DynamicData, GqlChain, PoolData, Token, QuantAmmWeightedParams},
+        crate::sources::balancer_v3::graph_api::{
+            DynamicData,
+            GqlChain,
+            PoolData,
+            QuantAmmWeightedParams,
+            Token,
+        },
         ethcontract::{H160, U256},
     };
 

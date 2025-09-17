@@ -47,10 +47,8 @@ impl LiquidityClient {
             return Err(LiquidityClientError::HttpStatus(response.status()));
         }
 
-        let api_response: ApiLiquidityResponse = response
-            .json()
-            .await
-            .map_err(LiquidityClientError::Json)?;
+        let api_response: ApiLiquidityResponse =
+            response.json().await.map_err(LiquidityClientError::Json)?;
 
         tracing::debug!(
             auction_id = request.auction_id,
@@ -98,7 +96,9 @@ impl std::fmt::Display for LiquidityClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LiquidityClientError::Http(e) => write!(f, "HTTP request failed: {}", e),
-            LiquidityClientError::HttpStatus(status) => write!(f, "HTTP request returned status: {}", status),
+            LiquidityClientError::HttpStatus(status) => {
+                write!(f, "HTTP request returned status: {}", status)
+            }
             LiquidityClientError::Json(e) => write!(f, "Failed to parse JSON response: {}", e),
         }
     }

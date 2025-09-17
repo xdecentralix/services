@@ -76,7 +76,7 @@ struct Inner {
     /// If provided, ERC4626 baseline quoting will be enabled using this Web3.
     /// If not provided but `uni_v3_quoter_v2` is, its Web3 will be reused.
     erc4626_web3: Option<shared::ethrpc::Web3>,
-    
+
     /// Optional liquidity client for fetching liquidity from external API
     liquidity_client: Option<crate::infra::liquidity_client::LiquidityClient>,
 }
@@ -141,20 +141,17 @@ impl Solver {
     pub fn liquidity_client(&self) -> Option<&crate::infra::liquidity_client::LiquidityClient> {
         self.0.liquidity_client.as_ref()
     }
-    
+
     /// Returns the base tokens configured for this solver
     pub fn base_tokens(&self) -> &HashSet<eth::TokenAddress> {
         &self.0.base_tokens
     }
-    
+
     /// Returns the protocols configured for liquidity fetching
     pub fn protocols(&self) -> Option<Vec<String>> {
         self.0.liquidity_client.as_ref().map(|_| {
             // For now return default protocols - this could be made configurable
-            vec![
-                "balancer_v2".to_string(),
-                "uniswap_v2".to_string(),
-            ]
+            vec!["balancer_v2".to_string(), "uniswap_v2".to_string()]
         })
     }
 

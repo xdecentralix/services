@@ -34,7 +34,7 @@ fn extract_token_pairs_from_auction(
     // Expand with base token pairs if base tokens are provided
     if let Some(base_tokens) = base_tokens {
         let base_token_set: HashSet<_> = base_tokens.iter().copied().collect();
-        
+
         // For each pair, add connections to base tokens
         let original_pairs: Vec<_> = result.iter().copied().collect();
         for (token_a, token_b) in original_pairs {
@@ -77,9 +77,10 @@ fn extract_token_pairs_from_auction(
 }
 
 /// Converts a data transfer object into its domain object representation.
-/// If liquidity_client is provided and auction has empty liquidity, fetches independently.
+/// If liquidity_client is provided and auction has empty liquidity, fetches
+/// independently.
 pub async fn into_domain(
-    auction: Auction, 
+    auction: Auction,
     liquidity_client: Option<&LiquidityClient>,
     base_tokens: Option<&[eth::H160]>,
     protocols: Option<&[String]>,
@@ -148,13 +149,13 @@ pub async fn into_domain(
                 // Fetch liquidity independently from the liquidity-driver API
                 let client = liquidity_client.unwrap();
                 let token_pairs = extract_token_pairs_from_auction(&auction, base_tokens);
-                
+
                 tracing::info!(
                     auction_id = auction.id,
                     pairs_count = token_pairs.len(),
                     "Auction has empty liquidity - fetching from liquidity-driver API"
                 );
-                
+
                 // Use the auction deadline to estimate a reasonable block number
                 // This is approximate but better than 0
                 let estimated_block_number = match auction.deadline.timestamp() {
@@ -167,20 +168,17 @@ pub async fn into_domain(
                     }
                     _ => 18_000_000u64, // Fallback to reasonable mainnet block number
                 };
-                
+
                 let request = LiquidityRequest {
                     auction_id: auction.id.unwrap_or(0) as u64,
                     tokens: auction.tokens.keys().copied().collect(),
                     token_pairs,
                     block_number: estimated_block_number,
-                    protocols: protocols
-                        .map(|p| p.to_vec())
-                        .unwrap_or_else(|| vec![
-                            "balancer_v2".to_string(),
-                            "uniswap_v2".to_string(),
-                        ]),
+                    protocols: protocols.map(|p| p.to_vec()).unwrap_or_else(|| {
+                        vec!["balancer_v2".to_string(), "uniswap_v2".to_string()]
+                    }),
                 };
-                
+
                 match client.fetch_liquidity(request).await {
                     Ok(response) => {
                         tracing::info!(
@@ -188,9 +186,10 @@ pub async fn into_domain(
                             liquidity_count = response.liquidity.len(),
                             "Successfully fetched liquidity from API"
                         );
-                        
+
                         // Process the fetched liquidity
-                        response.liquidity
+                        response
+                            .liquidity
                             .iter()
                             .map(|liquidity| convert_dto_liquidity_to_domain(liquidity))
                             .try_collect()?
@@ -221,12 +220,8 @@ pub async fn into_domain(
 /// Helper function to convert DTO liquidity to domain liquidity
 fn convert_dto_liquidity_to_domain(liquidity: &Liquidity) -> Result<liquidity::Liquidity, Error> {
     match liquidity {
-        Liquidity::ConstantProduct(liquidity) => {
-            constant_product_pool::to_domain(liquidity)
-        }
-        Liquidity::WeightedProduct(liquidity) => {
-            weighted_product_pool::to_domain(liquidity)
-        }
+        Liquidity::ConstantProduct(liquidity) => constant_product_pool::to_domain(liquidity),
+        Liquidity::WeightedProduct(liquidity) => weighted_product_pool::to_domain(liquidity),
         Liquidity::Stable(liquidity) => stable_pool::to_domain(liquidity),
         Liquidity::ConcentratedLiquidity(liquidity) => {
             concentrated_liquidity_pool::to_domain(liquidity)

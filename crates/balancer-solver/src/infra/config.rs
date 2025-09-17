@@ -69,11 +69,11 @@ struct Config {
 pub struct LiquidityConfig {
     /// URL of the liquidity-driver instance
     pub driver_url: String,
-    
+
     /// Request timeout in milliseconds
     #[serde(default = "default_timeout_ms")]
     pub timeout_ms: u64,
-    
+
     /// Protocols to fetch liquidity from
     #[serde(default = "default_protocols")]
     pub protocols: Vec<String>,
@@ -84,10 +84,7 @@ fn default_timeout_ms() -> u64 {
 }
 
 fn default_protocols() -> Vec<String> {
-    vec![
-        "balancer_v2".to_string(),
-        "uniswap_v2".to_string(),
-    ]
+    vec!["balancer_v2".to_string(), "uniswap_v2".to_string()]
 }
 
 /// Load the driver configuration from a TOML file.
