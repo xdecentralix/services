@@ -104,9 +104,9 @@ pub async fn solve(
         for (i, solution) in solutions.iter().enumerate() {
             tracing::info!(
                 solution_index = i,
-                solution_id = ?solution.id(),
-                trades_count = solution.trades().len(),
-                interactions_count = solution.interactions().len(),
+                solution_id = ?solution.id,
+                trades_count = solution.trades.len(),
+                interactions_count = solution.interactions.len(),
                 "💡 SOLUTION SUMMARY"
             );
         }
@@ -115,7 +115,7 @@ pub async fn solve(
         
         tracing::info!(
             auction_id = %auction_id,
-            returning_solutions = solutions_dto.len(),
+            returning_solutions = solutions_dto.solutions.len(),
             "✅ SENDING RESPONSE TO COW PROTOCOL"
         );
 
