@@ -51,12 +51,16 @@ impl PoolIndexing for PoolInfo {
             ));
         }
 
-        let max_trade_size_ratio = pool.max_trade_size_ratio.ok_or_else(|| {
-            anyhow!(
-                "missing max_trade_size_ratio for QuantAMM pool {:?}",
-                pool.id
-            )
-        })?;
+        let max_trade_size_ratio = pool
+            .quant_amm_weighted_params
+            .as_ref()
+            .and_then(|params| params.max_trade_size_ratio)
+            .ok_or_else(|| {
+                anyhow!(
+                    "missing max_trade_size_ratio for QuantAMM pool {:?}",
+                    pool.id
+                )
+            })?;
 
         Ok(PoolInfo {
             common: common::PoolInfo::for_type(PoolType::QuantAmmWeighted, pool, block_created)?,

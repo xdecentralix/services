@@ -229,12 +229,20 @@ pub struct PoolData {
     #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub sqrt_beta: Option<SBfp>,
     /// QuantAMM-specific parameters
-    #[serde_as(as = "Option<DisplayFromStr>")]
     #[serde(default)]
-    pub max_trade_size_ratio: Option<Bfp>,
+    pub quant_amm_weighted_params: Option<QuantAmmWeightedParams>,
     /// Hook configuration for the pool (matches GraphQL nested structure)
     #[serde(default)]
     pub hook: Option<HookConfig>,
+}
+
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct QuantAmmWeightedParams {
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub max_trade_size_ratio: Option<Bfp>,
 }
 
 /// Hook configuration that matches the GraphQL response structure.
