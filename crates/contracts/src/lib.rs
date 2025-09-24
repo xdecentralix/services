@@ -103,7 +103,6 @@ pub mod support {
         Balances;
         Multicall;
         Signatures;
-        Solver;
         Spardose;
         Swapper;
         Trader;
@@ -279,6 +278,5 @@ mod tests {
         }
 
         assert_has_bytecode!(support::Trader);
-        assert_has_bytecode!(support::Solver);
     }
 }
