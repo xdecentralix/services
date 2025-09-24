@@ -100,7 +100,6 @@ include_contracts! {
 
 pub mod support {
     include_contracts! {
-        AnyoneAuthenticator;
         Balances;
         Multicall;
         Signatures;

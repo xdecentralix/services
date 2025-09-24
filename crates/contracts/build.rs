@@ -1258,7 +1258,6 @@ fn main() {
     });
 
     // Support contract used for solver fee simulations.
-    generate_contract("AnyoneAuthenticator");
     generate_contract("Swapper");
 
     // Contract for batching multiple `eth_call`s into a single one.
