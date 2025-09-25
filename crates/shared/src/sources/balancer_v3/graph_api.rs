@@ -229,12 +229,20 @@ pub struct PoolData {
     #[serde(default, deserialize_with = "deserialize_optional_sbfp")]
     pub sqrt_beta: Option<SBfp>,
     /// QuantAMM-specific parameters
-    #[serde_as(as = "Option<DisplayFromStr>")]
     #[serde(default)]
-    pub max_trade_size_ratio: Option<Bfp>,
+    pub quant_amm_weighted_params: Option<QuantAmmWeightedParams>,
     /// Hook configuration for the pool (matches GraphQL nested structure)
     #[serde(default)]
     pub hook: Option<HookConfig>,
+}
+
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct QuantAmmWeightedParams {
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde(default)]
+    pub max_trade_size_ratio: Option<Bfp>,
 }
 
 /// Hook configuration that matches the GraphQL response structure.
@@ -524,7 +532,7 @@ mod tests {
         // Verify null values converted to None
         assert!(pool.sqrt_alpha.is_none());
         assert!(pool.sqrt_beta.is_none());
-        assert!(pool.max_trade_size_ratio.is_none());
+        assert!(pool.quant_amm_weighted_params.is_none());
 
         // Verify pool type identification
         assert_eq!(pool.pool_type_enum(), PoolType::GyroE);
@@ -621,7 +629,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: None,
+            quant_amm_weighted_params: None,
             hook: None,
         };
         let pool2 = PoolData {
@@ -652,7 +660,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: None,
+            quant_amm_weighted_params: None,
             hook: None,
         };
         let pools = RegisteredPools {

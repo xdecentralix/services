@@ -170,7 +170,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: Some(SBfp::from_wei(I256::from(900_000_000_000_000_000i64))), /* sqrt_alpha = 0.9e18 */
             sqrt_beta: Some(SBfp::from_wei(I256::from(1_100_000_000_000_000_000i64))), /* sqrt_beta = 1.1e18 */
-            max_trade_size_ratio: None,
+            quant_amm_weighted_params: None,
             hook: None,
         };
 

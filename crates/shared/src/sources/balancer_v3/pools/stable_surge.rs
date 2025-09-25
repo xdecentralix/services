@@ -292,7 +292,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: None,
+            quant_amm_weighted_params: None,
             hook: Some(HookConfig {
                 address: H160([0x44; 20]),
                 params: Some(hook_params.clone()),
@@ -356,7 +356,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: None,
+            quant_amm_weighted_params: None,
             hook: None, // Missing hook
         };
 
@@ -396,7 +396,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: None,
+            quant_amm_weighted_params: None,
             hook: Some(HookConfig {
                 address: H160([0x44; 20]),
                 params: None, // Missing params

@@ -51,12 +51,16 @@ impl PoolIndexing for PoolInfo {
             ));
         }
 
-        let max_trade_size_ratio = pool.max_trade_size_ratio.ok_or_else(|| {
-            anyhow!(
-                "missing max_trade_size_ratio for QuantAMM pool {:?}",
-                pool.id
-            )
-        })?;
+        let max_trade_size_ratio = pool
+            .quant_amm_weighted_params
+            .as_ref()
+            .and_then(|params| params.max_trade_size_ratio)
+            .ok_or_else(|| {
+                anyhow!(
+                    "missing max_trade_size_ratio for QuantAMM pool {:?}",
+                    pool.id
+                )
+            })?;
 
         Ok(PoolInfo {
             common: common::PoolInfo::for_type(PoolType::QuantAmmWeighted, pool, block_created)?,
@@ -164,7 +168,13 @@ pub type TokenState = common::TokenState;
 mod tests {
     use {
         super::*,
-        crate::sources::balancer_v3::graph_api::{DynamicData, GqlChain, PoolData, Token},
+        crate::sources::balancer_v3::graph_api::{
+            DynamicData,
+            GqlChain,
+            PoolData,
+            QuantAmmWeightedParams,
+            Token,
+        },
         ethcontract::{H160, U256},
     };
 
@@ -209,7 +219,9 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: Some(Bfp::from_wei(U256::from(100_000_000_000_000_000u128))), /* 10% */
+            quant_amm_weighted_params: Some(QuantAmmWeightedParams {
+                max_trade_size_ratio: Some(Bfp::from_wei(U256::from(100_000_000_000_000_000u128))), /* 10% */
+            }),
             hook: None,
         };
 
@@ -257,7 +269,9 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: Some(Bfp::from_wei(U256::from(100_000_000_000_000_000u128))),
+            quant_amm_weighted_params: Some(QuantAmmWeightedParams {
+                max_trade_size_ratio: Some(Bfp::from_wei(U256::from(100_000_000_000_000_000u128))),
+            }),
             hook: None,
         };
 
@@ -292,7 +306,7 @@ mod tests {
             d_sq: None,
             sqrt_alpha: None,
             sqrt_beta: None,
-            max_trade_size_ratio: None, // Missing!
+            quant_amm_weighted_params: None, // Missing!
             hook: None,
         };
 
