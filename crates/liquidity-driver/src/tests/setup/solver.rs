@@ -10,7 +10,12 @@ use {
             eth,
             time::{self},
         },
-        infra::{self, Ethereum, blockchain::contracts::Addresses, config::file::FeeHandler},
+        infra::{
+            self,
+            Ethereum,
+            blockchain::contracts::Addresses,
+            config::file::{FeeHandler, FlashloanWrapperConfig},
+        },
         tests::{hex_address, setup::blockchain::Trade},
     },
     ethereum_types::H160,
@@ -152,9 +157,8 @@ impl Solver {
             }
             if let Some(flashloan) = quote.order.app_data.flashloan() {
                 order["flashloanHint"] = json!(FlashloanHint {
-                    liquidity_provider: flashloan.liquidity_provider,
-                    protocol_adapter: flashloan.protocol_adapter,
-                    receiver: flashloan.receiver,
+                    lender: flashloan.lender.unwrap(),
+                    borrower: flashloan.borrower.unwrap(),
                     token: flashloan.token,
                     amount: flashloan.amount
                 });
@@ -464,6 +468,16 @@ impl Solver {
             .await
             .unwrap(),
         );
+        let flashloan_wrappers = config
+            .solutions
+            .iter()
+            .flat_map(|solution| solution.flashloans.clone())
+            .map(|(_order, flashloan)| FlashloanWrapperConfig {
+                lender: flashloan.lender,
+                helper_contract: config.blockchain.flashloan_wrapper.address(),
+                fee_in_bps: Default::default(),
+            })
+            .collect::<Vec<_>>();
         let eth = Ethereum::new(
             rpc,
             Addresses {
@@ -472,7 +486,9 @@ impl Solver {
                 balances: Some(config.blockchain.balances.address().into()),
                 signatures: Some(config.blockchain.signatures.address().into()),
                 cow_amms: vec![],
-                flashloan_router: Some(config.blockchain.flashloan_router.address().into()),
+                flashloan_default_lender: flashloan_wrappers.first().map(|w| w.lender.into()),
+                flashloan_wrappers,
+                flashloan_router: Some(config.blockchain.flashloan_wrapper.address().into()),
             },
             gas,
             None,

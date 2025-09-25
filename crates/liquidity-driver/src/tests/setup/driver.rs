@@ -229,6 +229,10 @@ async fn create_config_file(
            signatures = "{}"
            flashloan-router = "{}"
 
+           [[contracts.flashloan-wrappers]]
+           lender = "0x0000000000000000000000000000000000000000"
+           helper-contract = "{}"
+
            [submission]
            gas-price-cap = "1000000000000"
            "#,
@@ -237,6 +241,7 @@ async fn create_config_file(
         hex_address(blockchain.balances.address()),
         hex_address(blockchain.signatures.address()),
         hex_address(blockchain.flashloan_router.address()),
+        hex_address(blockchain.flashloan_wrapper.address()),
     )
     .unwrap();
 

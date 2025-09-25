@@ -196,43 +196,11 @@ impl Utilities {
             .map(|((trader, token, source), mut orders)| {
                 let first = orders.next().expect("group contains at least 1 order");
                 let mut others = orders;
-                let all_setups_equal = others.all(|order| {
-                    order.pre_interactions == first.pre_interactions
-                        && order.app_data.flashloan() == first.app_data.flashloan()
-                });
-                Query {
-                    owner: trader.0.0,
-                    token: token.0.0,
-                    source: match source {
-                        SellTokenBalance::Erc20 => SellTokenSource::Erc20,
-                        SellTokenBalance::Internal => SellTokenSource::Internal,
-                        SellTokenBalance::External => SellTokenSource::External,
-                    },
-                    interactions: if all_setups_equal {
-                        first
-                            .pre_interactions
-                            .iter()
-                            .map(|i| InteractionData {
-                                target: i.target.0,
-                                value: i.value.0,
-                                call_data: i.call_data.0.clone(),
-                            })
-                            .collect()
-                    } else {
-                        Vec::default()
-                    },
-                    balance_override: if all_setups_equal {
-                        first
-                            .app_data
-                            .flashloan()
-                            .map(|loan| BalanceOverrideRequest {
-                                token: loan.token,
-                                amount: loan.amount,
-                                holder: loan.receiver,
-                            })
-                    } else {
-                        None
-                    },
+                tokens.entry(token).or_insert_with(|| ethereum.erc20(token));
+                if others.all(|order| order.pre_interactions == first.pre_interactions) {
+                    (trader, token, source, &first.pre_interactions[..])
+                } else {
+                    (trader, token, source, Default::default())
                 }
             })
             .collect::<Vec<_>>();

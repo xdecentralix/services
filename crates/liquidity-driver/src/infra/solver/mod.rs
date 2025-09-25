@@ -306,6 +306,7 @@ impl Solver {
         if !self.config.flashloans_enabled {
             return Default::default();
         }
+        let default_lender = self.eth.contracts().flashloan_default_lender();
 
         auction
             .orders()
@@ -313,9 +314,8 @@ impl Solver {
             .flat_map(|order| {
                 let hint = order.app_data.flashloan()?;
                 let flashloan = eth::Flashloan {
-                    liquidity_provider: hint.liquidity_provider.into(),
-                    protocol_adapter: hint.protocol_adapter.into(),
-                    receiver: hint.receiver.into(),
+                    lender: hint.lender.or(default_lender.map(|l| l.0))?.into(),
+                    borrower: hint.borrower.unwrap_or(order.uid.owner().0).into(),
                     token: hint.token.into(),
                     amount: hint.amount.into(),
                 };
