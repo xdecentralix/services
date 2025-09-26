@@ -111,11 +111,13 @@ impl UniV3SubgraphClient {
         subgraph_url: &Url,
         client: Client,
         api_key: Option<String>,
+        max_pools_per_tick_query: usize,
     ) -> Result<Self> {
-        Ok(Self(SubgraphClient::try_new(
+        Ok(Self(SubgraphClient::try_new( 
             subgraph_url.clone(),
             client,
             api_key,
+            max_pools_per_tick_query,
         )?))
     }
 
@@ -142,7 +144,6 @@ impl UniV3SubgraphClient {
         })
     }
 
-    /// Retrieves the pool data for pools with given pool ids
     async fn get_pools_by_pool_ids(
         &self,
         pool_ids: &[H160],
@@ -162,15 +163,23 @@ impl UniV3SubgraphClient {
         pool_ids: &[H160],
         block_number: u64,
     ) -> Result<Vec<TickData>> {
-        let variables = json_map! {
-            "block" => block_number,
-            "pool_ids" => json!(pool_ids)
-        };
-        let result = self
-            .0
-            .paginated_query(TICKS_BY_POOL_IDS_QUERY, variables)
-            .await?;
-        Ok(result)
+        let mut all = Vec::new();
+
+        // Default chunk size is usize::MAX - all pool ids in one `where`. We want to
+        // run requests sequentially to avoid overwhelming the node.
+        for chunk in pool_ids.chunks(self.0.max_pools_per_tick_query()) {
+            let variables = json_map! {
+                "block" => block_number,
+                "pool_ids" => json!(chunk)
+            };
+            let mut batch = self
+                .0
+                .paginated_query(TICKS_BY_POOL_IDS_QUERY, variables)
+                .await?;
+            all.append(&mut batch);
+        }
+
+        Ok(all)
     }
 
     /// Retrieves the pool data and ticks data for pools with given pool ids

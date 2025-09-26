@@ -16,6 +16,7 @@ pub struct SubgraphClient {
     client: Client,
     subgraph_url: Url,
     api_key: Option<String>,
+    max_pools_per_tick_query: usize,
 }
 
 pub trait ContainsId {
@@ -30,11 +31,12 @@ pub struct Data<T> {
 
 impl SubgraphClient {
     /// Creates a new subgraph client from the specified organization and name.
-    pub fn try_new(subgraph_url: Url, client: Client, api_key: Option<String>) -> Result<Self> {
+    pub fn try_new(subgraph_url: Url, client: Client, api_key: Option<String>, max_pools_per_tick_query: usize) -> Result<Self> {
         Ok(Self {
             client,
             subgraph_url,
             api_key,
+            max_pools_per_tick_query,
         })
     }
 
@@ -110,6 +112,10 @@ impl SubgraphClient {
         }
 
         Ok(result)
+    }
+
+    pub fn max_pools_per_tick_query(&self) -> usize {
+        self.max_pools_per_tick_query
     }
 }
 

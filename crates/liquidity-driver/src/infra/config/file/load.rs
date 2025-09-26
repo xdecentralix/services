@@ -223,6 +223,7 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         graph_url,
                         reinit_interval,
                         graph_api_key,
+                        max_pools_per_tick_query,
                         ..
                     } => liquidity::config::UniswapV3 {
                         max_pools_to_initialize,
@@ -234,6 +235,7 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                                     &graph_url,
                                     chain,
                                     graph_api_key,
+                                    max_pools_per_tick_query,
                                 )
                             }
                         }
@@ -245,6 +247,7 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         graph_url,
                         reinit_interval,
                         graph_api_key,
+                        max_pools_per_tick_query,
                         ..
                     } => liquidity::config::UniswapV3 {
                         router: router.into(),
@@ -252,6 +255,7 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         graph_url,
                         reinit_interval,
                         graph_api_key,
+                        max_pools_per_tick_query,
                     },
                 })
                 .collect(),

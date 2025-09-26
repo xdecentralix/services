@@ -163,6 +163,11 @@ pub struct UniswapV3 {
 
     /// Graph API key for subgraph queries
     pub graph_api_key: Option<String>,
+
+    /// How many pool IDs can be present in a where clause of a Tick query
+    /// at once. Some subgraphs are overloaded and throw errors when
+    /// there are too many.
+    pub max_pools_per_tick_query: usize,
 }
 
 impl UniswapV3 {
@@ -172,6 +177,7 @@ impl UniswapV3 {
         graph_url: &Url,
         chain: Chain,
         graph_api_key: Option<String>,
+        max_pools_per_tick_query: usize,
     ) -> Option<Self> {
         Some(Self {
             router: deployment_address(contracts::UniswapV3SwapRouterV2::raw_contract(), chain)?,
@@ -179,6 +185,7 @@ impl UniswapV3 {
             graph_url: graph_url.clone(),
             reinit_interval: None,
             graph_api_key,
+            max_pools_per_tick_query,
         })
     }
 }
