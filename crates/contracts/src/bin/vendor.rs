@@ -295,6 +295,50 @@ fn run() -> Result<()> {
     vendor
         .abi_only()
         .github(
+            "BalancerV2ComposableStablePool",
+            "balancer/balancer-deployments/7211ed9f209d767f8ff411bb57262daf83ecb439/\
+             tasks/deprecated/20230206-composable-stable-pool-v3/artifact/\
+             ComposableStablePool.json",
+        )?
+        .github(
+            "BalancerQueries",
+            "balancer/balancer-deployments/80505f7061ff668dc55173344564fa1ddd83b726/\
+            v2/tasks/20220721-balancer-queries/artifact/BalancerQueries.json",
+        )?
+        .github(
+            "BalancerV2ComposableStablePoolFactory",
+            "balancer/balancer-deployments/7211ed9f209d767f8ff411bb57262daf83ecb439/\
+             tasks/deprecated/20230206-composable-stable-pool-v3/artifact/\
+             ComposableStablePoolFactory.json",
+        )?
+        .github(
+            "BalancerV2LiquidityBootstrappingPool",
+            "balancer-labs/balancer-v2-monorepo/7a643349a5ef4511234b19a33e3f18d30770cb66/pkg/\
+             deployments/tasks/20210721-liquidity-bootstrapping-pool/abi/\
+             LiquidityBootstrappingPool.json",
+        )?
+        .github(
+            "BalancerV2LiquidityBootstrappingPoolFactory",
+            "balancer-labs/balancer-v2-monorepo/7a643349a5ef4511234b19a33e3f18d30770cb66/pkg/\
+             deployments/tasks/20210721-liquidity-bootstrapping-pool/abi/\
+             LiquidityBootstrappingPoolFactory.json",
+        )?
+        .github(
+            "BalancerV2WeightedPool",
+            "balancer-labs/balancer-v2-monorepo/a3b570a2aa655d4c4941a67e3db6a06fbd72ef09/pkg/\
+             deployments/extra-abis/WeightedPool.json",
+        )?
+        .github(
+            "BalancerV2StablePool",
+            "balancer-labs/balancer-subgraph-v2/2b97edd5e65aed06718ce64a69111ccdabccf048/abis/\
+             StablePool.json",
+        )?
+        .github(
+            "BalancerV2StablePoolFactoryV2",
+            "balancer-labs/balancer-v2-monorepo/903d34e491a5e9c5d59dabf512c7addf1ccf9bbd/pkg/\
+             deployments/tasks/20220609-stable-pool-v2/abi/StablePoolFactory.json",
+        )?
+        .github(
             "CoWSwapOnchainOrders",
             &format!("cowprotocol/ethflowcontract/{ETHFLOW_VERSION}-artifacts/hardhat-artifacts/src/mixins/CoWSwapOnchainOrders.sol/CoWSwapOnchainOrders.json"),
         )?
