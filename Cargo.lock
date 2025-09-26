@@ -4695,6 +4695,7 @@ dependencies = [
 name = "orderbook"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "app-data",
  "async-trait",
@@ -4706,6 +4707,7 @@ dependencies = [
  "contracts",
  "database",
  "ethcontract",
+ "ethrpc",
  "futures",
  "hex",
  "hex-literal",
