@@ -434,7 +434,7 @@ mod tests {
         },
         anyhow::bail,
         ethcontract::{U256, transport::DynTransport},
-        ethrpc::mock::MockTransport,
+        ethrpc::{alloy::MutWallet, mock::MockTransport},
         maplit::{btreemap, hashmap},
         mockall::predicate,
         std::future,
@@ -446,6 +446,7 @@ mod tests {
         ethrpc::Web3 {
             legacy: web3::Web3::new(DynTransport::new(MockTransport::new())),
             alloy: ethrpc::mock::web3().alloy,
+            wallet: MutWallet::default(),
         }
     }
 
