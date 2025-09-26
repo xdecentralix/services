@@ -1,6 +1,9 @@
-use crate::{
-    domain::{self, eth, liquidity},
-    util::Bytes,
+use {
+    crate::{
+        domain::{self, eth, liquidity},
+        util::Bytes,
+    },
+    ethrpc::alloy::conversions::IntoLegacy,
 };
 
 /// Interaction with a smart contract which is needed to execute this solution
@@ -56,30 +59,6 @@ impl Interaction {
                     liquidity::Kind::Erc4626(edge) => edge.tokens.1.0.into(),
                 };
                 match &interaction.liquidity.kind {
-                    // For AMMs and 0x, keep using max approvals
-                    liquidity::Kind::UniswapV2(_)
-                    | liquidity::Kind::UniswapV3(_)
-                    | liquidity::Kind::BalancerV2Stable(_)
-                    | liquidity::Kind::BalancerV3Stable(_)
-                    | liquidity::Kind::BalancerV2Weighted(_)
-                    | liquidity::Kind::BalancerV3Weighted(_)
-                    | liquidity::Kind::BalancerV2GyroE(_)
-                    | liquidity::Kind::BalancerV2Gyro2CLP(_)
-                    | liquidity::Kind::BalancerV2Gyro3CLP(_)
-                    | liquidity::Kind::BalancerV3GyroE(_)
-                    | liquidity::Kind::BalancerV3Gyro2CLP(_)
-                    | liquidity::Kind::BalancerV3ReClamm(_)
-                    | liquidity::Kind::BalancerV3QuantAmm(_)
-                    | liquidity::Kind::BalancerV3StableSurge(_)
-                    | liquidity::Kind::Swapr(_)
-                    | liquidity::Kind::ZeroEx(_) => vec![
-                        eth::Allowance {
-                            token: interaction.input.token,
-                            spender: address,
-                            amount: eth::U256::max_value(),
-                        }
-                        .into(),
-                    ],
                     liquidity::Kind::Erc4626(edge) => {
                         // For ERC4626, only require bounded approval on wrap (asset->vault)
                         // direction. Wrap if input token equals asset and
@@ -99,6 +78,21 @@ impl Interaction {
                             // Unwrap: no approval required (owner is settlement)
                             vec![]
                         }
+                    }
+                    _ => {
+                        // As a gas optimization, we always approve the max amount possible. This
+                        // minimizes the number of approvals necessary, and therefore
+                        // minimizes the approval fees over time. This is a
+                        // potential security issue, but we assume that the router contract for protocol
+                        // indexed liquidity to be safe.
+                        vec![
+                            eth::Allowance {
+                                token: interaction.input.token,
+                                spender: address,
+                                amount: eth::U256::max_value(),
+                            }
+                            .into(),
+                        ]
                     }
                 }
             }
