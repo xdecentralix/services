@@ -29,7 +29,7 @@ use {
         swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     },
     crate::{
-        ethrpc::{Web3, Web3Transport},
+        ethrpc::{Web3, Web3Transport},     
         recent_block_cache::{Block, CacheConfig},
         token_info::TokenInfoFetching,
     },
@@ -47,11 +47,11 @@ use {
         BalancerV2LiquidityBootstrappingPoolFactory,
         BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory,
         BalancerV2StablePoolFactoryV2,
-        BalancerV2Vault,
         BalancerV2WeightedPool2TokensFactory,
         BalancerV2WeightedPoolFactory,
         BalancerV2WeightedPoolFactoryV3,
         BalancerV2WeightedPoolFactoryV4,
+        alloy::{BalancerV2Vault, InstanceExt},
     },
     ethcontract::{BlockId, H160, H256, Instance, dyns::DynInstance},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
@@ -447,20 +447,20 @@ impl BalancerFactoryKind {
 
 /// All balancer related contracts that we expect to exist.
 pub struct BalancerContracts {
-    pub vault: BalancerV2Vault,
+    pub vault: BalancerV2Vault::Instance,
     pub factories: Vec<(BalancerFactoryKind, DynInstance)>,
 }
 
 impl BalancerContracts {
-    pub async fn try_new(web3: &Web3, factory_kinds: Vec<BalancerFactoryKind>) -> Result<Self> {
-        let web3 = ethrpc::instrumented::instrument_with_label(web3, "balancerV2".into());
-        let vault = BalancerV2Vault::deployed(&web3)
+    pub async fn try_new(web3_provider: &Web3, factory_kinds: Vec<BalancerFactoryKind>) -> Result<Self> {
+        let web3_client = ethrpc::instrumented::instrument_with_label(web3_provider, "balancerV2".into());
+        let vault = BalancerV2Vault::Instance::deployed(&web3_client.alloy)
             .await
             .context("Cannot retrieve balancer vault")?;
 
         macro_rules! instance {
             ($factory:ident) => {{
-                $factory::deployed(&web3)
+                $factory::deployed(&web3_client)
                     .await
                     .context(format!(
                         "Cannot retrieve Balancer factory {}",
@@ -638,6 +638,7 @@ async fn create_aggregate_pool_fetcher(
         ($factory:ident, $instance:expr_2021) => {{
             create_internal_pool_fetcher(
                 contracts.vault.clone(),
+                web3.clone(),
                 $factory::with_deployment_info(
                     &$instance.web3(),
                     $instance.address(),
@@ -713,7 +714,8 @@ async fn create_aggregate_pool_fetcher(
 /// Helper method for creating a boxed `InternalPoolFetching` instance for the
 /// specified factory and parameters.
 fn create_internal_pool_fetcher<Factory>(
-    vault: BalancerV2Vault,
+    vault: BalancerV2Vault::Instance,
+    web3: Web3,
     factory: Factory,
     block_retriever: Arc<dyn BlockRetrieving>,
     token_infos: Arc<dyn TokenInfoFetching>,
@@ -733,7 +735,7 @@ where
 
     Ok(Box::new(Registry::new(
         block_retriever,
-        Arc::new(PoolInfoFetcher::new(vault, factory, token_infos)),
+        Arc::new(PoolInfoFetcher::new(vault, web3, factory, token_infos)),
         factory_instance,
         initial_pools,
         start_sync_at_block,

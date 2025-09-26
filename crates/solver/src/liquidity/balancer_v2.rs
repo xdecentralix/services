@@ -20,8 +20,9 @@ use {
         settlement::SettlementEncoder,
     },
     anyhow::Result,
-    contracts::{BalancerV2Vault, GPv2Settlement},
+    contracts::{GPv2Settlement, alloy::BalancerV2Vault},
     ethcontract::H256,
+    ethrpc::alloy::conversions::IntoLegacy,
     model::TokenPair,
     shared::{
         ethrpc::Web3,
@@ -36,7 +37,7 @@ use {
 /// A liquidity provider for Balancer V2 weighted pools.
 pub struct BalancerV2Liquidity {
     settlement: GPv2Settlement,
-    vault: BalancerV2Vault,
+    vault: BalancerV2Vault::Instance,
     pool_fetcher: Arc<dyn BalancerPoolFetching>,
     allowance_manager: Box<dyn AllowanceManaging>,
 }
@@ -46,7 +47,7 @@ impl BalancerV2Liquidity {
         web3: Web3,
         pool_fetcher: Arc<dyn BalancerPoolFetching>,
         settlement: GPv2Settlement,
-        vault: BalancerV2Vault,
+        vault: BalancerV2Vault::Instance,
     ) -> Self {
         let allowance_manager = AllowanceManager::new(web3, settlement.address());
         Self {
@@ -74,7 +75,7 @@ impl BalancerV2Liquidity {
 
         let allowances = self
             .allowance_manager
-            .get_allowances(tokens, self.vault.address())
+            .get_allowances(tokens, self.vault.address().into_legacy())
             .await?;
 
         let inner = Arc::new(Inner {
@@ -218,7 +219,7 @@ pub struct SettlementHandler {
 
 struct Inner {
     settlement: GPv2Settlement,
-    vault: BalancerV2Vault,
+    vault: BalancerV2Vault::Instance,
     allowances: Allowances,
 }
 
@@ -226,7 +227,7 @@ impl SettlementHandler {
     pub fn new(
         pool_id: H256,
         settlement: GPv2Settlement,
-        vault: BalancerV2Vault,
+        vault: BalancerV2Vault::Instance,
         allowances: Allowances,
     ) -> Self {
         SettlementHandler {
@@ -239,7 +240,7 @@ impl SettlementHandler {
         }
     }
 
-    pub fn vault(&self) -> &BalancerV2Vault {
+    pub fn vault(&self) -> &BalancerV2Vault::Instance {
         &self.inner.vault
     }
 
@@ -373,10 +374,10 @@ mod tests {
         },
     };
 
-    fn dummy_contracts() -> (GPv2Settlement, BalancerV2Vault) {
+    fn dummy_contracts() -> (GPv2Settlement, BalancerV2Vault::Instance) {
         (
             dummy_contract!(GPv2Settlement, H160([0xc0; 20])),
-            dummy_contract!(BalancerV2Vault, H160([0xc1; 20])),
+            BalancerV2Vault::Instance::new([0xc1; 20].into(), ethrpc::mock::web3().alloy),
         )
     }
 
@@ -583,7 +584,7 @@ mod tests {
             settlement: settlement.clone(),
             vault: vault.clone(),
             allowances: Allowances::new(
-                vault.address(),
+                vault.address().into_legacy(),
                 hashmap! {
                     H160([0x70; 20]) => 0.into(),
                     H160([0x71; 20]) => 100.into(),
@@ -625,7 +626,7 @@ mod tests {
             [
                 Approval {
                     token: H160([0x70; 20]),
-                    spender: vault.address(),
+                    spender: vault.address().into_legacy(),
                 }
                 .encode(),
                 BalancerSwapGivenOutInteraction {

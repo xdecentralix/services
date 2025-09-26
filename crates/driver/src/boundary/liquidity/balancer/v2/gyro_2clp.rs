@@ -6,6 +6,7 @@ use {
             liquidity::{self, balancer},
         },
     },
+    ethrpc::alloy::conversions::IntoLegacy,
     shared::sources::balancer_v2::pool_fetching::Gyro2CLPPoolVersion,
     solver::liquidity::{Gyro2CLPPoolOrder, Settleable},
 };
@@ -76,6 +77,7 @@ fn vault(pool: &Gyro2CLPPoolOrder) -> eth::ContractAddress {
         .expect("downcast balancer settlement handler")
         .vault()
         .address()
+        .into_legacy()
         .into()
 }
 
