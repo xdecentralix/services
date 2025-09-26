@@ -107,7 +107,8 @@ pub enum GqlChain {
 impl BalancerApiClient {
     /// Creates a new Balancer API v3 client.
     pub fn from_subgraph_url(subgraph_url: &Url, client: Client, chain: GqlChain) -> Result<Self> {
-        let subgraph_client = SubgraphClient::try_new(subgraph_url.clone(), client, None, usize::MAX)?;
+        let subgraph_client =
+            SubgraphClient::try_new(subgraph_url.clone(), client, None, usize::MAX)?;
         Ok(Self {
             client: subgraph_client,
             chain,

@@ -3,9 +3,9 @@ pub mod dto;
 pub use dto::AuctionError;
 use {
     crate::infra::{
-            api::{Error, State},
-            observe,
-        },
+        api::{Error, State},
+        observe,
+    },
     std::sync::Arc,
     tracing::Instrument,
 };

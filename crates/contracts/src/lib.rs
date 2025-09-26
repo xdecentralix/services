@@ -268,7 +268,7 @@ mod tests {
                 assert_has_deployment_address!(PancakeRouter for *network);
             }
 
-        assert_has_deployment_address!(BalancerV2WeightedPoolFactory for MAINNET);
+            assert_has_deployment_address!(BalancerV2WeightedPoolFactory for MAINNET);
 
             for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
                 assert_has_deployment_address!(BalancerV2StablePoolFactoryV2 for *network);

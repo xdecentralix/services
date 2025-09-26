@@ -14,11 +14,7 @@ use {
     itertools::Itertools,
     model::{order::OrderKind, signature::Signature},
     shared::signature_validator::SignatureValidating,
-    std::{
-        collections::HashMap,
-        future::Future,
-        sync::Arc,
-    },
+    std::{collections::HashMap, future::Future, sync::Arc},
     tap::TapFallible,
     tokio::sync::Mutex,
     tracing::Instrument,
@@ -81,7 +77,10 @@ impl DataAggregator {
     /// Aggregates all the data that is needed to pre-process the given auction.
     /// Uses a shared futures internally to make sure that the works happens
     /// only once for all connected solvers to share.
-    pub async fn start_or_get_tasks_for_auction(&self, request: Arc<String>) -> Result<DataFetchingTasks> {
+    pub async fn start_or_get_tasks_for_auction(
+        &self,
+        request: Arc<String>,
+    ) -> Result<DataFetchingTasks> {
         let mut lock = self.control.lock().await;
         let current_auction = &lock.solve_request;
 

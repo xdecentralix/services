@@ -19,12 +19,21 @@ pub async fn solve(
             orders_count = auction.orders.len(),
             "🎯 RECEIVED SOLVE REQUEST FROM COW PROTOCOL"
         );
-        
+
         // Log request headers to identify source
-        let user_agent = headers.get("user-agent").and_then(|v| v.to_str().ok()).unwrap_or("unknown");
-        let content_type = headers.get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("unknown");
-        let x_request_id = headers.get("x-request-id").and_then(|v| v.to_str().ok()).unwrap_or("none");
-        
+        let user_agent = headers
+            .get("user-agent")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("unknown");
+        let content_type = headers
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("unknown");
+        let x_request_id = headers
+            .get("x-request-id")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("none");
+
         tracing::info!(
             user_agent = %user_agent,
             content_type = %content_type,
@@ -112,7 +121,7 @@ pub async fn solve(
         }
 
         let solutions_dto = dto::solution::from_domain(&solutions);
-        
+
         tracing::info!(
             auction_id = %auction_id,
             returning_solutions = solutions_dto.solutions.len(),

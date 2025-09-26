@@ -270,8 +270,8 @@ impl Competition {
             }
         };
         if tokio::time::timeout(deadline.remaining().unwrap_or_default(), future)
-        .await
-        .is_err()
+            .await
+            .is_err()
         {
             observe::postprocessing_timed_out(&settlements);
             notify::postprocessing_timed_out(&self.solver, auction.id())

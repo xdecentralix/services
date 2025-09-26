@@ -83,8 +83,8 @@ impl Interaction {
                         // As a gas optimization, we always approve the max amount possible. This
                         // minimizes the number of approvals necessary, and therefore
                         // minimizes the approval fees over time. This is a
-                        // potential security issue, but we assume that the router contract for protocol
-                        // indexed liquidity to be safe.
+                        // potential security issue, but we assume that the router contract for
+                        // protocol indexed liquidity to be safe.
                         vec![
                             eth::Allowance {
                                 token: interaction.input.token,
