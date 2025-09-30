@@ -495,6 +495,7 @@ crate::bindings!(
 );
 crate::bindings!(IUniswapLikeRouter);
 crate::bindings!(IUniswapLikePair);
+crate::bindings!(UniswapV3Pool);
 
 crate::bindings!(
     HooksTrampoline,
@@ -584,7 +585,7 @@ macro_rules! bindings {
             mod [<$contract Private>] {
                 alloy::sol!(
                     #[allow(missing_docs, clippy::too_many_arguments)]
-                    #[sol(rpc)]
+                    #[sol(rpc, all_derives)]
                     $contract,
                     concat!("./artifacts/", stringify!($contract), ".json"),
                 );
