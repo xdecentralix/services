@@ -7,12 +7,13 @@ use {
         swap::fixed_point::Bfp,
     },
     anyhow::{Result, anyhow},
-    contracts::{
+    contracts::alloy::{
         BalancerV2WeightedPool,
         BalancerV2WeightedPoolFactory,
         BalancerV2WeightedPoolFactoryV3,
     },
     ethcontract::{BlockId, H160},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
 };
@@ -65,19 +66,21 @@ impl PoolIndexing for PoolInfo {
 }
 
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV2WeightedPoolFactory {
+impl FactoryIndexing for BalancerV2WeightedPoolFactory::Instance {
     type PoolInfo = PoolInfo;
     type PoolState = PoolState;
 
     async fn specialize_pool_info(&self, pool: common::PoolInfo) -> Result<Self::PoolInfo> {
-        let pool_contract = BalancerV2WeightedPool::at(&self.raw_instance().web3(), pool.address);
+        let pool_contract = BalancerV2WeightedPool::Instance::new(
+            pool.address.into_alloy(),
+            self.provider().clone(),
+        );
         let weights = pool_contract
-            .methods()
-            .get_normalized_weights()
+            .getNormalizedWeights()
             .call()
             .await?
             .into_iter()
-            .map(Bfp::from_wei)
+            .map(|weight| Bfp::from_wei(weight.into_legacy()))
             .collect();
 
         Ok(PoolInfo {
@@ -97,12 +100,13 @@ impl FactoryIndexing for BalancerV2WeightedPoolFactory {
 }
 
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV2WeightedPoolFactoryV3 {
-    type PoolInfo = <BalancerV2WeightedPoolFactory as FactoryIndexing>::PoolInfo;
-    type PoolState = <BalancerV2WeightedPoolFactory as FactoryIndexing>::PoolState;
+impl FactoryIndexing for BalancerV2WeightedPoolFactoryV3::Instance {
+    type PoolInfo = <BalancerV2WeightedPoolFactory::Instance as FactoryIndexing>::PoolInfo;
+    type PoolState = <BalancerV2WeightedPoolFactory::Instance as FactoryIndexing>::PoolState;
 
     async fn specialize_pool_info(&self, pool: common::PoolInfo) -> Result<Self::PoolInfo> {
-        let v0 = BalancerV2WeightedPoolFactory::at(&self.raw_instance().web3(), self.address());
+        let v0 =
+            BalancerV2WeightedPoolFactory::Instance::new(*self.address(), self.provider().clone());
         v0.specialize_pool_info(pool).await
     }
 
@@ -145,9 +149,15 @@ mod tests {
     use {
         super::*,
         crate::sources::balancer_v2::graph_api::{DynamicData, GqlChain, PoolData, Token},
+        alloy::{
+            dyn_abi::{DynSolValue, FunctionExt},
+            primitives::Address,
+            providers::{Provider, ProviderBuilder, mock::Asserter},
+        },
         contracts::dummy_contract,
         ethcontract::{H160, H256, U256},
         ethcontract_mock::Mock,
+        ethrpc::alloy::conversions::IntoLegacy,
         futures::future,
         maplit::btreemap,
     };
@@ -266,19 +276,44 @@ mod tests {
     async fn fetch_weighted_pool() {
         let weights = [bfp!("0.5"), bfp!("0.25"), bfp!("0.25")];
 
-        let mock = Mock::new(42);
-        let web3 = mock.web3();
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .connect_mocked_client(asserter.clone())
+            .erased();
 
-        let pool = mock.deploy(BalancerV2WeightedPool::raw_contract().interface.abi.clone());
-        pool.expect_call(BalancerV2WeightedPool::signatures().get_normalized_weights())
-            .returns(weights.iter().copied().map(Bfp::as_uint256).collect());
+        let pool =
+            BalancerV2WeightedPool::Instance::new(Address::new([0x90; 20]), provider.clone());
+        let factory = BalancerV2WeightedPoolFactory::Instance::new(
+            Address::new([0xfa; 20]),
+            provider.clone(),
+        );
+        let get_normalized_weights_response = {
+            let weighted_response = DynSolValue::Array(
+                weights
+                    .iter()
+                    .copied()
+                    .map(|w| DynSolValue::Uint(w.as_uint256().into_alloy(), 256))
+                    .collect(),
+            );
 
-        let factory = BalancerV2WeightedPoolFactory::at(&web3, H160([0xfa; 20]));
+            BalancerV2WeightedPool::abi_functions_by_name("getNormalizedWeights")
+                .unwrap()
+                .first()
+                .unwrap()
+                .abi_encode_output(&[weighted_response])
+                .unwrap()
+        };
+        asserter.push_success(&get_normalized_weights_response);
+
+        let factory = BalancerV2WeightedPoolFactory::Instance::new(
+            Address::new([0xfa; 20]),
+            provider.clone(),
+        );
         let pool = factory
             .specialize_pool_info(common::PoolInfo {
                 id: H256([0x90; 32]),
                 tokens: vec![H160([1; 20]), H160([2; 20]), H160([3; 20])],
-                address: pool.address(),
+                address: pool.address().into_legacy(),
                 scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0), Bfp::exp10(0)],
                 rate_providers: vec![H160::zero(), H160::zero(), H160::zero()],
                 block_created: 42,
@@ -306,10 +341,16 @@ mod tests {
         let weights = [bfp!("0.8"), bfp!("0.2")];
         let swap_fee = bfp!("0.003");
 
-        let mock = Mock::new(42);
-        let web3 = mock.web3();
+        // Create a mock alloy provider (no actual RPC calls needed for this test)
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .connect_mocked_client(asserter)
+            .erased();
 
-        let factory = dummy_contract!(BalancerV2WeightedPoolFactory, H160::default());
+        let factory = BalancerV2WeightedPoolFactory::Instance::new(
+            Address::default(),
+            provider,
+        );
         let pool_info = PoolInfo {
             common: common::PoolInfo {
                 id: H256([0x90; 32]),
@@ -327,17 +368,13 @@ mod tests {
             tokens,
         };
 
-        let pool_state = {
-            let block = web3.eth().block_number().await.unwrap();
+        let pool_state = factory.fetch_pool_state(
+            &pool_info,
+            future::ready(common_pool_state.clone()).boxed(),
+            BlockId::Number(42.into()),
+        );
 
-            let pool_state = factory.fetch_pool_state(
-                &pool_info,
-                future::ready(common_pool_state.clone()).boxed(),
-                block.into(),
-            );
-
-            pool_state.await.unwrap()
-        };
+        let pool_state = pool_state.await.unwrap();
 
         let weighted_tokens = common_pool_state
             .tokens

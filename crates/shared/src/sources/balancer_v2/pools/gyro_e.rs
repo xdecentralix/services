@@ -7,8 +7,9 @@ use {
         swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     },
     anyhow::{Result, anyhow},
-    contracts::{BalancerV2GyroECLPPool, BalancerV2GyroECLPPoolFactory},
-    ethcontract::{BlockId, H160},
+    contracts::alloy::{BalancerV2GyroECLPPool, BalancerV2GyroECLPPoolFactory},
+    ethcontract::{BlockId, I256, H160},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
 };
@@ -129,33 +130,42 @@ impl PoolIndexing for PoolInfo {
 }
 
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV2GyroECLPPoolFactory {
+impl FactoryIndexing for BalancerV2GyroECLPPoolFactory::Instance {
     type PoolInfo = PoolInfo;
     type PoolState = PoolState;
 
     async fn specialize_pool_info(&self, pool: common::PoolInfo) -> Result<Self::PoolInfo> {
         // For Gyroscope E-CLP, we need to fetch the immutable parameters from the pool
         // contract
-        let pool_contract = BalancerV2GyroECLPPool::at(&self.raw_instance().web3(), pool.address);
+        let pool_contract = BalancerV2GyroECLPPool::Instance::new(
+            pool.address.into_alloy(),
+            self.provider().clone(),
+        );
 
-        let (params, derived_params) = pool_contract.get_eclp_params().call().await?;
+        let result = pool_contract.getECLPParams().call().await?;
+
+        // Helper to convert alloy signed I256 to ethcontract I256
+        let convert_signed = |alloy_i256: alloy::primitives::I256| -> I256 {
+            let underlying_u256 = alloy_i256.into_raw();
+            I256::from_raw(underlying_u256.into_legacy())
+        };
 
         Ok(PoolInfo {
             common: pool,
-            params_alpha: SBfp::from_wei(params.0),
-            params_beta: SBfp::from_wei(params.1),
-            params_c: SBfp::from_wei(params.2),
-            params_s: SBfp::from_wei(params.3),
-            params_lambda: SBfp::from_wei(params.4),
-            tau_alpha_x: SBfp::from_wei(derived_params.0.0),
-            tau_alpha_y: SBfp::from_wei(derived_params.0.1),
-            tau_beta_x: SBfp::from_wei(derived_params.1.0),
-            tau_beta_y: SBfp::from_wei(derived_params.1.1),
-            u: SBfp::from_wei(derived_params.2),
-            v: SBfp::from_wei(derived_params.3),
-            w: SBfp::from_wei(derived_params.4),
-            z: SBfp::from_wei(derived_params.5),
-            d_sq: SBfp::from_wei(derived_params.6),
+            params_alpha: SBfp::from_wei(convert_signed(result.params.alpha)),
+            params_beta: SBfp::from_wei(convert_signed(result.params.beta)),
+            params_c: SBfp::from_wei(convert_signed(result.params.c)),
+            params_s: SBfp::from_wei(convert_signed(result.params.s)),
+            params_lambda: SBfp::from_wei(convert_signed(result.params.lambda)),
+            tau_alpha_x: SBfp::from_wei(convert_signed(result.d.tauAlpha.x)),
+            tau_alpha_y: SBfp::from_wei(convert_signed(result.d.tauAlpha.y)),
+            tau_beta_x: SBfp::from_wei(convert_signed(result.d.tauBeta.x)),
+            tau_beta_y: SBfp::from_wei(convert_signed(result.d.tauBeta.y)),
+            u: SBfp::from_wei(convert_signed(result.d.u)),
+            v: SBfp::from_wei(convert_signed(result.d.v)),
+            w: SBfp::from_wei(convert_signed(result.d.w)),
+            z: SBfp::from_wei(convert_signed(result.d.z)),
+            d_sq: SBfp::from_wei(convert_signed(result.d.dSq)),
         })
     }
 

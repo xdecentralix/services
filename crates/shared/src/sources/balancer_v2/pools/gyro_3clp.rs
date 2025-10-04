@@ -7,8 +7,9 @@ use {
         swap::fixed_point::Bfp,
     },
     anyhow::{Result, anyhow},
-    contracts::{BalancerV2Gyro3CLPPool, BalancerV2Gyro3CLPPoolFactory},
+    contracts::alloy::{BalancerV2Gyro3CLPPool, BalancerV2Gyro3CLPPoolFactory},
     ethcontract::{BlockId, H160},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
 };
@@ -52,20 +53,23 @@ impl PoolIndexing for PoolInfo {
 }
 
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV2Gyro3CLPPoolFactory {
+impl FactoryIndexing for BalancerV2Gyro3CLPPoolFactory::Instance {
     type PoolInfo = PoolInfo;
     type PoolState = PoolState;
 
     async fn specialize_pool_info(&self, pool: common::PoolInfo) -> Result<Self::PoolInfo> {
         // For Gyroscope 3-CLP, we need to fetch the immutable parameter from the pool
         // contract
-        let pool_contract = BalancerV2Gyro3CLPPool::at(&self.raw_instance().web3(), pool.address);
+        let pool_contract = BalancerV2Gyro3CLPPool::Instance::new(
+            pool.address.into_alloy(),
+            self.provider().clone(),
+        );
 
-        let root3_alpha = pool_contract.get_root_3_alpha().call().await?;
+        let root3_alpha = pool_contract.getRoot3Alpha().call().await?;
 
         Ok(PoolInfo {
             common: pool,
-            root3_alpha: Bfp::from_wei(root3_alpha),
+            root3_alpha: Bfp::from_wei(root3_alpha.into_legacy()),
         })
     }
 

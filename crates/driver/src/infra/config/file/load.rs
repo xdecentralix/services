@@ -285,54 +285,14 @@ pub async fn load(chain: Chain, path: &Path) -> infra::Config {
                         let manual_config = manual_config.as_ref();
                         liquidity::config::BalancerV2 {
                             vault: manual_config.vault.into(),
-                            weighted: manual_config
-                                .weighted
-                                .iter()
-                                .cloned()
-                                .map(eth::ContractAddress::from)
-                                .collect(),
-                            weighted_v3plus: manual_config
-                                .weighted_v3plus
-                                .iter()
-                                .cloned()
-                                .map(eth::ContractAddress::from)
-                                .collect(),
-                            stable: manual_config
-                                .stable
-                                .iter()
-                                .cloned()
-                                .map(eth::ContractAddress::from)
-                                .collect(),
-                            liquidity_bootstrapping: manual_config
-                                .liquidity_bootstrapping
-                                .iter()
-                                .cloned()
-                                .map(eth::ContractAddress::from)
-                                .collect(),
-                            composable_stable: manual_config
-                                .composable_stable
-                                .iter()
-                                .cloned()
-                                .map(eth::ContractAddress::from)
-                                .collect(),
-                            gyro_e: manual_config
-                                .gyro_e
-                                .iter()
-                                .cloned()
-                                .map(eth::ContractAddress::from)
-                                .collect(),
-                            gyro_2clp: manual_config
-                                .gyro_2clp
-                                .iter()
-                                .cloned()
-                                .map(eth::ContractAddress::from)
-                                .collect(),
-                            gyro_3clp: manual_config
-                                .gyro_3clp
-                                .iter()
-                                .cloned()
-                                .map(eth::ContractAddress::from)
-                                .collect(),
+                            weighted: manual_config.weighted.clone(),
+                            weighted_v3plus: manual_config.weighted_v3plus.clone(),
+                            stable: manual_config.stable.clone(),
+                            liquidity_bootstrapping: manual_config.liquidity_bootstrapping.clone(),
+                            composable_stable: manual_config.composable_stable.clone(),
+                            gyro_e: manual_config.gyro_e.clone(),
+                            gyro_2clp: manual_config.gyro_2clp.clone(),
+                            gyro_3clp: manual_config.gyro_3clp.clone(),
                             pool_deny_list: manual_config.pool_deny_list.clone(),
                             graph_url: manual_config.graph_url.clone(),
                             reinit_interval: manual_config.reinit_interval,

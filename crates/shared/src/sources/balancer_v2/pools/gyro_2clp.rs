@@ -7,8 +7,9 @@ use {
         swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     },
     anyhow::{Result, anyhow},
-    contracts::{BalancerV2Gyro2CLPPool, BalancerV2Gyro2CLPPoolFactory},
-    ethcontract::{BlockId, H160},
+    contracts::alloy::{BalancerV2Gyro2CLPPool, BalancerV2Gyro2CLPPoolFactory},
+    ethcontract::{BlockId, I256, H160},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
 };
@@ -58,29 +59,24 @@ impl PoolIndexing for PoolInfo {
 }
 
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV2Gyro2CLPPoolFactory {
+impl FactoryIndexing for BalancerV2Gyro2CLPPoolFactory::Instance {
     type PoolInfo = PoolInfo;
     type PoolState = PoolState;
 
     async fn specialize_pool_info(&self, pool: common::PoolInfo) -> Result<Self::PoolInfo> {
         // For Gyroscope 2-CLP, we need to fetch the immutable parameters from the pool
         // contract
-        let pool_contract = BalancerV2Gyro2CLPPool::at(&self.raw_instance().web3(), pool.address);
+        let pool_contract = BalancerV2Gyro2CLPPool::Instance::new(
+            pool.address.into_alloy(),
+            self.provider().clone(),
+        );
 
-        let sqrt_params = pool_contract.get_sqrt_parameters().call().await?;
+        let sqrt_params = pool_contract.getSqrtParameters().call().await?;
 
         Ok(PoolInfo {
             common: pool,
-            sqrt_alpha: SBfp::from_wei(
-                sqrt_params[0]
-                    .try_into()
-                    .map_err(|_| anyhow!("sqrt_alpha value too large for I256"))?,
-            ),
-            sqrt_beta: SBfp::from_wei(
-                sqrt_params[1]
-                    .try_into()
-                    .map_err(|_| anyhow!("sqrt_beta value too large for I256"))?,
-            ),
+            sqrt_alpha: SBfp::from_wei(I256::from_raw(sqrt_params[0].into_legacy())),
+            sqrt_beta: SBfp::from_wei(I256::from_raw(sqrt_params[1].into_legacy())),
         })
     }
 

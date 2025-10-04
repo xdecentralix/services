@@ -10,16 +10,18 @@ use {
     anyhow::{Context, Result},
     chain::Chain,
     contracts::{
-        BalancerV2ComposableStablePoolFactory,
-        BalancerV2Gyro2CLPPoolFactory,
-        BalancerV2Gyro3CLPPoolFactory,
-        BalancerV2GyroECLPPoolFactory,
-        BalancerV2LiquidityBootstrappingPoolFactory,
-        BalancerV2StablePoolFactoryV2,
-        BalancerV2WeightedPoolFactory,
-        BalancerV2WeightedPoolFactoryV3,
         GPv2Settlement,
-        alloy::BalancerV2Vault,
+        alloy::{
+            BalancerV2ComposableStablePoolFactory,
+            BalancerV2Gyro2CLPPoolFactory,
+            BalancerV2Gyro3CLPPoolFactory,
+            BalancerV2GyroECLPPoolFactory,
+            BalancerV2LiquidityBootstrappingPoolFactory,
+            BalancerV2StablePoolFactoryV2,
+            BalancerV2Vault,
+            BalancerV2WeightedPoolFactory,
+            BalancerV2WeightedPoolFactoryV3,
+        },
     },
     ethrpc::{
         alloy::conversions::IntoAlloy,
@@ -28,10 +30,9 @@ use {
     shared::{
         http_solver::model::TokenAmount,
         sources::balancer_v2::{
-            BalancerFactoryKind,
             BalancerPoolFetcher,
             GqlChain,
-            pool_fetching::BalancerContracts,
+            pool_fetching::{BalancerContracts, BalancerFactoryInstance},
         },
         token_info::{CachedTokenInfoFetcher, TokenInfoFetcher},
     },
@@ -142,23 +143,18 @@ async fn init_liquidity(
                 .weighted
                 .iter()
                 .map(|&factory| {
-                    (
-                        BalancerFactoryKind::Weighted,
-                        BalancerV2WeightedPoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
-                    )
+                    BalancerFactoryInstance::Weighted(BalancerV2WeightedPoolFactory::Instance::new(
+                        factory,
+                        web3.alloy.clone(),
+                    ))
                 })
                 .collect::<Vec<_>>(),
             config
                 .weighted_v3plus
                 .iter()
                 .map(|&factory| {
-                    (
-                        BalancerFactoryKind::WeightedV3,
-                        BalancerV2WeightedPoolFactoryV3::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                    BalancerFactoryInstance::WeightedV3(
+                        BalancerV2WeightedPoolFactoryV3::Instance::new(factory, web3.alloy.clone()),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -166,23 +162,21 @@ async fn init_liquidity(
                 .stable
                 .iter()
                 .map(|&factory| {
-                    (
-                        BalancerFactoryKind::StableV2,
-                        BalancerV2StablePoolFactoryV2::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
-                    )
+                    BalancerFactoryInstance::StableV2(BalancerV2StablePoolFactoryV2::Instance::new(
+                        factory,
+                        web3.alloy.clone(),
+                    ))
                 })
                 .collect::<Vec<_>>(),
             config
                 .liquidity_bootstrapping
                 .iter()
                 .map(|&factory| {
-                    (
-                        BalancerFactoryKind::LiquidityBootstrapping,
-                        BalancerV2LiquidityBootstrappingPoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                    BalancerFactoryInstance::LiquidityBootstrapping(
+                        BalancerV2LiquidityBootstrappingPoolFactory::Instance::new(
+                            factory,
+                            web3.alloy.clone(),
+                        ),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -190,11 +184,11 @@ async fn init_liquidity(
                 .composable_stable
                 .iter()
                 .map(|&factory| {
-                    (
-                        BalancerFactoryKind::ComposableStable,
-                        BalancerV2ComposableStablePoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                    BalancerFactoryInstance::ComposableStable(
+                        BalancerV2ComposableStablePoolFactory::Instance::new(
+                            factory,
+                            web3.alloy.clone(),
+                        ),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -202,36 +196,30 @@ async fn init_liquidity(
                 .gyro_e
                 .iter()
                 .map(|&factory| {
-                    (
-                        BalancerFactoryKind::GyroE,
-                        BalancerV2GyroECLPPoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
-                    )
+                    BalancerFactoryInstance::GyroE(BalancerV2GyroECLPPoolFactory::Instance::new(
+                        factory,
+                        web3.alloy.clone(),
+                    ))
                 })
                 .collect::<Vec<_>>(),
             config
                 .gyro_2clp
                 .iter()
                 .map(|&factory| {
-                    (
-                        BalancerFactoryKind::Gyro2CLP,
-                        BalancerV2Gyro2CLPPoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
-                    )
+                    BalancerFactoryInstance::Gyro2CLP(BalancerV2Gyro2CLPPoolFactory::Instance::new(
+                        factory,
+                        web3.alloy.clone(),
+                    ))
                 })
                 .collect::<Vec<_>>(),
             config
                 .gyro_3clp
                 .iter()
                 .map(|&factory| {
-                    (
-                        BalancerFactoryKind::Gyro3CLP,
-                        BalancerV2Gyro3CLPPoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
-                    )
+                    BalancerFactoryInstance::Gyro3CLP(BalancerV2Gyro3CLPPoolFactory::Instance::new(
+                        factory,
+                        web3.alloy.clone(),
+                    ))
                 })
                 .collect::<Vec<_>>(),
         ]
