@@ -76,7 +76,6 @@ include_contracts! {
     CowAmmConstantProductFactory;
     CowAmmLegacyHelper;
     CowAmmUniswapV2PriceOracle;
-    CoWSwapEthFlow;
     CoWSwapOnchainOrders;
     CowProtocolToken;
     ERC1271SignatureValidator;
