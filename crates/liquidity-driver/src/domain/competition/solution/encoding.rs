@@ -229,7 +229,7 @@ pub fn tx(
         let router = contracts
             .flashloan_router()
             .ok_or(Error::FlashloanSupportDisabled)?;
-        
+
         let flashloans = solution
             .flashloans
             .values()

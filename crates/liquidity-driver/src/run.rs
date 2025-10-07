@@ -46,7 +46,6 @@ pub async fn run(
 /// Run the driver. This function exists to avoid multiple monomorphizations of
 /// the `run` code, which bloats the binaries and increases compile times.
 async fn run_with(args: cli::Args, addr_sender: Option<oneshot::Sender<SocketAddr>>) {
-
     infra::observe::init(observe::Config::new(
         &args.log,
         args.stderr_threshold,
@@ -102,7 +101,6 @@ async fn run_with(args: cli::Args, addr_sender: Option<oneshot::Sender<SocketAdd
         app_data_retriever,
     );
 
-    drop(startup_span_guard);
     futures::pin_mut!(serve);
     tokio::select! {
         result = &mut serve => panic!("serve task exited: {result:?}"),

@@ -381,7 +381,6 @@ struct ContractsConfig {
     /// Flashloan router to support taking out multiple flashloans
     /// in the same settlement.
     flashloan_router: Option<eth::H160>,
-
 }
 
 #[derive(Debug, Clone, Deserialize)]
