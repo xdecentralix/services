@@ -91,7 +91,6 @@ include_contracts! {
     IERC4626;
     IRateProvider;
     IUniswapLikePair;
-    IUniswapLikeRouter;
     IUniswapV3Factory;
     Permit2;
     UniswapV3Pool;
