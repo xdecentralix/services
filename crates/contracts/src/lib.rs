@@ -90,7 +90,6 @@ include_contracts! {
     IFlashLoanSolverWrapper;
     IERC4626;
     IRateProvider;
-    ISwaprPair;
     IUniswapLikePair;
     IUniswapLikeRouter;
     IUniswapV3Factory;
