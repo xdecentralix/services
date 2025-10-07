@@ -94,7 +94,6 @@ include_contracts! {
     IUniswapLikeRouter;
     IUniswapV3Factory;
     Permit2;
-    TestnetUniswapV2Router02;
     UniswapV2Factory;
     UniswapV2Router02;
     UniswapV3Pool;
