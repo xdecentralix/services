@@ -95,7 +95,6 @@ include_contracts! {
     IUniswapLikeRouter;
     IUniswapV3Factory;
     Permit2;
-    SwaprRouter;
     TestnetUniswapV2Router02;
     UniswapV2Factory;
     UniswapV2Router02;
@@ -245,15 +244,9 @@ mod tests {
 
             assert!(alloy::BalancerV2WeightedPoolFactory::deployment_address(&MAINNET).is_some());
 
-            for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
-                assert!(
-                    alloy::BalancerV2StablePoolFactoryV2::deployment_address(network).is_some()
-                );
-            }
-
-            for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
-                assert_has_deployment_address!(SwaprRouter for *network);
-            }
+        for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
+            assert!(alloy::BalancerV2StablePoolFactoryV2::deployment_address(network).is_some());
+        }
 
             // only sepolia
             assert_has_deployment_address!(TestnetUniswapV2Router02 for SEPOLIA);
