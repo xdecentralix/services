@@ -137,8 +137,9 @@ pub async fn into_domain(
                     .flashloan_hint
                     .clone()
                     .map(|hint| order::FlashloanHint {
-                        lender: eth::Address(hint.lender),
-                        borrower: eth::Address(hint.borrower),
+                        liquidity_provider: eth::Address(hint.liquidity_provider),
+                        protocol_adapter: eth::Address(hint.protocol_adapter),
+                        receiver: eth::Address(hint.receiver),
                         token: eth::TokenAddress(hint.token),
                         amount: hint.amount,
                     }),
