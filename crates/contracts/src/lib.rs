@@ -77,7 +77,6 @@ include_contracts! {
     CowProtocolToken;
     ERC1271SignatureValidator;
     ERC20;
-    FlashLoanRouter;
     GPv2AllowListAuthentication;
     GPv2Settlement;
     IERC4626;
