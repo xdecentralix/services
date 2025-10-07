@@ -494,6 +494,7 @@ crate::bindings!(
     }
 );
 crate::bindings!(IUniswapLikeRouter);
+crate::bindings!(IUniswapLikePair);
 
 pub use alloy::providers::DynProvider as Provider;
 
