@@ -493,6 +493,8 @@ crate::bindings!(
         // Not available on Lens
     }
 );
+crate::bindings!(IUniswapLikeRouter);
+crate::bindings!(IUniswapLikePair);
 
 pub use alloy::providers::DynProvider as Provider;
 
