@@ -94,7 +94,6 @@ include_contracts! {
     IUniswapLikeRouter;
     IUniswapV3Factory;
     Permit2;
-    UniswapV2Router02;
     UniswapV3Pool;
     UniswapV3QuoterV2;
     UniswapV3SwapRouterV2;
@@ -208,9 +207,6 @@ mod tests {
         }
         for network in &[MAINNET, GNOSIS, SEPOLIA] {
             assert_has_deployment_address!(CowProtocolToken for *network);
-        }
-        for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
-            assert_has_deployment_address!(UniswapV2Router02 for *network);
         }
         for network in &[MAINNET, SEPOLIA, ARBITRUM_ONE] {
             assert_has_deployment_address!(UniswapV3SwapRouterV2 for *network);
