@@ -150,9 +150,9 @@ mod tests {
         super::*,
         crate::sources::balancer_v2::graph_api::{DynamicData, GqlChain, PoolData, Token},
         alloy::{
-            dyn_abi::{DynSolValue, FunctionExt},
             primitives::Address,
             providers::{Provider, ProviderBuilder, mock::Asserter},
+            sol_types::SolCall,
         },
         ethcontract::{H160, H256, U256},
         ethrpc::alloy::conversions::IntoLegacy,
@@ -281,28 +281,18 @@ mod tests {
 
         let pool =
             BalancerV2WeightedPool::Instance::new(Address::new([0x90; 20]), provider.clone());
-        let get_normalized_weights_response = {
-            let weighted_response = DynSolValue::Array(
-                weights
-                    .iter()
-                    .copied()
-                    .map(|w| DynSolValue::Uint(w.as_uint256().into_alloy(), 256))
-                    .collect(),
-            );
-
-            BalancerV2WeightedPool::abi_functions_by_name("getNormalizedWeights")
-                .unwrap()
-                .first()
-                .unwrap()
-                .abi_encode_output(&[weighted_response])
-                .unwrap()
-        };
-        asserter.push_success(&get_normalized_weights_response);
-
         let factory = BalancerV2WeightedPoolFactory::Instance::new(
             Address::new([0xfa; 20]),
             provider.clone(),
         );
+        let get_normalized_weights_response =
+            BalancerV2WeightedPool::BalancerV2WeightedPool::getNormalizedWeightsCall::abi_encode_returns(
+                &weights.iter()
+                    .map(|w| w.as_uint256().into_alloy())
+                    .collect()
+            );
+        asserter.push_success(&get_normalized_weights_response);
+
         let pool = factory
             .specialize_pool_info(common::PoolInfo {
                 id: H256([0x90; 32]),
