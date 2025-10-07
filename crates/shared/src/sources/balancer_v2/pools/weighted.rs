@@ -154,9 +154,7 @@ mod tests {
             primitives::Address,
             providers::{Provider, ProviderBuilder, mock::Asserter},
         },
-        contracts::dummy_contract,
         ethcontract::{H160, H256, U256},
-        ethcontract_mock::Mock,
         ethrpc::alloy::conversions::IntoLegacy,
         futures::future,
         maplit::btreemap,
@@ -283,10 +281,6 @@ mod tests {
 
         let pool =
             BalancerV2WeightedPool::Instance::new(Address::new([0x90; 20]), provider.clone());
-        let factory = BalancerV2WeightedPoolFactory::Instance::new(
-            Address::new([0xfa; 20]),
-            provider.clone(),
-        );
         let get_normalized_weights_response = {
             let weighted_response = DynSolValue::Array(
                 weights
