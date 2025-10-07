@@ -46,9 +46,6 @@ pub async fn run(
 /// Run the driver. This function exists to avoid multiple monomorphizations of
 /// the `run` code, which bloats the binaries and increases compile times.
 async fn run_with(args: cli::Args, addr_sender: Option<oneshot::Sender<SocketAddr>>) {
-    // Start a new span that measures the initialization phase of the driver
-    let startup_span = tracing::info_span!("driver_startup");
-    let startup_span_guard = startup_span.enter();
 
     infra::observe::init(observe::Config::new(
         &args.log,
