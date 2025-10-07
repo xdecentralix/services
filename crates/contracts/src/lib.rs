@@ -85,7 +85,6 @@ include_contracts! {
     FlashLoanRouter;
     GPv2AllowListAuthentication;
     GPv2Settlement;
-    HoneyswapRouter;
     HooksTrampoline;
     IAavePool;
     IFlashLoanSolverWrapper;
