@@ -8,7 +8,7 @@ use {
     },
     anyhow::{Result, anyhow},
     contracts::alloy::{BalancerV2Gyro2CLPPool, BalancerV2Gyro2CLPPoolFactory},
-    ethcontract::{BlockId, I256, H160},
+    ethcontract::{BlockId, H160, I256},
     ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,

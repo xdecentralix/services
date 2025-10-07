@@ -347,10 +347,7 @@ mod tests {
             .connect_mocked_client(asserter)
             .erased();
 
-        let factory = BalancerV2WeightedPoolFactory::Instance::new(
-            Address::default(),
-            provider,
-        );
+        let factory = BalancerV2WeightedPoolFactory::Instance::new(Address::default(), provider);
         let pool_info = PoolInfo {
             common: common::PoolInfo {
                 id: H256([0x90; 32]),
