@@ -94,7 +94,6 @@ include_contracts! {
     IUniswapLikePair;
     IUniswapLikeRouter;
     IUniswapV3Factory;
-    PancakeRouter;
     Permit2;
     SushiSwapRouter;
     SwaprRouter;
@@ -246,10 +245,6 @@ mod tests {
                 );
             }
 
-            for network in &[MAINNET, ARBITRUM_ONE] {
-                assert_has_deployment_address!(PancakeRouter for *network);
-            }
-
             assert!(alloy::BalancerV2WeightedPoolFactory::deployment_address(&MAINNET).is_some());
 
             for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
@@ -261,9 +256,6 @@ mod tests {
             for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
                 assert_has_deployment_address!(SwaprRouter for *network);
             }
-
-        // only gnosis
-        assert_has_deployment_address!(HoneyswapRouter for GNOSIS);
 
             // only sepolia
             assert_has_deployment_address!(TestnetUniswapV2Router02 for SEPOLIA);
