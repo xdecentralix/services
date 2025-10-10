@@ -116,6 +116,8 @@ impl Competition {
     #[instrument(skip_all)]
     pub async fn solve(&self, auction: Arc<String>) -> Result<Option<Solved>, Error> {
         let start = Instant::now();
+        let timer = ::observe::metrics::metrics()
+            .on_auction_overhead_start("driver", "pre_processing_total");
 
         let tasks = self
             .fetcher
@@ -180,6 +182,7 @@ impl Competition {
             .auction_preprocessing
             .with_label_values(&["total"])
             .observe(elapsed.as_secs_f64());
+        drop(timer);
         tracing::debug!(?elapsed, "auction task execution time");
 
         let auction = &auction;
@@ -521,6 +524,7 @@ impl Competition {
     {
         task::spawn_blocking(move || {
             let _timer = metrics::get().processing_stage_timer(stage);
+            let _timer2 = ::observe::metrics::metrics().on_auction_overhead_start("driver", stage);
             f()
         })
         .await

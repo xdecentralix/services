@@ -4648,6 +4648,7 @@ dependencies = [
  "pin-project-lite",
  "prometheus",
  "prometheus-metric-storage",
+ "scopeguard",
  "serde",
  "serde_json",
  "time",
