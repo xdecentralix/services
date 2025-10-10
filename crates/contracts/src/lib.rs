@@ -97,7 +97,6 @@ pub mod support {
 pub mod test {
     include_contracts! {
         Counter;
-        GasHog;
     }
 }
 
