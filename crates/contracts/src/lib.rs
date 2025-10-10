@@ -91,7 +91,6 @@ include_contracts! {
 pub mod support {
     include_contracts! {
         Balances;
-        Signatures;
     }
 }
 

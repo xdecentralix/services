@@ -232,7 +232,7 @@ pub fn tx(
             .flashloan_router()
             .ok_or(Error::FlashloanSupportDisabled)?;
 
-            let flashloans = solution
+        let flashloans = solution
             .flashloans
             .values()
             .map(|flashloan| LoanRequest::Data {
