@@ -79,6 +79,9 @@ pub async fn solve(
         };
         let protocols = state.protocols();
 
+        // Serialize auction DTO for potential saving later (before consuming it)
+        let auction_json = serde_json::to_value(&auction).ok();
+
         let auction = match dto::auction::into_domain(
             auction,
             liquidity_client,
@@ -128,6 +131,18 @@ pub async fn solve(
             "✅ SENDING RESPONSE TO COW PROTOCOL"
         );
 
+        // Save auction and solutions to JSON if configured (non-blocking)
+        if let (Some(save_dir), Some(auction_json)) = (state.auction_save_directory(), auction_json)
+        {
+            let solutions_json = serde_json::to_value(&solutions_dto).ok();
+            let save_dir = save_dir.to_path_buf();
+            tokio::spawn(async move {
+                if let Some(solutions) = solutions_json {
+                    save_auction_and_solutions(auction_json, solutions, &save_dir).await;
+                }
+            });
+        }
+
         (
             axum::http::StatusCode::OK,
             axum::response::Json(Response::Ok(solutions_dto)),
@@ -137,4 +152,77 @@ pub async fn solve(
     handle_request
         .instrument(tracing::info_span!("/solve"))
         .await
+}
+
+/// Saves auction and solutions to a JSON file in the configured directory.
+/// This function runs in a background task and logs errors without failing the
+/// request.
+async fn save_auction_and_solutions(
+    auction: serde_json::Value,
+    solutions: serde_json::Value,
+    save_dir: &std::path::Path,
+) {
+    use tokio::fs;
+
+    // Determine filename based on auction ID
+    let filename = match auction.get("id").and_then(|v| v.as_i64()) {
+        Some(id) => format!("{}.json", id),
+        None => {
+            // Use timestamp for quote auctions
+            let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S_%3f");
+            format!("quote_{}.json", timestamp)
+        }
+    };
+
+    let file_path = save_dir.join(&filename);
+
+    // Create directory if it doesn't exist
+    if let Err(err) = fs::create_dir_all(save_dir).await {
+        tracing::warn!(
+            ?err,
+            directory = ?save_dir,
+            "Failed to create auction save directory"
+        );
+        return;
+    }
+
+    // Create combined JSON structure
+    let combined = serde_json::json!({
+        "auction": auction,
+        "solutions": solutions,
+    });
+
+    // Serialize to pretty JSON
+    let json_content = match serde_json::to_string_pretty(&combined) {
+        Ok(content) => content,
+        Err(err) => {
+            tracing::warn!(?err, "Failed to serialize auction/solutions to JSON");
+            return;
+        }
+    };
+
+    // Write to file
+    let solutions_count = solutions
+        .get("solutions")
+        .and_then(|s| s.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+
+    match fs::write(&file_path, json_content).await {
+        Ok(_) => {
+            tracing::info!(
+                file_path = ?file_path,
+                auction_id = ?auction.get("id"),
+                solutions_count,
+                "💾 Saved auction and solutions to JSON file"
+            );
+        }
+        Err(err) => {
+            tracing::warn!(
+                ?err,
+                file_path = ?file_path,
+                "Failed to write auction/solutions JSON file"
+            );
+        }
+    }
 }

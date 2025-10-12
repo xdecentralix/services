@@ -2,3 +2,6 @@ chain-id = "1"
 solver-name = "CoW Solver"
 endpoint = "https://solver.cow.fi"
 gzip-requests = false
+
+# Optional: Directory to save auction and solution JSON files for debugging
+# auction-save-directory = "/tmp/balancer-auctions"

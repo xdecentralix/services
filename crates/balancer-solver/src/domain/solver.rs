@@ -40,6 +40,7 @@ pub struct Config {
     pub uni_v3_node_url: Option<Url>,
     pub erc4626_node_url: Option<Url>,
     pub liquidity_client_config: Option<crate::infra::config::LiquidityConfig>,
+    pub auction_save_directory: Option<std::path::PathBuf>,
 }
 
 struct Inner {
@@ -80,6 +81,9 @@ struct Inner {
 
     /// Optional liquidity client for fetching liquidity from external API
     liquidity_client: Option<crate::infra::liquidity_client::LiquidityClient>,
+
+    /// Optional directory to save auction and solution JSON files
+    auction_save_directory: Option<std::path::PathBuf>,
 }
 
 impl Solver {
@@ -135,6 +139,7 @@ impl Solver {
             uni_v3_quoter_v2,
             erc4626_web3,
             liquidity_client,
+            auction_save_directory: config.auction_save_directory,
         }))
     }
 
@@ -154,6 +159,11 @@ impl Solver {
             // For now return default protocols - this could be made configurable
             vec!["balancer_v2".to_string(), "uniswap_v2".to_string()]
         })
+    }
+
+    /// Returns the auction save directory if configured
+    pub fn auction_save_directory(&self) -> Option<&std::path::Path> {
+        self.0.auction_save_directory.as_deref()
     }
 
     /// Solves the specified auction, returning a vector of all possible

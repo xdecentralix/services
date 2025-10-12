@@ -61,6 +61,9 @@ struct Config {
 
     /// Configuration for independent liquidity fetching
     liquidity: Option<LiquidityConfig>,
+
+    /// Optional directory path to save auction and solution JSON files
+    auction_save_directory: Option<String>,
 }
 
 /// Configuration for the liquidity client
@@ -124,6 +127,7 @@ pub async fn load(path: &Path) -> solver::Config {
         uni_v3_node_url: config.uni_v3_node_url,
         erc4626_node_url: config.erc4626_node_url,
         liquidity_client_config: config.liquidity,
+        auction_save_directory: config.auction_save_directory.map(std::path::PathBuf::from),
     }
 }
 
