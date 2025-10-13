@@ -154,7 +154,7 @@ pub async fn solve(
         .await
 }
 
-/// Saves auction and solutions to a JSON file in the configured directory.
+/// Saves auction and solutions to separate JSON files in the configured directory.
 /// This function runs in a background task and logs errors without failing the
 /// request.
 async fn save_auction_and_solutions(
@@ -164,17 +164,18 @@ async fn save_auction_and_solutions(
 ) {
     use tokio::fs;
 
-    // Determine filename based on auction ID
-    let filename = match auction.get("id").and_then(|v| v.as_str()) {
-        Some(id) => format!("{}.json", id),
+    // Determine base filename based on auction ID
+    let base_filename = match auction.get("id").and_then(|v| v.as_str()) {
+        Some(id) => id.to_string(),
         None => {
             // Use timestamp for quote auctions
             let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S_%3f");
-            format!("quote_{}.json", timestamp)
+            format!("quote_{}", timestamp)
         }
     };
 
-    let file_path = save_dir.join(&filename);
+    let auction_file_path = save_dir.join(format!("{}_auction.json", base_filename));
+    let solutions_file_path = save_dir.join(format!("{}_solutions.json", base_filename));
 
     // Create directory if it doesn't exist
     if let Err(err) = fs::create_dir_all(save_dir).await {
@@ -186,42 +187,59 @@ async fn save_auction_and_solutions(
         return;
     }
 
-    // Create combined JSON structure
-    let combined = serde_json::json!({
-        "auction": auction,
-        "solutions": solutions,
-    });
-
-    // Serialize to pretty JSON
-    let json_content = match serde_json::to_string_pretty(&combined) {
+    // Serialize auction to pretty JSON
+    let auction_json = match serde_json::to_string_pretty(&auction) {
         Ok(content) => content,
         Err(err) => {
-            tracing::warn!(?err, "Failed to serialize auction/solutions to JSON");
+            tracing::warn!(?err, "Failed to serialize auction to JSON");
             return;
         }
     };
 
-    // Write to file
+    // Serialize solutions to pretty JSON
+    let solutions_json = match serde_json::to_string_pretty(&solutions) {
+        Ok(content) => content,
+        Err(err) => {
+            tracing::warn!(?err, "Failed to serialize solutions to JSON");
+            return;
+        }
+    };
+
     let solutions_count = solutions
         .get("solutions")
         .and_then(|s| s.as_array())
         .map(|a| a.len())
         .unwrap_or(0);
 
-    match fs::write(&file_path, json_content).await {
-        Ok(_) => {
+    // Write auction file
+    let auction_write_result = fs::write(&auction_file_path, auction_json).await;
+    
+    // Write solutions file
+    let solutions_write_result = fs::write(&solutions_file_path, solutions_json).await;
+
+    // Log results
+    match (auction_write_result, solutions_write_result) {
+        (Ok(_), Ok(_)) => {
             tracing::info!(
-                file_path = ?file_path,
+                auction_file = ?auction_file_path,
+                solutions_file = ?solutions_file_path,
                 auction_id = ?auction.get("id"),
                 solutions_count,
-                "💾 Saved auction and solutions to JSON file"
+                "💾 Saved auction and solutions to separate JSON files"
             );
         }
-        Err(err) => {
+        (Err(err), _) => {
             tracing::warn!(
                 ?err,
-                file_path = ?file_path,
-                "Failed to write auction/solutions JSON file"
+                file_path = ?auction_file_path,
+                "Failed to write auction JSON file"
+            );
+        }
+        (_, Err(err)) => {
+            tracing::warn!(
+                ?err,
+                file_path = ?solutions_file_path,
+                "Failed to write solutions JSON file"
             );
         }
     }
