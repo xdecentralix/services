@@ -165,7 +165,7 @@ async fn save_auction_and_solutions(
     use tokio::fs;
 
     // Determine filename based on auction ID
-    let filename = match auction.get("id").and_then(|v| v.as_i64()) {
+    let filename = match auction.get("id").and_then(|v| v.as_str()) {
         Some(id) => format!("{}.json", id),
         None => {
             // Use timestamp for quote auctions
