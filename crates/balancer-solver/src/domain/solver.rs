@@ -31,6 +31,7 @@ pub struct Solver(Arc<Inner>);
 const DEADLINE_SLACK: chrono::Duration = chrono::Duration::milliseconds(500);
 
 pub struct Config {
+    pub chain_id: u64,
     pub weth: eth::WethAddress,
     pub base_tokens: Vec<eth::TokenAddress>,
     pub max_hops: usize,
@@ -44,6 +45,7 @@ pub struct Config {
 }
 
 struct Inner {
+    chain_id: u64,
     weth: eth::WethAddress,
 
     /// Set of tokens to additionally consider as intermediary hops when
@@ -130,6 +132,7 @@ impl Solver {
         });
 
         Self(Arc::new(Inner {
+            chain_id: config.chain_id,
             weth: config.weth,
             base_tokens: config.base_tokens.into_iter().collect(),
             max_hops: config.max_hops,
@@ -164,6 +167,27 @@ impl Solver {
     /// Returns the auction save directory if configured
     pub fn auction_save_directory(&self) -> Option<&std::path::Path> {
         self.0.auction_save_directory.as_deref()
+    }
+
+    /// Returns the chain ID for this solver
+    pub fn chain_id(&self) -> u64 {
+        self.0.chain_id
+    }
+
+    /// Returns the CoW API base URL for this chain
+    pub fn cow_api_base_url(&self) -> &'static str {
+        match self.0.chain_id {
+            1 => "https://api.cow.fi/mainnet",
+            100 => "https://api.cow.fi/xdai",
+            42161 => "https://api.cow.fi/arbitrum_one",
+            8453 => "https://api.cow.fi/base",
+            43114 => "https://api.cow.fi/avalanche",
+            137 => "https://api.cow.fi/polygon",
+            _ => {
+                tracing::warn!(chain_id = self.0.chain_id, "Unknown chain ID for CoW API");
+                "https://api.cow.fi/mainnet" // Fallback
+            }
+        }
     }
 
     /// Solves the specified auction, returning a vector of all possible

@@ -114,6 +114,7 @@ pub async fn load(path: &Path) -> solver::Config {
     };
 
     solver::Config {
+        chain_id: config.chain_id.map(|c| c as u64).unwrap_or(1),
         weth,
         base_tokens: config
             .base_tokens

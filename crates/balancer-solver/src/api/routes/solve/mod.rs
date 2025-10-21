@@ -137,10 +137,18 @@ pub async fn solve(
         {
             let solutions_json = serde_json::to_value(&solutions_dto).ok();
             let save_dir = save_dir.to_path_buf();
+            let save_dir_for_competition = save_dir.clone();
+            
             tokio::spawn(async move {
                 if let Some(solutions) = solutions_json {
                     save_auction_and_solutions(auction_json, solutions, &save_dir).await;
                 }
+            });
+
+            // Spawn background task to fetch competition data
+            let cow_api_url = state.cow_api_base_url();
+            tokio::spawn(async move {
+                fetch_and_save_competition_data(auction_id, cow_api_url, &save_dir_for_competition).await;
             });
         }
 
@@ -244,4 +252,143 @@ async fn save_auction_and_solutions(
             );
         }
     }
+}
+
+/// Fetches competition data from the CoW API and saves it to a JSON file.
+/// This function waits 60 seconds before attempting to fetch, then retries up to 10 times.
+async fn fetch_and_save_competition_data(
+    auction_id: crate::domain::auction::Id,
+    cow_api_base_url: &str,
+    save_dir: &std::path::Path,
+) {
+    use tokio::fs;
+    use tokio::time::{sleep, Duration};
+
+    // Extract the numeric auction ID
+    let auction_id_num = match auction_id {
+        crate::domain::auction::Id::Solve(id) => id,
+        crate::domain::auction::Id::Quote => {
+            tracing::debug!("Skipping competition data fetch for quote auction");
+            return;
+        }
+    };
+
+    // Wait 60 seconds for the competition to settle
+    tracing::info!(
+        auction_id = auction_id_num,
+        "Waiting 60 seconds before fetching competition data"
+    );
+    sleep(Duration::from_secs(60)).await;
+
+    let url = format!(
+        "{}/api/v2/solver_competition/{}",
+        cow_api_base_url, auction_id_num
+    );
+    let client = reqwest::Client::new();
+
+    // Retry up to 10 times with 10 second delays between attempts
+    for attempt in 1..=10 {
+        tracing::debug!(
+            auction_id = auction_id_num,
+            attempt,
+            "Fetching competition data"
+        );
+
+        match client.get(&url).send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    match response.json::<serde_json::Value>().await {
+                        Ok(competition_data) => {
+                            // Save to file
+                            let filename = format!("{}_competition.json", auction_id_num);
+                            let file_path = save_dir.join(filename);
+
+                            // Create directory if needed
+                            if let Err(err) = fs::create_dir_all(save_dir).await {
+                                tracing::warn!(
+                                    ?err,
+                                    directory = ?save_dir,
+                                    "Failed to create competition data directory"
+                                );
+                                return;
+                            }
+
+                            // Serialize to pretty JSON
+                            let json_string = match serde_json::to_string_pretty(&competition_data)
+                            {
+                                Ok(s) => s,
+                                Err(err) => {
+                                    tracing::warn!(
+                                        ?err,
+                                        "Failed to serialize competition data"
+                                    );
+                                    return;
+                                }
+                            };
+
+                            // Write to file
+                            match fs::write(&file_path, json_string).await {
+                                Ok(_) => {
+                                    tracing::info!(
+                                        auction_id = auction_id_num,
+                                        file_path = ?file_path,
+                                        attempt,
+                                        "💾 Successfully saved competition data"
+                                    );
+                                    return; // Success!
+                                }
+                                Err(err) => {
+                                    tracing::warn!(
+                                        ?err,
+                                        file_path = ?file_path,
+                                        "Failed to write competition data file"
+                                    );
+                                    return;
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                ?err,
+                                auction_id = auction_id_num,
+                                attempt,
+                                "Failed to parse competition data JSON"
+                            );
+                        }
+                    }
+                } else if response.status().as_u16() == 404 {
+                    tracing::debug!(
+                        auction_id = auction_id_num,
+                        attempt,
+                        "Competition data not yet available (404), will retry"
+                    );
+                } else {
+                    tracing::warn!(
+                        auction_id = auction_id_num,
+                        status = response.status().as_u16(),
+                        attempt,
+                        "Unexpected HTTP status when fetching competition data"
+                    );
+                }
+            }
+            Err(err) => {
+                tracing::warn!(
+                    ?err,
+                    auction_id = auction_id_num,
+                    attempt,
+                    "HTTP request failed when fetching competition data"
+                );
+            }
+        }
+
+        // Wait 10 seconds before next retry (unless this was the last attempt)
+        if attempt < 10 {
+            sleep(Duration::from_secs(10)).await;
+        }
+    }
+
+    tracing::warn!(
+        auction_id = auction_id_num,
+        "Failed to fetch competition data after 10 attempts"
+    );
 }
