@@ -84,6 +84,7 @@ pub async fn into_domain(
     liquidity_client: Option<&LiquidityClient>,
     base_tokens: Option<&[eth::H160]>,
     protocols: Option<&[String]>,
+    save_directory: Option<&std::path::Path>,
 ) -> Result<auction::Auction, Error> {
     Ok(auction::Auction {
         id: match auction.id {
@@ -188,6 +189,18 @@ pub async fn into_domain(
                             "Successfully fetched liquidity from API"
                         );
 
+                        // Save liquidity to JSON if save_directory is provided
+                        if let Some(save_dir) = save_directory {
+                            let liquidity_json = serde_json::to_value(&response).ok();
+                            let save_dir = save_dir.to_path_buf();
+                            let auction_id = auction.id;
+                            tokio::spawn(async move {
+                                if let Some(liquidity) = liquidity_json {
+                                    save_liquidity_json(liquidity, auction_id, &save_dir).await;
+                                }
+                            });
+                        }
+
                         // Process the fetched liquidity
                         response
                             .liquidity
@@ -235,6 +248,72 @@ fn convert_dto_liquidity_to_domain(liquidity: &Liquidity) -> Result<liquidity::L
         Liquidity::ReClamm(liquidity) => reclamm_pool::to_domain(liquidity),
         Liquidity::QuantAmm(liquidity) => quant_amm_pool::to_domain(liquidity),
         Liquidity::StableSurge(liquidity) => stable_surge_pool::to_domain(liquidity),
+    }
+}
+
+/// Saves fetched liquidity data to a JSON file in the configured directory.
+/// This function runs in a background task and logs errors without failing the request.
+async fn save_liquidity_json(
+    liquidity: serde_json::Value,
+    auction_id: Option<i64>,
+    save_dir: &std::path::Path,
+) {
+    use tokio::fs;
+
+    // Determine filename based on auction ID
+    let base_filename = match auction_id {
+        Some(id) => id.to_string(),
+        None => {
+            // Use timestamp for quote auctions
+            let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S_%3f");
+            format!("quote_{}", timestamp)
+        }
+    };
+
+    let liquidity_file_path = save_dir.join(format!("{}_liquidity.json", base_filename));
+
+    // Create directory if it doesn't exist
+    if let Err(err) = fs::create_dir_all(save_dir).await {
+        tracing::warn!(
+            ?err,
+            directory = ?save_dir,
+            "Failed to create liquidity save directory"
+        );
+        return;
+    }
+
+    // Serialize liquidity to pretty JSON
+    let liquidity_json = match serde_json::to_string_pretty(&liquidity) {
+        Ok(content) => content,
+        Err(err) => {
+            tracing::warn!(?err, "Failed to serialize liquidity to JSON");
+            return;
+        }
+    };
+
+    let liquidity_count = liquidity
+        .get("liquidity")
+        .and_then(|l| l.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+
+    // Write liquidity file
+    match fs::write(&liquidity_file_path, liquidity_json).await {
+        Ok(_) => {
+            tracing::info!(
+                liquidity_file = ?liquidity_file_path,
+                auction_id = ?auction_id,
+                liquidity_count,
+                "💾 Saved fetched liquidity to JSON file"
+            );
+        }
+        Err(err) => {
+            tracing::warn!(
+                ?err,
+                file_path = ?liquidity_file_path,
+                "Failed to write liquidity JSON file"
+            );
+        }
     }
 }
 

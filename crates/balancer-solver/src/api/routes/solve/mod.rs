@@ -87,6 +87,7 @@ pub async fn solve(
             liquidity_client,
             base_tokens.as_deref(),
             protocols.as_deref(),
+            state.auction_save_directory(),
         )
         .await
         {
