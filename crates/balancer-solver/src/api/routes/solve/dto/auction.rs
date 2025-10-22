@@ -79,14 +79,17 @@ fn extract_token_pairs_from_auction(
 /// Converts a data transfer object into its domain object representation.
 /// If liquidity_client is provided and auction has empty liquidity, fetches
 /// independently.
+/// Returns the auction and optionally the fetched liquidity response.
 pub async fn into_domain(
     auction: Auction,
     liquidity_client: Option<&LiquidityClient>,
     base_tokens: Option<&[eth::H160]>,
     protocols: Option<&[String]>,
     save_directory: Option<&std::path::Path>,
-) -> Result<auction::Auction, Error> {
-    Ok(auction::Auction {
+) -> Result<(auction::Auction, Option<crate::infra::liquidity_client::LiquidityResponse>), Error> {
+    let mut fetched_liquidity_response = None;
+    
+    let auction_domain = auction::Auction {
         id: match auction.id {
             Some(id) => auction::Id::Solve(id),
             None => auction::Id::Quote,
@@ -147,6 +150,7 @@ pub async fn into_domain(
             })
             .collect(),
         liquidity: {
+            
             if auction.liquidity.is_empty() && liquidity_client.is_some() {
                 // Fetch liquidity independently from the liquidity-driver API
                 let client = liquidity_client.unwrap();
@@ -202,11 +206,16 @@ pub async fn into_domain(
                         }
 
                         // Process the fetched liquidity
-                        response
+                        let domain_liquidity = response
                             .liquidity
                             .iter()
                             .map(|liquidity| convert_dto_liquidity_to_domain(liquidity))
-                            .try_collect()?
+                            .try_collect()?;
+                        
+                        // Store the response for enhanced solutions
+                        fetched_liquidity_response = Some(response);
+                        
+                        domain_liquidity
                     }
                     Err(e) => {
                         tracing::warn!(
@@ -228,7 +237,9 @@ pub async fn into_domain(
         },
         gas_price: auction::GasPrice(eth::Ether(auction.effective_gas_price)),
         deadline: auction::Deadline(auction.deadline),
-    })
+    };
+    
+    Ok((auction_domain, fetched_liquidity_response))
 }
 
 /// Helper function to convert DTO liquidity to domain liquidity
@@ -802,5 +813,62 @@ mod quant_amm_pool {
                 current_timestamp: pool.current_timestamp,
             }),
         })
+    }
+}
+
+/// Creates an enhanced solutions JSON with full liquidity details embedded
+pub fn create_enhanced_solutions(
+    solutions: &solvers_dto::solution::Solutions,
+    liquidity_response: &crate::infra::liquidity_client::LiquidityResponse,
+) -> serde_json::Value {
+    // Convert to JSON value
+    let mut solutions_json = serde_json::to_value(solutions).unwrap();
+    
+    // Build a map of liquidity ID -> full liquidity details
+    let mut liquidity_map: std::collections::HashMap<String, &solvers_dto::auction::Liquidity> = 
+        std::collections::HashMap::new();
+    
+    for liq in &liquidity_response.liquidity {
+        let id = extract_liquidity_id(liq);
+        liquidity_map.insert(id, liq);
+    }
+    
+    // Enhance each solution's interactions
+    if let Some(solutions_array) = solutions_json["solutions"].as_array_mut() {
+        for solution in solutions_array {
+            if let Some(interactions) = solution["interactions"].as_array_mut() {
+                for interaction in interactions {
+                    if interaction["kind"] == "liquidity" {
+                        if let Some(id) = interaction["id"].as_str() {
+                            if let Some(liquidity_details) = liquidity_map.get(id) {
+                                // Embed full liquidity details
+                                interaction["liquidityDetails"] = 
+                                    serde_json::to_value(liquidity_details).unwrap();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    solutions_json
+}
+
+fn extract_liquidity_id(liq: &solvers_dto::auction::Liquidity) -> String {
+    // Extract ID from each liquidity variant
+    match liq {
+        solvers_dto::auction::Liquidity::ConstantProduct(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::WeightedProduct(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::Stable(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::ConcentratedLiquidity(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::GyroE(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::Gyro2CLP(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::Gyro3CLP(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::LimitOrder(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::Erc4626(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::ReClamm(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::QuantAmm(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::StableSurge(p) => p.id.clone(),
     }
 }
