@@ -78,7 +78,6 @@ include_contracts! {
     IERC4626;
     IRateProvider;
     IUniswapV3Factory;
-    Permit2;
     WETH9;
 }
 
