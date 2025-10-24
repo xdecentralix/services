@@ -118,19 +118,8 @@ impl SolutionVerifier {
             };
 
         // Determine pool version ONLY by ID length (not by pool kind)
-        let pool_version = if let Some(balancer_pool_id) = balancer_pool_id_opt {
-            // Use balancerPoolId from liquidityDetails if available
-            // V2 pool IDs are 66 chars (0x + 64 hex chars)
-            // V3 pool IDs are 42 chars (0x + 40 hex chars - same as address)
-            if balancer_pool_id.len() > 42 {
-                PoolVersion::V2
-            } else {
-                PoolVersion::V3
-            }
-        } else {
-            // Fall back to detecting from the pool_id string
-            Self::detect_pool_version(pool_id)
-        };
+        // Prefer balancerPoolId from liquidityDetails, fall back to pool_id
+        let pool_version = Self::detect_pool_version(balancer_pool_id_opt.unwrap_or(pool_id));
 
         // Quote using appropriate method with enhanced data
         let quoted_amount = match pool_version {
