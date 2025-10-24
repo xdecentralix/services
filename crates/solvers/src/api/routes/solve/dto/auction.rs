@@ -163,6 +163,8 @@ mod weighted_product_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate)
+                            .ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -202,6 +204,8 @@ mod stable_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate)
+                            .ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -301,6 +305,8 @@ mod gyro_e_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate)
+                            .ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -364,6 +370,8 @@ mod gyro_2clp_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate)
+                            .ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -409,6 +417,8 @@ mod gyro_3clp_pool {
                             .ok_or("invalid scaling factor")?,
                     )
                     .ok_or("invalid scaling factor")?,
+                    rate: conv::decimal_to_rational(&token.rate)
+                        .ok_or("invalid token rate")?,
                 })
             })
             .collect::<Result<Vec<_>, Error>>()?;
@@ -447,6 +457,8 @@ mod reclamm_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate)
+                            .ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -506,6 +518,8 @@ mod stable_surge_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate)
+                            .ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -547,6 +561,8 @@ mod quant_amm_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate)
+                            .ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
