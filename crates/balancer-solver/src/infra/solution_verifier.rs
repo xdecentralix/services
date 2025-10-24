@@ -117,14 +117,18 @@ impl SolutionVerifier {
                 (None, None, None)
             };
 
-        // Determine pool version using liquidityDetails if available
-        let pool_version = if let Some(kind) = pool_kind_opt {
-            // Use pool kind to determine version
-            match kind {
-                "constantProduct" | "weightedProduct" | "stable" => PoolVersion::V2,
-                _ => PoolVersion::V3, // gyroE, gyro2CLP, gyro3CLP, etc are V3
+        // Determine pool version ONLY by ID length (not by pool kind)
+        let pool_version = if let Some(balancer_pool_id) = balancer_pool_id_opt {
+            // Use balancerPoolId from liquidityDetails if available
+            // V2 pool IDs are 66 chars (0x + 64 hex chars)
+            // V3 pool IDs are 42 chars (0x + 40 hex chars - same as address)
+            if balancer_pool_id.len() > 42 {
+                PoolVersion::V2
+            } else {
+                PoolVersion::V3
             }
         } else {
+            // Fall back to detecting from the pool_id string
             Self::detect_pool_version(pool_id)
         };
 
