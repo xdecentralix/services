@@ -24,6 +24,16 @@ pub struct SwapVerification {
     pub quoted_amount_out: Option<String>,
     pub difference_bps: Option<i64>,
     pub quote_error: Option<String>,
+    pub contract_call: Option<ContractCallDetails>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ContractCallDetails {
+    pub contract_address: String,
+    pub contract_name: String,
+    pub function_name: String,
+    pub calldata: String,
+    pub decoded_params: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -151,12 +161,12 @@ impl SolutionVerifier {
             }
         };
 
-        let (quoted_amount_out, difference_bps, quote_error) = match quoted_amount {
-            Ok(quote) => {
+        let (quoted_amount_out, difference_bps, quote_error, contract_call) = match quoted_amount {
+            Ok((quote, call_details)) => {
                 let diff = calculate_difference_bps(&output_amount, &quote);
-                (Some(quote), diff, None)
+                (Some(quote), diff, None, Some(call_details))
             }
-            Err(e) => (None, None, Some(e.to_string())),
+            Err(e) => (None, None, Some(e.to_string()), None),
         };
 
         SwapVerification {
@@ -170,6 +180,7 @@ impl SolutionVerifier {
             quoted_amount_out,
             difference_bps,
             quote_error,
+            contract_call,
         }
     }
 
@@ -180,7 +191,7 @@ impl SolutionVerifier {
         input_token: H160,
         output_token: H160,
         input_amount: U256,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+    ) -> Result<(String, ContractCallDetails), Box<dyn std::error::Error>> {
         // Parse pool ID (it's a hex string starting with 0x)
         let pool_id_bytes = if balancer_pool_id.starts_with("0x") {
             hex::decode(&balancer_pool_id[2..])?
@@ -208,7 +219,7 @@ impl SolutionVerifier {
                 input_amount,
                 Bytes(vec![]), // empty userData
             )],
-            assets,
+            assets.clone(),
             (
                 H160::zero(), // sender (not needed for query)
                 false,        // fromInternalBalance
@@ -217,22 +228,60 @@ impl SolutionVerifier {
             ),
         );
 
+        // Capture contract call details for debugging
+        let calldata = swap.tx.data.clone().map(|d| format!("0x{}", hex::encode(d.0)))
+            .unwrap_or_else(|| "0x".to_string());
+        
+        let decoded_params = serde_json::json!({
+            "kind": "GIVEN_IN (0)",
+            "swaps": [{
+                "poolId": balancer_pool_id,
+                "assetInIndex": 0,
+                "assetOutIndex": 1,
+                "amount": input_amount.to_string(),
+                "userData": "0x"
+            }],
+            "assets": vec![
+                format!("{:?}", assets[0]),
+                format!("{:?}", assets[1])
+            ],
+            "funds": {
+                "sender": "0x0000000000000000000000000000000000000000",
+                "fromInternalBalance": false,
+                "recipient": "0x0000000000000000000000000000000000000000",
+                "toInternalBalance": false
+            }
+        });
+
+        let call_details = ContractCallDetails {
+            contract_address: format!("{:?}", self.vault.address()),
+            contract_name: "BalancerV2Vault".to_string(),
+            function_name: "queryBatchSwap".to_string(),
+            calldata,
+            decoded_params,
+        };
+
         // Call the query (static call)
         let deltas = swap.call().await?;
 
-        // Parse output: assetDeltas[1] should be positive (amount out)
+        // Parse output: assetDeltas[1] represents net token flow for output token
+        // In Balancer V2:
+        //   - Positive delta = tokens going INTO vault (user sends)
+        //   - Negative delta = tokens coming OUT of vault (user receives)
+        // For the output token in a swap, we expect a NEGATIVE delta
         if deltas.len() < 2 {
             return Err("Invalid deltas returned from queryBatchSwap".into());
         }
 
-        // Convert I256 to U256 (take absolute value since output is positive)
         let amount_out = if deltas[1].is_negative() {
-            return Err("Expected positive output delta".into());
+            // Negative means tokens out - negate to get positive amount
+            (-deltas[1]).into_raw()
         } else {
-            deltas[1].into_raw()
+            // Positive means tokens in, which is wrong for output token
+            return Err("Expected negative output delta (tokens out of vault)".into());
         };
 
-        Ok(amount_out.to_string())
+        Ok((amount_out.to_string(), call_details))
     }
 
     /// Quote V3 swap via Batch Router.querySwapExactIn
@@ -242,7 +291,7 @@ impl SolutionVerifier {
         input_token: H160,
         output_token: H160,
         input_amount: U256,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+    ) -> Result<(String, ContractCallDetails), Box<dyn std::error::Error>> {
         // Parse pool address from string
         let pool_address: H160 = pool_address_str.parse()?;
 
@@ -260,10 +309,37 @@ impl SolutionVerifier {
 
         // Call querySwapExactIn
         let query = self.batch_router.methods().query_swap_exact_in(
-            vec![path],
+            vec![path.clone()],
             H160::zero(),  // sender (not needed for query)
             Bytes(vec![]), // empty userData
         );
+
+        // Capture contract call details for debugging
+        let calldata = query.tx.data.clone().map(|d| format!("0x{}", hex::encode(d.0)))
+            .unwrap_or_else(|| "0x".to_string());
+        
+        let decoded_params = serde_json::json!({
+            "paths": [{
+                "tokenIn": format!("{:?}", input_token),
+                "steps": [{
+                    "pool": pool_address_str,
+                    "tokenOut": format!("{:?}", output_token),
+                    "isBuffer": false
+                }],
+                "exactAmountIn": input_amount.to_string(),
+                "minAmountOut": "0"
+            }],
+            "sender": "0x0000000000000000000000000000000000000000",
+            "userData": "0x"
+        });
+
+        let call_details = ContractCallDetails {
+            contract_address: format!("{:?}", self.batch_router.address()),
+            contract_name: "BalancerV3BatchRouter".to_string(),
+            function_name: "querySwapExactIn".to_string(),
+            calldata,
+            decoded_params,
+        };
 
         let (path_amounts_out, _tokens_out, _amounts_out) = query.call().await?;
 
@@ -272,7 +348,7 @@ impl SolutionVerifier {
             return Err("No output amounts returned from querySwapExactIn".into());
         }
 
-        Ok(path_amounts_out[0].to_string())
+        Ok((path_amounts_out[0].to_string(), call_details))
     }
 }
 
