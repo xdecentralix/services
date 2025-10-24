@@ -116,16 +116,14 @@ impl SolutionVerifier {
         let pool_details = interaction.get("liquidityDetails");
 
         // Extract pool address and Balancer pool ID from liquidityDetails if available
-        let (pool_address_opt, balancer_pool_id_opt, pool_kind_opt) =
-            if let Some(details) = pool_details {
-                (
-                    details["address"].as_str(),
-                    details["balancerPoolId"].as_str(),
-                    details["kind"].as_str(),
-                )
-            } else {
-                (None, None, None)
-            };
+        let (pool_address_opt, balancer_pool_id_opt) = if let Some(details) = pool_details {
+            (
+                details["address"].as_str(),
+                details["balancerPoolId"].as_str(),
+            )
+        } else {
+            (None, None)
+        };
 
         // Determine pool version ONLY by ID length (not by pool kind)
         // Prefer balancerPoolId from liquidityDetails, fall back to pool_id
@@ -166,7 +164,13 @@ impl SolutionVerifier {
                 let diff = calculate_difference_bps(&output_amount, &quote);
                 (Some(quote), diff, None, Some(call_details))
             }
-            Err(e) => (None, None, Some(e.to_string()), None),
+            Err(e) => {
+                // Try to extract contract call details from error context if available
+                // For now, we don't have call details on error (they're created inside the
+                // functions) This is acceptable as errors typically happen
+                // during call execution
+                (None, None, Some(e.to_string()), None)
+            }
         };
 
         SwapVerification {
@@ -229,9 +233,13 @@ impl SolutionVerifier {
         );
 
         // Capture contract call details for debugging
-        let calldata = swap.tx.data.clone().map(|d| format!("0x{}", hex::encode(d.0)))
+        let calldata = swap
+            .tx
+            .data
+            .clone()
+            .map(|d| format!("0x{}", hex::encode(d.0)))
             .unwrap_or_else(|| "0x".to_string());
-        
+
         let decoded_params = serde_json::json!({
             "kind": "GIVEN_IN (0)",
             "swaps": [{
@@ -315,9 +323,13 @@ impl SolutionVerifier {
         );
 
         // Capture contract call details for debugging
-        let calldata = query.tx.data.clone().map(|d| format!("0x{}", hex::encode(d.0)))
+        let calldata = query
+            .tx
+            .data
+            .clone()
+            .map(|d| format!("0x{}", hex::encode(d.0)))
             .unwrap_or_else(|| "0x".to_string());
-        
+
         let decoded_params = serde_json::json!({
             "paths": [{
                 "tokenIn": format!("{:?}", input_token),

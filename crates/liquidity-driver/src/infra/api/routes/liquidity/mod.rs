@@ -144,6 +144,7 @@ fn convert_domain_to_dto(
                                     balance: r.asset.amount.into(),
                                     scaling_factor: scaling_factor_to_decimal(r.scale),
                                     weight: weight_to_decimal(r.weight),
+                                    rate: rate_to_decimal(r.rate),
                                 },
                             )
                         })
@@ -181,6 +182,7 @@ fn convert_domain_to_dto(
                                     balance: r.asset.amount.into(),
                                     scaling_factor: scaling_factor_to_decimal_v3(r.scale),
                                     weight: weight_to_decimal_v3(r.weight),
+                                    rate: rate_to_decimal(r.rate),
                                 },
                             )
                         })
@@ -211,6 +213,7 @@ fn convert_domain_to_dto(
                             solvers_dto::auction::StableReserve {
                                 balance: r.asset.amount.into(),
                                 scaling_factor: scaling_factor_to_decimal(r.scale),
+                                rate: rate_to_decimal(r.rate),
                             },
                         )
                     })
@@ -241,6 +244,7 @@ fn convert_domain_to_dto(
                             solvers_dto::auction::StableReserve {
                                 balance: r.asset.amount.into(),
                                 scaling_factor: scaling_factor_to_decimal_v3(r.scale),
+                                rate: rate_to_decimal(r.rate),
                             },
                         )
                     })
@@ -271,6 +275,7 @@ fn convert_domain_to_dto(
                             solvers_dto::auction::StableReserve {
                                 balance: r.asset.amount.into(),
                                 scaling_factor: scaling_factor_to_decimal_v3(r.scale),
+                                rate: rate_to_decimal(r.rate),
                             },
                         )
                     })
@@ -304,6 +309,7 @@ fn convert_domain_to_dto(
                             solvers_dto::auction::GyroEReserve {
                                 balance: r.asset.amount.into(),
                                 scaling_factor: scaling_factor_to_decimal(r.scale),
+                                rate: rate_to_decimal(r.rate),
                             },
                         )
                     })
@@ -346,6 +352,7 @@ fn convert_domain_to_dto(
                             solvers_dto::auction::Gyro2CLPReserve {
                                 balance: r.asset.amount.into(),
                                 scaling_factor: scaling_factor_to_decimal(r.scale),
+                                rate: rate_to_decimal(r.rate),
                             },
                         )
                     })
@@ -376,6 +383,7 @@ fn convert_domain_to_dto(
                             solvers_dto::auction::Gyro3CLPReserve {
                                 balance: r.asset.amount.into(),
                                 scaling_factor: scaling_factor_to_decimal(r.scale),
+                                rate: rate_to_decimal(r.rate),
                             },
                         )
                     })
@@ -408,6 +416,7 @@ fn convert_domain_to_dto(
                             solvers_dto::auction::GyroEReserve {
                                 balance: r.asset.amount.into(),
                                 scaling_factor: scaling_factor_to_decimal_v3(r.scale),
+                                rate: rate_to_decimal(r.rate),
                             },
                         )
                     })
@@ -453,6 +462,7 @@ fn convert_domain_to_dto(
                             solvers_dto::auction::Gyro2CLPReserve {
                                 balance: r.asset.amount.into(),
                                 scaling_factor: scaling_factor_to_decimal_v3(r.scale),
+                                rate: rate_to_decimal(r.rate),
                             },
                         )
                     })
@@ -482,6 +492,7 @@ fn convert_domain_to_dto(
                             solvers_dto::auction::ReClammReserve {
                                 balance: r.asset.amount.into(),
                                 scaling_factor: scaling_factor_to_decimal_v3(r.scale),
+                                rate: rate_to_decimal(r.rate),
                             },
                         )
                     })
@@ -524,6 +535,7 @@ fn convert_domain_to_dto(
                             solvers_dto::auction::QuantAmmReserve {
                                 balance: r.asset.amount.into(),
                                 scaling_factor: scaling_factor_to_decimal_v3(r.scale),
+                                rate: rate_to_decimal(r.rate),
                             },
                         )
                     })
@@ -644,6 +656,10 @@ fn scaling_factor_to_decimal_v3(
     scale: liquidity::balancer::v3::ScalingFactor,
 ) -> bigdecimal::BigDecimal {
     bigdecimal::BigDecimal::new(scale.as_raw().to_big_int(), 18)
+}
+
+fn rate_to_decimal(rate: eth::U256) -> bigdecimal::BigDecimal {
+    bigdecimal::BigDecimal::new(rate.to_big_int(), 18)
 }
 
 fn surge_threshold_to_decimal_v3(

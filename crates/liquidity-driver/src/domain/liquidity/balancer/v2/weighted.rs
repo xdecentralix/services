@@ -102,6 +102,7 @@ pub struct Reserve {
     pub asset: eth::Asset,
     pub scale: ScalingFactor,
     pub weight: Weight,
+    pub rate: eth::U256,
 }
 
 /// A Balancer token weight.

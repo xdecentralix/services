@@ -219,6 +219,7 @@ pub struct WeightedProductReserve {
     pub balance: U256,
     pub scaling_factor: BigDecimal,
     pub weight: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -249,6 +250,7 @@ pub struct StableReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[serde_as]
@@ -356,6 +358,7 @@ pub struct GyroEReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -404,6 +407,7 @@ pub struct Gyro2CLPReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -419,6 +423,7 @@ pub struct Gyro3CLPReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -455,6 +460,7 @@ pub struct ReClammReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[serde_as]
@@ -485,6 +491,7 @@ pub struct QuantAmmReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -33,6 +33,7 @@ pub fn to_domain(id: liquidity::Id, pool: Gyro3CLPPoolOrder) -> Result<liquidity
                             scale: balancer::v2::ScalingFactor::from_raw(
                                 reserve.scaling_factor.as_uint256(),
                             )?,
+                            rate: reserve.rate.into(),
                         })
                     })
                     .collect::<Result<_>>()?,

@@ -79,11 +79,13 @@ async fn weighted() {
                             "balance": "11260752191375725565253",
                             "scalingFactor": "1",
                             "weight": "0.5",
+                            "rate": "1000000000000000000",
                         },
                         "0xdef1ca1fb7fbcdc777520aa7f396b4e015f497ab": {
                             "balance": "18764168403990393422000071",
                             "scalingFactor": "1",
                             "weight": "0.5",
+                            "rate": "1000000000000000000",
                         }
                     },
                     "fee": "0.005",
@@ -207,11 +209,13 @@ async fn weighted_v3plus() {
                             "balance": "5089632258314443812936111",
                             "scalingFactor": "1",
                             "weight": "0.5",
+                            "rate": "1000000000000000000",
                         },
                         "0x9c58bacc331c9aa871afd802db6379a98e80cedb": {
                             "balance": "3043530764763263654069",
                             "scalingFactor": "1",
                             "weight": "0.5",
+                            "rate": "1000000000000000000",
                         }
                     },
                     "fee": "0.005",
@@ -381,14 +385,17 @@ async fn stable() {
                         "0x6b175474e89094c44da98b954eedeac495271d0f": {
                             "balance": "505781036390938593206504",
                             "scalingFactor": "1",
+                            "rate": "1000000000000000000",
                         },
                         "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": {
                             "balance": "554894862074",
                             "scalingFactor": "1000000000000",
+                            "rate": "1000000000000000000",
                         },
                         "0xdac17f958d2ee523a2206206994597c13d831ec7": {
                             "balance": "1585576741011",
                             "scalingFactor": "1000000000000",
+                            "rate": "1000000000000000000",
                         },
                     },
                     "fee": "0.0001",
@@ -557,14 +564,17 @@ async fn composable_stable_v4() {
                         "0x4b1e2c2762667331bc91648052f646d1b0d35984": {
                             "balance": "126041615528606990697699",
                             "scalingFactor": "1",
+                            "rate": "1000000000000000000",
                         },
                         "0x5c78d05b8ecf97507d1cf70646082c54faa4da95": {
                             "balance": "2596148429267369423681023550322451",
                             "scalingFactor": "1",
+                            "rate": "1000000000000000000",
                         },
                         "0xcb444e90d8198415266c6a2724b7900fb12fc56e": {
                             "balance": "170162457652825667152980",
                             "scalingFactor": "1",
+                            "rate": "1000000000000000000",
                         },
                     },
                     "fee": "0.0001",

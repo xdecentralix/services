@@ -241,6 +241,7 @@ pub fn new(
                                         solvers_dto::auction::StableReserve {
                                             balance: r.asset.amount.into(),
                                             scaling_factor: scaling_factor_to_decimal(r.scale),
+                                            rate: rate_to_decimal(r.rate),
                                         },
                                     )
                                 })
@@ -272,6 +273,7 @@ pub fn new(
                                         solvers_dto::auction::StableReserve {
                                             balance: r.asset.amount.into(),
                                             scaling_factor: scaling_factor_to_decimal_v3(r.scale),
+                                            rate: rate_to_decimal(r.rate),
                                         },
                                     )
                                 })
@@ -302,6 +304,7 @@ pub fn new(
                                                 balance: r.asset.amount.into(),
                                                 scaling_factor: scaling_factor_to_decimal(r.scale),
                                                 weight: weight_to_decimal(r.weight),
+                                                rate: rate_to_decimal(r.rate),
                                             },
                                         )
                                     })
@@ -340,6 +343,7 @@ pub fn new(
                                                     r.scale,
                                                 ),
                                                 weight: weight_to_decimal_v3(r.weight),
+                                                rate: rate_to_decimal(r.rate),
                                             },
                                         )
                                     })
@@ -373,6 +377,7 @@ pub fn new(
                                             solvers_dto::auction::GyroEReserve {
                                                 balance: r.asset.amount.into(),
                                                 scaling_factor: scaling_factor_to_decimal(r.scale),
+                                                rate: rate_to_decimal(r.rate),
                                             },
                                         )
                                     })
@@ -417,6 +422,7 @@ pub fn new(
                                             solvers_dto::auction::Gyro2CLPReserve {
                                                 balance: r.asset.amount.into(),
                                                 scaling_factor: scaling_factor_to_decimal(r.scale),
+                                                rate: rate_to_decimal(r.rate),
                                             },
                                         )
                                     })
@@ -451,6 +457,7 @@ pub fn new(
                                             solvers_dto::auction::Gyro3CLPReserve {
                                                 balance: r.asset.amount.into(),
                                                 scaling_factor: scaling_factor_to_decimal(r.scale),
+                                                rate: rate_to_decimal(r.rate),
                                             },
                                         )
                                     })
@@ -487,6 +494,7 @@ pub fn new(
                                                 scaling_factor: scaling_factor_to_decimal_v3(
                                                     r.scale,
                                                 ),
+                                                rate: rate_to_decimal(r.rate),
                                             },
                                         )
                                     })
@@ -536,6 +544,7 @@ pub fn new(
                                                 scaling_factor: scaling_factor_to_decimal_v3(
                                                     r.scale,
                                                 ),
+                                                rate: rate_to_decimal(r.rate),
                                             },
                                         )
                                     })
@@ -573,6 +582,7 @@ pub fn new(
                                                 scaling_factor: scaling_factor_to_decimal_v3(
                                                     r.scale,
                                                 ),
+                                                rate: rate_to_decimal(r.rate),
                                             },
                                         )
                                     })
@@ -622,6 +632,7 @@ pub fn new(
                                                 scaling_factor: scaling_factor_to_decimal_v3(
                                                     r.scale,
                                                 ),
+                                                rate: rate_to_decimal(r.rate),
                                             },
                                         )
                                     })
@@ -729,6 +740,7 @@ pub fn new(
                                                 scaling_factor: scaling_factor_to_decimal_v3(
                                                     r.scale,
                                                 ),
+                                                rate: rate_to_decimal(r.rate),
                                             },
                                         )
                                     })
@@ -862,6 +874,10 @@ fn scaling_factor_to_decimal_v3(
     scale: liquidity::balancer::v3::ScalingFactor,
 ) -> bigdecimal::BigDecimal {
     bigdecimal::BigDecimal::new(scale.as_raw().to_big_int(), 18)
+}
+
+fn rate_to_decimal(rate: eth::U256) -> bigdecimal::BigDecimal {
+    bigdecimal::BigDecimal::new(rate.to_big_int(), 18)
 }
 
 fn signed_fixed_point_to_decimal(
