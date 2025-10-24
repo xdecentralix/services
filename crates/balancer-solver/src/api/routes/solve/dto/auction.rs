@@ -86,9 +86,15 @@ pub async fn into_domain(
     base_tokens: Option<&[eth::H160]>,
     protocols: Option<&[String]>,
     save_directory: Option<&std::path::Path>,
-) -> Result<(auction::Auction, Option<crate::infra::liquidity_client::LiquidityResponse>), Error> {
+) -> Result<
+    (
+        auction::Auction,
+        Option<crate::infra::liquidity_client::LiquidityResponse>,
+    ),
+    Error,
+> {
     let mut fetched_liquidity_response = None;
-    
+
     let auction_domain = auction::Auction {
         id: match auction.id {
             Some(id) => auction::Id::Solve(id),
@@ -150,7 +156,6 @@ pub async fn into_domain(
             })
             .collect(),
         liquidity: {
-            
             if auction.liquidity.is_empty() && liquidity_client.is_some() {
                 // Fetch liquidity independently from the liquidity-driver API
                 let client = liquidity_client.unwrap();
@@ -211,10 +216,10 @@ pub async fn into_domain(
                             .iter()
                             .map(|liquidity| convert_dto_liquidity_to_domain(liquidity))
                             .try_collect()?;
-                        
+
                         // Store the response for enhanced solutions
                         fetched_liquidity_response = Some(response);
-                        
+
                         domain_liquidity
                     }
                     Err(e) => {
@@ -238,7 +243,7 @@ pub async fn into_domain(
         gas_price: auction::GasPrice(eth::Ether(auction.effective_gas_price)),
         deadline: auction::Deadline(auction.deadline),
     };
-    
+
     Ok((auction_domain, fetched_liquidity_response))
 }
 
@@ -263,7 +268,8 @@ fn convert_dto_liquidity_to_domain(liquidity: &Liquidity) -> Result<liquidity::L
 }
 
 /// Saves fetched liquidity data to a JSON file in the configured directory.
-/// This function runs in a background task and logs errors without failing the request.
+/// This function runs in a background task and logs errors without failing the
+/// request.
 async fn save_liquidity_json(
     liquidity: serde_json::Value,
     auction_id: Option<i64>,
@@ -823,16 +829,16 @@ pub fn create_enhanced_solutions(
 ) -> serde_json::Value {
     // Convert to JSON value
     let mut solutions_json = serde_json::to_value(solutions).unwrap();
-    
+
     // Build a map of liquidity ID -> full liquidity details
-    let mut liquidity_map: std::collections::HashMap<String, &solvers_dto::auction::Liquidity> = 
+    let mut liquidity_map: std::collections::HashMap<String, &solvers_dto::auction::Liquidity> =
         std::collections::HashMap::new();
-    
+
     for liq in &liquidity_response.liquidity {
         let id = extract_liquidity_id(liq);
         liquidity_map.insert(id, liq);
     }
-    
+
     // Enhance each solution's interactions
     if let Some(solutions_array) = solutions_json["solutions"].as_array_mut() {
         for solution in solutions_array {
@@ -842,7 +848,7 @@ pub fn create_enhanced_solutions(
                         if let Some(id) = interaction["id"].as_str() {
                             if let Some(liquidity_details) = liquidity_map.get(id) {
                                 // Embed full liquidity details
-                                interaction["liquidityDetails"] = 
+                                interaction["liquidityDetails"] =
                                     serde_json::to_value(liquidity_details).unwrap();
                             }
                         }
@@ -851,7 +857,7 @@ pub fn create_enhanced_solutions(
             }
         }
     }
-    
+
     solutions_json
 }
 

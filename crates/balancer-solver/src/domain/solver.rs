@@ -138,9 +138,14 @@ impl Solver {
         });
 
         // Create solution verifier if vault and batch router addresses are provided
-        let verifier = match (config.vault_address, config.batch_router_address, config.node_url) {
+        let verifier = match (
+            config.vault_address,
+            config.batch_router_address,
+            config.node_url,
+        ) {
             (Some(vault_addr), Some(batch_router_addr), Some(ref node_url)) => {
-                let web3 = ethrpc::web3(Default::default(), Default::default(), node_url, "verifier");
+                let web3 =
+                    ethrpc::web3(Default::default(), Default::default(), node_url, "verifier");
                 let vault = contracts::BalancerV2Vault::at(&web3, vault_addr.0);
                 let batch_router = contracts::BalancerV3BatchRouter::at(&web3, batch_router_addr.0);
                 Some(crate::infra::solution_verifier::SolutionVerifier::new(

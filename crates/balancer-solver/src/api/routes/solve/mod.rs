@@ -140,7 +140,7 @@ pub async fn solve(
             let save_dir_for_competition = save_dir.clone();
             let save_dir_for_enhanced = save_dir.clone();
             let save_dir_for_verify = save_dir.clone();
-            
+
             tokio::spawn(async move {
                 if let Some(solutions) = solutions_json {
                     save_auction_and_solutions(auction_json, solutions, &save_dir).await;
@@ -150,33 +150,54 @@ pub async fn solve(
             // Spawn background task to fetch competition data
             let cow_api_url = state.cow_api_base_url();
             tokio::spawn(async move {
-                fetch_and_save_competition_data(auction_id, cow_api_url, &save_dir_for_competition).await;
+                fetch_and_save_competition_data(auction_id, cow_api_url, &save_dir_for_competition)
+                    .await;
             });
 
             // Spawn background task to create enhanced solutions if liquidity was fetched
+            // If verifier is also configured, verify using the enhanced solutions
             if let Some(liq_response) = fetched_liquidity {
-                // Serialize solutions_dto for the enhanced file before returning
+                let verifier_opt = state.verifier().cloned();
                 let solutions_json_for_enhanced = serde_json::to_value(&solutions_dto).ok();
+
                 tokio::spawn(async move {
                     if let Some(solutions_json) = solutions_json_for_enhanced {
                         // Deserialize back to Solutions for the function
-                        if let Ok(solutions_for_enhance) = serde_json::from_value(solutions_json) {
-                            save_enhanced_solutions(
-                                solutions_for_enhance,
-                                liq_response,
+                        if let Ok(solutions_for_enhance) =
+                            serde_json::from_value::<dto::Solutions>(solutions_json)
+                        {
+                            // Create enhanced solutions with liquidityDetails
+                            let enhanced = dto::auction::create_enhanced_solutions(
+                                &solutions_for_enhance,
+                                &liq_response,
+                            );
+
+                            // Save enhanced solutions file
+                            save_enhanced_solutions_json(
+                                enhanced.clone(),
                                 auction_id,
                                 &save_dir_for_enhanced,
-                            ).await;
+                            )
+                            .await;
+
+                            // Verify using enhanced solutions if verifier is configured
+                            if let Some(verifier) = verifier_opt {
+                                verify_and_save_solutions(
+                                    enhanced,
+                                    verifier,
+                                    auction_id,
+                                    &save_dir_for_verify,
+                                )
+                                .await;
+                            }
                         }
                     }
                 });
-            }
-
-            // Spawn background task to verify solutions if verifier is configured
-            if let Some(verifier) = state.verifier() {
+            } else if let Some(verifier) = state.verifier() {
+                // No liquidity fetched, but verifier configured - use basic solutions
                 let solutions_json_for_verify = serde_json::to_value(&solutions_dto).ok();
                 let verifier = verifier.clone();
-                
+
                 tokio::spawn(async move {
                     if let Some(solutions_json) = solutions_json_for_verify {
                         verify_and_save_solutions(
@@ -184,7 +205,8 @@ pub async fn solve(
                             verifier,
                             auction_id,
                             &save_dir_for_verify,
-                        ).await;
+                        )
+                        .await;
                     }
                 });
             }
@@ -201,9 +223,9 @@ pub async fn solve(
         .await
 }
 
-/// Saves auction and solutions to separate JSON files in the configured directory.
-/// This function runs in a background task and logs errors without failing the
-/// request.
+/// Saves auction and solutions to separate JSON files in the configured
+/// directory. This function runs in a background task and logs errors without
+/// failing the request.
 async fn save_auction_and_solutions(
     auction: serde_json::Value,
     solutions: serde_json::Value,
@@ -260,7 +282,7 @@ async fn save_auction_and_solutions(
 
     // Write auction file
     let auction_write_result = fs::write(&auction_file_path, auction_json).await;
-    
+
     // Write solutions file
     let solutions_write_result = fs::write(&solutions_file_path, solutions_json).await;
 
@@ -293,14 +315,17 @@ async fn save_auction_and_solutions(
 }
 
 /// Fetches competition data from the CoW API and saves it to a JSON file.
-/// This function waits 60 seconds before attempting to fetch, then retries up to 10 times.
+/// This function waits 60 seconds before attempting to fetch, then retries up
+/// to 10 times.
 async fn fetch_and_save_competition_data(
     auction_id: crate::domain::auction::Id,
     cow_api_base_url: &str,
     save_dir: &std::path::Path,
 ) {
-    use tokio::fs;
-    use tokio::time::{sleep, Duration};
+    use tokio::{
+        fs,
+        time::{Duration, sleep},
+    };
 
     // Extract the numeric auction ID
     let auction_id_num = match auction_id {
@@ -356,10 +381,7 @@ async fn fetch_and_save_competition_data(
                             {
                                 Ok(s) => s,
                                 Err(err) => {
-                                    tracing::warn!(
-                                        ?err,
-                                        "Failed to serialize competition data"
-                                    );
+                                    tracing::warn!(?err, "Failed to serialize competition data");
                                     return;
                                 }
                             };
@@ -432,6 +454,7 @@ async fn fetch_and_save_competition_data(
 }
 
 /// Verifies solutions against on-chain Balancer contracts and saves results
+/// Accepts JSON solutions (possibly enhanced with liquidityDetails)
 async fn verify_and_save_solutions(
     solutions_json: serde_json::Value,
     verifier: crate::infra::solution_verifier::SolutionVerifier,
@@ -439,7 +462,7 @@ async fn verify_and_save_solutions(
     save_dir: &std::path::Path,
 ) {
     use tokio::fs;
-    
+
     let auction_id_num = match auction_id {
         crate::domain::auction::Id::Solve(id) => id,
         crate::domain::auction::Id::Quote => {
@@ -447,47 +470,53 @@ async fn verify_and_save_solutions(
             return;
         }
     };
-    
-    // Deserialize solutions
-    let solutions: solvers_dto::solution::Solutions = match serde_json::from_value(solutions_json) {
-        Ok(s) => s,
-        Err(e) => {
-            tracing::warn!(?e, "Failed to deserialize solutions for verification");
+
+    // Extract solutions array from JSON
+    let solutions_array = match solutions_json["solutions"].as_array() {
+        Some(arr) => arr,
+        None => {
+            tracing::warn!("Solutions JSON missing 'solutions' array");
             return;
         }
     };
-    
+
     tracing::info!(
         auction_id = auction_id_num,
-        solutions_count = solutions.solutions.len(),
-        "Starting solution verification"
+        solutions_count = solutions_array.len(),
+        has_liquidity_details = solutions_array
+            .get(0)
+            .and_then(|s| s["interactions"].as_array())
+            .and_then(|i| i.get(0))
+            .and_then(|i| i.get("liquidityDetails"))
+            .is_some(),
+        "Starting solution verification with enhanced liquidity data"
     );
-    
+
     // Verify each solution in parallel
     let mut verification_futures = Vec::new();
-    for (idx, solution) in solutions.solutions.iter().enumerate() {
+    for (idx, solution) in solutions_array.iter().enumerate() {
         let verifier_clone = verifier.clone();
         let solution = solution.clone();
         verification_futures.push(tokio::spawn(async move {
             verifier_clone.verify_solution(&solution, idx).await
         }));
     }
-    
+
     let results: Vec<_> = futures::future::join_all(verification_futures)
         .await
         .into_iter()
         .filter_map(|r| r.ok())
         .collect();
-    
+
     // Save results
     let filename = format!("{}_solution_verification.json", auction_id_num);
     let file_path = save_dir.join(filename);
-    
+
     if let Err(err) = fs::create_dir_all(save_dir).await {
         tracing::warn!(?err, "Failed to create verification directory");
         return;
     }
-    
+
     let json_string = match serde_json::to_string_pretty(&results) {
         Ok(s) => s,
         Err(err) => {
@@ -495,7 +524,7 @@ async fn verify_and_save_solutions(
             return;
         }
     };
-    
+
     match fs::write(&file_path, json_string).await {
         Ok(_) => {
             tracing::info!(
@@ -511,15 +540,14 @@ async fn verify_and_save_solutions(
     }
 }
 
-/// Saves enhanced solutions with embedded liquidity details
-async fn save_enhanced_solutions(
-    solutions: dto::Solutions,
-    liquidity_response: crate::infra::liquidity_client::LiquidityResponse,
+/// Saves enhanced solutions (already created) to a JSON file
+async fn save_enhanced_solutions_json(
+    enhanced: serde_json::Value,
     auction_id: crate::domain::auction::Id,
     save_dir: &std::path::Path,
 ) {
     use tokio::fs;
-    
+
     let auction_id_num = match auction_id {
         crate::domain::auction::Id::Solve(id) => id,
         crate::domain::auction::Id::Quote => {
@@ -527,19 +555,16 @@ async fn save_enhanced_solutions(
             return;
         }
     };
-    
-    // Create enhanced solutions
-    let enhanced = dto::auction::create_enhanced_solutions(&solutions, &liquidity_response);
-    
+
     let filename = format!("{}_enhanced_solutions.json", auction_id_num);
     let file_path = save_dir.join(filename);
-    
+
     // Create directory if needed
     if let Err(err) = fs::create_dir_all(save_dir).await {
         tracing::warn!(?err, directory = ?save_dir, "Failed to create directory");
         return;
     }
-    
+
     // Serialize to pretty JSON
     let json_string = match serde_json::to_string_pretty(&enhanced) {
         Ok(s) => s,
@@ -548,7 +573,7 @@ async fn save_enhanced_solutions(
             return;
         }
     };
-    
+
     // Write to file
     match fs::write(&file_path, json_string).await {
         Ok(_) => {
