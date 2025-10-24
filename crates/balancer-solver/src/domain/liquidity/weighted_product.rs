@@ -57,6 +57,7 @@ pub struct Reserve {
     pub asset: eth::Asset,
     pub weight: eth::Rational,
     pub scale: liquidity::ScalingFactor,
+    pub rate: eth::Rational,
 }
 
 /// The version of the weighted product math to use. Different versions have
