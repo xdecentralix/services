@@ -42,6 +42,9 @@ pub struct Config {
     pub erc4626_node_url: Option<Url>,
     pub liquidity_client_config: Option<crate::infra::config::LiquidityConfig>,
     pub auction_save_directory: Option<std::path::PathBuf>,
+    pub vault_address: Option<eth::Address>,
+    pub batch_router_address: Option<eth::Address>,
+    pub node_url: Option<Url>,
 }
 
 struct Inner {
@@ -86,6 +89,9 @@ struct Inner {
 
     /// Optional directory to save auction and solution JSON files
     auction_save_directory: Option<std::path::PathBuf>,
+
+    /// Optional solution verifier for on-chain quote verification
+    verifier: Option<crate::infra::solution_verifier::SolutionVerifier>,
 }
 
 impl Solver {
@@ -131,6 +137,20 @@ impl Solver {
             )
         });
 
+        // Create solution verifier if vault and batch router addresses are provided
+        let verifier = match (config.vault_address, config.batch_router_address, config.node_url) {
+            (Some(vault_addr), Some(batch_router_addr), Some(ref node_url)) => {
+                let web3 = ethrpc::web3(Default::default(), Default::default(), node_url, "verifier");
+                let vault = contracts::BalancerV2Vault::at(&web3, vault_addr.0);
+                let batch_router = contracts::BalancerV3BatchRouter::at(&web3, batch_router_addr.0);
+                Some(crate::infra::solution_verifier::SolutionVerifier::new(
+                    vault,
+                    batch_router,
+                ))
+            }
+            _ => None,
+        };
+
         Self(Arc::new(Inner {
             chain_id: config.chain_id,
             weth: config.weth,
@@ -143,6 +163,7 @@ impl Solver {
             erc4626_web3,
             liquidity_client,
             auction_save_directory: config.auction_save_directory,
+            verifier,
         }))
     }
 
@@ -188,6 +209,11 @@ impl Solver {
                 "https://api.cow.fi/mainnet" // Fallback
             }
         }
+    }
+
+    /// Returns a reference to the solution verifier if configured
+    pub fn verifier(&self) -> Option<&crate::infra::solution_verifier::SolutionVerifier> {
+        self.0.verifier.as_ref()
     }
 
     /// Solves the specified auction, returning a vector of all possible

@@ -139,6 +139,7 @@ pub async fn solve(
             let save_dir = save_dir.to_path_buf();
             let save_dir_for_competition = save_dir.clone();
             let save_dir_for_enhanced = save_dir.clone();
+            let save_dir_for_verify = save_dir.clone();
             
             tokio::spawn(async move {
                 if let Some(solutions) = solutions_json {
@@ -167,6 +168,23 @@ pub async fn solve(
                                 &save_dir_for_enhanced,
                             ).await;
                         }
+                    }
+                });
+            }
+
+            // Spawn background task to verify solutions if verifier is configured
+            if let Some(verifier) = state.verifier() {
+                let solutions_json_for_verify = serde_json::to_value(&solutions_dto).ok();
+                let verifier = verifier.clone();
+                
+                tokio::spawn(async move {
+                    if let Some(solutions_json) = solutions_json_for_verify {
+                        verify_and_save_solutions(
+                            solutions_json,
+                            verifier,
+                            auction_id,
+                            &save_dir_for_verify,
+                        ).await;
                     }
                 });
             }
@@ -411,6 +429,86 @@ async fn fetch_and_save_competition_data(
         auction_id = auction_id_num,
         "Failed to fetch competition data after 10 attempts"
     );
+}
+
+/// Verifies solutions against on-chain Balancer contracts and saves results
+async fn verify_and_save_solutions(
+    solutions_json: serde_json::Value,
+    verifier: crate::infra::solution_verifier::SolutionVerifier,
+    auction_id: crate::domain::auction::Id,
+    save_dir: &std::path::Path,
+) {
+    use tokio::fs;
+    
+    let auction_id_num = match auction_id {
+        crate::domain::auction::Id::Solve(id) => id,
+        crate::domain::auction::Id::Quote => {
+            tracing::debug!("Skipping verification for quote auction");
+            return;
+        }
+    };
+    
+    // Deserialize solutions
+    let solutions: solvers_dto::solution::Solutions = match serde_json::from_value(solutions_json) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!(?e, "Failed to deserialize solutions for verification");
+            return;
+        }
+    };
+    
+    tracing::info!(
+        auction_id = auction_id_num,
+        solutions_count = solutions.solutions.len(),
+        "Starting solution verification"
+    );
+    
+    // Verify each solution in parallel
+    let mut verification_futures = Vec::new();
+    for (idx, solution) in solutions.solutions.iter().enumerate() {
+        let verifier_clone = verifier.clone();
+        let solution = solution.clone();
+        verification_futures.push(tokio::spawn(async move {
+            verifier_clone.verify_solution(&solution, idx).await
+        }));
+    }
+    
+    let results: Vec<_> = futures::future::join_all(verification_futures)
+        .await
+        .into_iter()
+        .filter_map(|r| r.ok())
+        .collect();
+    
+    // Save results
+    let filename = format!("{}_solution_verification.json", auction_id_num);
+    let file_path = save_dir.join(filename);
+    
+    if let Err(err) = fs::create_dir_all(save_dir).await {
+        tracing::warn!(?err, "Failed to create verification directory");
+        return;
+    }
+    
+    let json_string = match serde_json::to_string_pretty(&results) {
+        Ok(s) => s,
+        Err(err) => {
+            tracing::warn!(?err, "Failed to serialize verification results");
+            return;
+        }
+    };
+    
+    match fs::write(&file_path, json_string).await {
+        Ok(_) => {
+            tracing::info!(
+                auction_id = auction_id_num,
+                file_path = ?file_path,
+                solutions_verified = results.len(),
+                "💾 Saved solution verification results"
+            );
+        }
+        Err(err) => {
+            tracing::warn!(?err, "Failed to write verification file");
+        }
+    }
 }
 
 /// Saves enhanced solutions with embedded liquidity details
