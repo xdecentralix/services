@@ -867,13 +867,17 @@ fn weight_to_decimal_v3(
 fn scaling_factor_to_decimal(
     scale: liquidity::balancer::v2::ScalingFactor,
 ) -> bigdecimal::BigDecimal {
-    bigdecimal::BigDecimal::new(scale.as_raw().to_big_int(), 18)
+    // Scaling factors are raw values (e.g., 10^12 for 6-decimal tokens),
+    // NOT in 18-decimal format like rates. Use exponent 0.
+    bigdecimal::BigDecimal::new(scale.as_raw().to_big_int(), 0)
 }
 
 fn scaling_factor_to_decimal_v3(
     scale: liquidity::balancer::v3::ScalingFactor,
 ) -> bigdecimal::BigDecimal {
-    bigdecimal::BigDecimal::new(scale.as_raw().to_big_int(), 18)
+    // Scaling factors are raw values (e.g., 10^12 for 6-decimal tokens),
+    // NOT in 18-decimal format like rates. Use exponent 0.
+    bigdecimal::BigDecimal::new(scale.as_raw().to_big_int(), 0)
 }
 
 fn rate_to_decimal(rate: eth::U256) -> bigdecimal::BigDecimal {

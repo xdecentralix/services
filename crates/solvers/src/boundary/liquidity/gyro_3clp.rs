@@ -64,7 +64,8 @@ fn to_fixed_point(ratio: &crate::domain::eth::Rational) -> Option<Bfp> {
 }
 
 /// Converts a rational to a U256.
-/// Note: Rate is already in wei (18 decimals), so we just convert the rational directly.
+/// Note: Rate is already in wei (18 decimals), so we just convert the rational
+/// directly.
 fn to_u256(ratio: &crate::domain::eth::Rational) -> Option<U256> {
     ratio.numer().checked_div(*ratio.denom())
 }

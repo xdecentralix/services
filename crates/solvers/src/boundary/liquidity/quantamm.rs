@@ -62,7 +62,8 @@ fn to_fixed_point(ratio: &eth::Rational) -> Option<Bfp> {
 }
 
 fn to_u256(ratio: &eth::Rational) -> Option<U256> {
-    // Rate is already in wei (18 decimals), so we just convert the rational directly.
+    // Rate is already in wei (18 decimals), so we just convert the rational
+    // directly.
     ratio.numer().checked_div(*ratio.denom())
 }
 

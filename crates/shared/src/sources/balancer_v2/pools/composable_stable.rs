@@ -95,8 +95,12 @@ impl FactoryIndexing for BalancerV2ComposableStablePoolFactory::Instance {
                         (
                             address,
                             common::TokenState {
+                                balance: token.balance,
                                 scaling_factor: Bfp::from_wei(scaling_factor.into_legacy()),
-                                ..token
+                                // For composable stable pools, getScalingFactors() returns
+                                // scaling factors that already include the rate provider rate.
+                                // We set rate to 1.0 to avoid double-applying the rate.
+                                rate: ethcontract::U256::exp10(18),
                             },
                         )
                     })
