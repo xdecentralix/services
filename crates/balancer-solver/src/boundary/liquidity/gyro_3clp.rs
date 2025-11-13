@@ -63,9 +63,9 @@ fn to_fixed_point(ratio: &crate::domain::eth::Rational) -> Option<Bfp> {
     Some(Bfp::from_wei(wei))
 }
 
-/// Converts a rational to a U256.
-/// Note: Rate is already in wei (18 decimals), so we just convert the rational
-/// directly.
+/// Converts a rational to a U256 rate in wei (18 decimals).
+/// Rates are stored as Rationals and need to be scaled to 18 decimals.
 fn to_u256(ratio: &crate::domain::eth::Rational) -> Option<U256> {
-    ratio.numer().checked_div(*ratio.denom())
+    let base = ethereum_types::U256::exp10(18);
+    ratio.numer().checked_mul(base)?.checked_div(*ratio.denom())
 }

@@ -67,9 +67,9 @@ fn to_signed_fixed_point(ratio: &eth::SignedRational) -> Option<SBfp> {
     Some(SBfp::from_wei(scaled))
 }
 
-/// Converts a rational to a U256.
-/// Note: Rate is already in wei (18 decimals), so we just convert the rational
-/// directly.
+/// Converts a rational to a U256 rate in wei (18 decimals).
+/// Rates are stored as Rationals and need to be scaled to 18 decimals.
 fn to_u256(ratio: &eth::Rational) -> Option<U256> {
-    ratio.numer().checked_div(*ratio.denom())
+    let base = U256::exp10(18);
+    ratio.numer().checked_mul(base)?.checked_div(*ratio.denom())
 }
