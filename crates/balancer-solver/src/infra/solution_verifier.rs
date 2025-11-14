@@ -324,7 +324,7 @@ impl SolutionVerifier {
         // Call querySwapExactIn
         let query = self.batch_router.methods().query_swap_exact_in(
             vec![path.clone()],
-            H160::zero(),  // sender (not needed for query)
+            self.batch_router.address(),  // sender (required for pools with hooks)
             Bytes(vec![]), // empty userData
         );
 
@@ -347,7 +347,7 @@ impl SolutionVerifier {
                 "exactAmountIn": input_amount.to_string(),
                 "minAmountOut": "0"
             }],
-            "sender": "0x0000000000000000000000000000000000000000",
+            "sender": format!("{:?}", self.batch_router.address()),
             "userData": "0x"
         });
 
