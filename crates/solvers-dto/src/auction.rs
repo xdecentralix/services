@@ -203,7 +203,8 @@ pub struct ConstantProductReserve {
 pub struct WeightedProductPool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, WeightedProductReserve>,
@@ -235,7 +236,8 @@ pub enum WeightedProductVersion {
 pub struct StablePool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, StableReserve>,
@@ -259,7 +261,8 @@ pub struct StableReserve {
 pub struct StableSurgePool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, StableReserve>,
@@ -328,7 +331,8 @@ pub struct Erc4626Edge {
 pub struct GyroEPool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, GyroEReserve>,
@@ -373,7 +377,8 @@ pub enum GyroEVersion {
 pub struct Gyro2CLPPool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, Gyro2CLPReserve>,
@@ -390,7 +395,8 @@ pub struct Gyro2CLPPool {
 pub struct Gyro3CLPPool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, Gyro3CLPReserve>,
@@ -469,7 +475,8 @@ pub struct ReClammReserve {
 pub struct QuantAmmPool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, QuantAmmReserve>,

@@ -518,7 +518,6 @@ components:
         - kind
         - tokens
         - fee
-        - balancer_pool_id
       properties:
         kind:
           type: string
@@ -557,7 +556,6 @@ components:
         - tokens
         - amplificationParameter
         - fee
-        - balancer_pool_id
       properties:
         kind:
           type: string

@@ -125,9 +125,15 @@ impl SolutionVerifier {
             (None, None)
         };
 
-        // Determine pool version ONLY by ID length (not by pool kind)
-        // Prefer balancerPoolId from liquidityDetails, fall back to pool_id
-        let pool_version = Self::detect_pool_version(balancer_pool_id_opt.unwrap_or(pool_id));
+        // Determine pool version:
+        // - If balancerPoolId is None/null, it's a V3 pool (V3 pools don't have
+        //   V2-style pool IDs)
+        // - If balancerPoolId exists, detect version by ID length
+        let pool_version = if balancer_pool_id_opt.is_none() {
+            PoolVersion::V3
+        } else {
+            Self::detect_pool_version(balancer_pool_id_opt.unwrap_or(pool_id))
+        };
 
         // Quote using appropriate method with enhanced data
         let quoted_amount = match pool_version {

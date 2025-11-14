@@ -132,7 +132,7 @@ fn convert_domain_to_dto(
                 solvers_dto::auction::WeightedProductPool {
                     id: liquidity.id.0.to_string(),
                     address: pool.id.address().into(),
-                    balancer_pool_id: pool.id.into(),
+                    balancer_pool_id: Some(pool.id.into()),
                     gas_estimate: liquidity.gas.0.into(),
                     tokens: pool
                         .reserves
@@ -167,10 +167,7 @@ fn convert_domain_to_dto(
                 solvers_dto::auction::WeightedProductPool {
                     id: liquidity.id.0.to_string(),
                     address: pool.id.address().into(),
-                    balancer_pool_id: {
-                        let pool_id_h160: eth::H160 = pool.id.into();
-                        pool_id_h160.into()
-                    },
+                    balancer_pool_id: None, // V3 pools don't have V2-style pool IDs
                     gas_estimate: liquidity.gas.0.into(),
                     tokens: pool
                         .reserves
@@ -202,7 +199,7 @@ fn convert_domain_to_dto(
             solvers_dto::auction::StablePool {
                 id: liquidity.id.0.to_string(),
                 address: pool.id.address().into(),
-                balancer_pool_id: pool.id.into(),
+                balancer_pool_id: Some(pool.id.into()),
                 gas_estimate: liquidity.gas.0.into(),
                 tokens: pool
                     .reserves
@@ -230,10 +227,7 @@ fn convert_domain_to_dto(
             solvers_dto::auction::StablePool {
                 id: liquidity.id.0.to_string(),
                 address: pool.id.address().into(),
-                balancer_pool_id: {
-                    let pool_id_h160: eth::H160 = pool.id.into();
-                    pool_id_h160.into()
-                },
+                balancer_pool_id: None, // V3 pools don't have V2-style pool IDs
                 gas_estimate: liquidity.gas.0.into(),
                 tokens: pool
                     .reserves
@@ -261,10 +255,7 @@ fn convert_domain_to_dto(
             solvers_dto::auction::Liquidity::StableSurge(solvers_dto::auction::StableSurgePool {
                 id: liquidity.id.0.to_string(),
                 address: pool.id.address().into(),
-                balancer_pool_id: {
-                    let pool_id_h160: eth::H160 = pool.id.into();
-                    pool_id_h160.into()
-                },
+                balancer_pool_id: None, // V3 pools don't have V2-style pool IDs
                 gas_estimate: liquidity.gas.0.into(),
                 tokens: pool
                     .reserves
@@ -298,7 +289,7 @@ fn convert_domain_to_dto(
             Box::new(solvers_dto::auction::GyroEPool {
                 id: liquidity.id.0.to_string(),
                 address: pool.id.address().into(),
-                balancer_pool_id: pool.id.into(),
+                balancer_pool_id: Some(pool.id.into()),
                 gas_estimate: liquidity.gas.0.into(),
                 tokens: pool
                     .reserves
@@ -341,7 +332,7 @@ fn convert_domain_to_dto(
             solvers_dto::auction::Gyro2CLPPool {
                 id: liquidity.id.0.to_string(),
                 address: pool.id.address().into(),
-                balancer_pool_id: pool.id.into(),
+                balancer_pool_id: Some(pool.id.into()),
                 gas_estimate: liquidity.gas.0.into(),
                 tokens: pool
                     .reserves
@@ -372,7 +363,7 @@ fn convert_domain_to_dto(
             solvers_dto::auction::Gyro3CLPPool {
                 id: liquidity.id.0.to_string(),
                 address: pool.id.address().into(),
-                balancer_pool_id: pool.id.into(),
+                balancer_pool_id: Some(pool.id.into()),
                 gas_estimate: liquidity.gas.0.into(),
                 tokens: pool
                     .reserves
@@ -402,10 +393,7 @@ fn convert_domain_to_dto(
             Box::new(solvers_dto::auction::GyroEPool {
                 id: liquidity.id.0.to_string(),
                 address: pool.id.address().into(),
-                balancer_pool_id: {
-                    let pool_id_h160: eth::H160 = pool.id.into();
-                    pool_id_h160.into()
-                },
+                balancer_pool_id: None, // V3 pools don't have V2-style pool IDs
                 gas_estimate: liquidity.gas.0.into(),
                 tokens: pool
                     .reserves
@@ -448,10 +436,7 @@ fn convert_domain_to_dto(
             solvers_dto::auction::Gyro2CLPPool {
                 id: liquidity.id.0.to_string(),
                 address: pool.id.address().into(),
-                balancer_pool_id: {
-                    let pool_id_h160: eth::H160 = pool.id.into();
-                    pool_id_h160.into()
-                },
+                balancer_pool_id: None, // V3 pools don't have V2-style pool IDs
                 gas_estimate: liquidity.gas.0.into(),
                 tokens: pool
                     .reserves
@@ -521,10 +506,7 @@ fn convert_domain_to_dto(
             solvers_dto::auction::QuantAmmPool {
                 id: liquidity.id.0.to_string(),
                 address: pool.id.address().into(),
-                balancer_pool_id: {
-                    let pool_id_h160: eth::H160 = pool.id.into();
-                    pool_id_h160.into()
-                },
+                balancer_pool_id: None, // V3 pools don't have V2-style pool IDs
                 gas_estimate: liquidity.gas.0.into(),
                 tokens: pool
                     .reserves
