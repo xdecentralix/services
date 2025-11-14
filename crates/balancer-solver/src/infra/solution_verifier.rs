@@ -36,7 +36,7 @@ pub struct ContractCallDetails {
     pub decoded_params: serde_json::Value,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum PoolVersion {
     V2,
     V3,
@@ -171,11 +171,24 @@ impl SolutionVerifier {
                 (Some(quote), diff, None, Some(call_details))
             }
             Err(e) => {
-                // Try to extract contract call details from error context if available
-                // For now, we don't have call details on error (they're created inside the
-                // functions) This is acceptable as errors typically happen
-                // during call execution
-                (None, None, Some(e.to_string()), None)
+                // For V3 calls, we still want to save the call details even on error
+                // so the user can see what was actually attempted
+                let error_call_details = if pool_version == PoolVersion::V3 {
+                    if let Some(address) = pool_address_opt {
+                        Some(create_v3_call_details(
+                            &self.batch_router,
+                            address,
+                            &input_token,
+                            &output_token,
+                            input_amount,
+                        ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                (None, None, Some(e.to_string()), error_call_details)
             }
         };
 
@@ -359,14 +372,52 @@ impl SolutionVerifier {
             decoded_params,
         };
 
-        let (path_amounts_out, _tokens_out, _amounts_out) = query.call().await?;
+        let result = query.call().await;
 
-        // Get the first path's output amount
-        if path_amounts_out.is_empty() {
-            return Err("No output amounts returned from querySwapExactIn".into());
+        match result {
+            Ok((path_amounts_out, _tokens_out, _amounts_out)) => {
+                // Get the first path's output amount
+                if path_amounts_out.is_empty() {
+                    return Err("No output amounts returned from querySwapExactIn".into());
+                }
+                Ok((path_amounts_out[0].to_string(), call_details))
+            }
+            Err(e) => {
+                // Return the error - call details will be saved separately in the JSON
+                Err(Box::new(e))
+            }
         }
+    }
+}
 
-        Ok((path_amounts_out[0].to_string(), call_details))
+fn create_v3_call_details(
+    batch_router: &BalancerV3BatchRouter,
+    pool_address: &str,
+    input_token: &Address,
+    output_token: &Address,
+    input_amount: U256,
+) -> ContractCallDetails {
+    let decoded_params = serde_json::json!({
+        "paths": [{
+            "tokenIn": format!("{:?}", H160::from(input_token.0)),
+            "steps": [{
+                "pool": pool_address,
+                "tokenOut": format!("{:?}", H160::from(output_token.0)),
+                "isBuffer": false
+            }],
+            "exactAmountIn": input_amount.to_string(),
+            "minAmountOut": "0"
+        }],
+        "sender": format!("{:?}", batch_router.address()),
+        "userData": "0x"
+    });
+
+    ContractCallDetails {
+        contract_address: format!("{:?}", batch_router.address()),
+        contract_name: "BalancerV3BatchRouter".to_string(),
+        function_name: "querySwapExactIn".to_string(),
+        calldata: "(error - call details captured without execution)".to_string(),
+        decoded_params,
     }
 }
 
