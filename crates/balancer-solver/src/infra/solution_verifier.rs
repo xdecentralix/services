@@ -1,6 +1,6 @@
 use {
     contracts::{BalancerV2Vault, BalancerV3BatchRouter},
-    ethcontract::{Address, Bytes, H160, U256},
+    ethcontract::{Account, Address, Bytes, H160, U256},
     serde::{Deserialize, Serialize},
 };
 
@@ -335,11 +335,13 @@ impl SolutionVerifier {
         );
 
         // Call querySwapExactIn
+        // IMPORTANT: Must set .from() to make this a proper staticcall
         let query = self.batch_router.methods().query_swap_exact_in(
             vec![path.clone()],
             self.batch_router.address(),  // sender (required for pools with hooks)
             Bytes(vec![]), // empty userData
-        );
+        )
+        .from(Account::Local(H160::zero(), None));  // Set from address for the eth_call
 
         // Capture contract call details for debugging
         let calldata = query
@@ -361,7 +363,8 @@ impl SolutionVerifier {
                 "minAmountOut": "0"
             }],
             "sender": format!("{:?}", self.batch_router.address()),
-            "userData": "0x"
+            "userData": "0x",
+            "from": "0x0000000000000000000000000000000000000000"
         });
 
         let call_details = ContractCallDetails {
