@@ -39,6 +39,7 @@ pub fn to_domain(
                             scale: balancer::v3::ScalingFactor::from_raw(
                                 reserve.common.scaling_factor.as_uint256(),
                             )?,
+                            rate: reserve.common.rate.into(),
                         })
                     })
                     .collect::<Result<_>>()?,

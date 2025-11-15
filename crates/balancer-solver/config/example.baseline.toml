@@ -13,3 +13,6 @@ native-token-price-estimation-amount = "100000000000000000"
 # driver-url = "http://localhost:8080"
 # timeout-ms = 5000
 # protocols = ["balancer_v2", "uniswap_v2"]
+
+# Optional: Directory to save auction and solution JSON files for debugging
+# auction-save-directory = "/tmp/balancer-auctions"

@@ -32,7 +32,7 @@ pub fn to_boundary_pool(address: H160, pool: &liquidity::weighted_product::Pool)
                     common: TokenState {
                         balance: reserve.asset.amount,
                         scaling_factor: to_fixed_point(&reserve.scale.get())?,
-                        rate: U256::exp10(18),
+                        rate: to_u256(&reserve.rate)?,
                     },
                     weight: to_fixed_point(&reserve.weight)?,
                 },
@@ -63,4 +63,11 @@ fn to_fixed_point(ratio: &eth::Rational) -> Option<Bfp> {
     let base = U256::exp10(18);
     let wei = ratio.numer().checked_mul(base)? / ratio.denom();
     Some(Bfp::from_wei(wei))
+}
+
+/// Converts a rational to a U256 rate in wei (18 decimals).
+/// Rates are stored as Rationals and need to be scaled to 18 decimals.
+fn to_u256(ratio: &eth::Rational) -> Option<U256> {
+    let base = U256::exp10(18);
+    ratio.numer().checked_mul(base)?.checked_div(*ratio.denom())
 }

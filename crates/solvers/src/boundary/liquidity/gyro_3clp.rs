@@ -31,7 +31,7 @@ pub fn to_boundary_pool(address: H160, pool: &liquidity::gyro_3clp::Pool) -> Opt
                 TokenState {
                     balance: reserve.asset.amount,
                     scaling_factor: to_fixed_point(&reserve.scale.get())?,
-                    rate: U256::exp10(18),
+                    rate: to_u256(&reserve.rate)?,
                 },
             ))
         })
@@ -61,4 +61,11 @@ fn to_fixed_point(ratio: &crate::domain::eth::Rational) -> Option<Bfp> {
     let base = ethereum_types::U256::exp10(18);
     let wei = ratio.numer().checked_mul(base)? / ratio.denom();
     Some(Bfp::from_wei(wei))
+}
+
+/// Converts a rational to a U256.
+/// Note: Rate is already in wei (18 decimals), so we just convert the rational
+/// directly.
+fn to_u256(ratio: &crate::domain::eth::Rational) -> Option<U256> {
+    ratio.numer().checked_div(*ratio.denom())
 }

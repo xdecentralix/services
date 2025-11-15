@@ -61,6 +61,18 @@ struct Config {
 
     /// Configuration for independent liquidity fetching
     liquidity: Option<LiquidityConfig>,
+
+    /// Optional directory path to save auction and solution JSON files
+    auction_save_directory: Option<String>,
+
+    /// Balancer V2 Vault address for solution verification
+    vault_address: Option<H160>,
+
+    /// Balancer V3 Batch Router address for solution verification
+    batch_router_address: Option<H160>,
+
+    /// Node URL for solution verification
+    node_url: Option<Url>,
 }
 
 /// Configuration for the liquidity client
@@ -111,6 +123,7 @@ pub async fn load(path: &Path) -> solver::Config {
     };
 
     solver::Config {
+        chain_id: config.chain_id.map(|c| c as u64).unwrap_or(1),
         weth,
         base_tokens: config
             .base_tokens
@@ -124,6 +137,10 @@ pub async fn load(path: &Path) -> solver::Config {
         uni_v3_node_url: config.uni_v3_node_url,
         erc4626_node_url: config.erc4626_node_url,
         liquidity_client_config: config.liquidity,
+        auction_save_directory: config.auction_save_directory.map(std::path::PathBuf::from),
+        vault_address: config.vault_address.map(eth::Address),
+        batch_router_address: config.batch_router_address.map(eth::Address),
+        node_url: config.node_url,
     }
 }
 

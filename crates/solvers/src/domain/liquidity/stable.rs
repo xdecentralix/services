@@ -56,4 +56,5 @@ impl Reserves {
 pub struct Reserve {
     pub asset: eth::Asset,
     pub scale: liquidity::ScalingFactor,
+    pub rate: eth::Rational,
 }

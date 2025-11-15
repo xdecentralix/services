@@ -31,6 +31,7 @@ pub struct Solver(Arc<Inner>);
 const DEADLINE_SLACK: chrono::Duration = chrono::Duration::milliseconds(500);
 
 pub struct Config {
+    pub chain_id: u64,
     pub weth: eth::WethAddress,
     pub base_tokens: Vec<eth::TokenAddress>,
     pub max_hops: usize,
@@ -40,9 +41,14 @@ pub struct Config {
     pub uni_v3_node_url: Option<Url>,
     pub erc4626_node_url: Option<Url>,
     pub liquidity_client_config: Option<crate::infra::config::LiquidityConfig>,
+    pub auction_save_directory: Option<std::path::PathBuf>,
+    pub vault_address: Option<eth::Address>,
+    pub batch_router_address: Option<eth::Address>,
+    pub node_url: Option<Url>,
 }
 
 struct Inner {
+    chain_id: u64,
     weth: eth::WethAddress,
 
     /// Set of tokens to additionally consider as intermediary hops when
@@ -80,6 +86,12 @@ struct Inner {
 
     /// Optional liquidity client for fetching liquidity from external API
     liquidity_client: Option<crate::infra::liquidity_client::LiquidityClient>,
+
+    /// Optional directory to save auction and solution JSON files
+    auction_save_directory: Option<std::path::PathBuf>,
+
+    /// Optional solution verifier for on-chain quote verification
+    verifier: Option<crate::infra::solution_verifier::SolutionVerifier>,
 }
 
 impl Solver {
@@ -125,7 +137,27 @@ impl Solver {
             )
         });
 
+        // Create solution verifier if vault and batch router addresses are provided
+        let verifier = match (
+            config.vault_address,
+            config.batch_router_address,
+            config.node_url,
+        ) {
+            (Some(vault_addr), Some(batch_router_addr), Some(ref node_url)) => {
+                let web3 =
+                    ethrpc::web3(Default::default(), Default::default(), node_url, "verifier");
+                let vault = contracts::BalancerV2Vault::at(&web3, vault_addr.0);
+                let batch_router = contracts::BalancerV3BatchRouter::at(&web3, batch_router_addr.0);
+                Some(crate::infra::solution_verifier::SolutionVerifier::new(
+                    vault,
+                    batch_router,
+                ))
+            }
+            _ => None,
+        };
+
         Self(Arc::new(Inner {
+            chain_id: config.chain_id,
             weth: config.weth,
             base_tokens: config.base_tokens.into_iter().collect(),
             max_hops: config.max_hops,
@@ -135,6 +167,8 @@ impl Solver {
             uni_v3_quoter_v2,
             erc4626_web3,
             liquidity_client,
+            auction_save_directory: config.auction_save_directory,
+            verifier,
         }))
     }
 
@@ -154,6 +188,37 @@ impl Solver {
             // For now return default protocols - this could be made configurable
             vec!["balancer_v2".to_string(), "uniswap_v2".to_string()]
         })
+    }
+
+    /// Returns the auction save directory if configured
+    pub fn auction_save_directory(&self) -> Option<&std::path::Path> {
+        self.0.auction_save_directory.as_deref()
+    }
+
+    /// Returns the chain ID for this solver
+    pub fn chain_id(&self) -> u64 {
+        self.0.chain_id
+    }
+
+    /// Returns the CoW API base URL for this chain
+    pub fn cow_api_base_url(&self) -> &'static str {
+        match self.0.chain_id {
+            1 => "https://api.cow.fi/mainnet",
+            100 => "https://api.cow.fi/xdai",
+            42161 => "https://api.cow.fi/arbitrum_one",
+            8453 => "https://api.cow.fi/base",
+            43114 => "https://api.cow.fi/avalanche",
+            137 => "https://api.cow.fi/polygon",
+            _ => {
+                tracing::warn!(chain_id = self.0.chain_id, "Unknown chain ID for CoW API");
+                "https://api.cow.fi/mainnet" // Fallback
+            }
+        }
+    }
+
+    /// Returns a reference to the solution verifier if configured
+    pub fn verifier(&self) -> Option<&crate::infra::solution_verifier::SolutionVerifier> {
+        self.0.verifier.as_ref()
     }
 
     /// Solves the specified auction, returning a vector of all possible

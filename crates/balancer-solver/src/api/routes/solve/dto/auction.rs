@@ -79,13 +79,23 @@ fn extract_token_pairs_from_auction(
 /// Converts a data transfer object into its domain object representation.
 /// If liquidity_client is provided and auction has empty liquidity, fetches
 /// independently.
+/// Returns the auction and optionally the fetched liquidity response.
 pub async fn into_domain(
     auction: Auction,
     liquidity_client: Option<&LiquidityClient>,
     base_tokens: Option<&[eth::H160]>,
     protocols: Option<&[String]>,
-) -> Result<auction::Auction, Error> {
-    Ok(auction::Auction {
+    save_directory: Option<&std::path::Path>,
+) -> Result<
+    (
+        auction::Auction,
+        Option<crate::infra::liquidity_client::LiquidityResponse>,
+    ),
+    Error,
+> {
+    let mut fetched_liquidity_response = None;
+
+    let auction_domain = auction::Auction {
         id: match auction.id {
             Some(id) => auction::Id::Solve(id),
             None => auction::Id::Quote,
@@ -188,12 +198,29 @@ pub async fn into_domain(
                             "Successfully fetched liquidity from API"
                         );
 
+                        // Save liquidity to JSON if save_directory is provided
+                        if let Some(save_dir) = save_directory {
+                            let liquidity_json = serde_json::to_value(&response).ok();
+                            let save_dir = save_dir.to_path_buf();
+                            let auction_id = auction.id;
+                            tokio::spawn(async move {
+                                if let Some(liquidity) = liquidity_json {
+                                    save_liquidity_json(liquidity, auction_id, &save_dir).await;
+                                }
+                            });
+                        }
+
                         // Process the fetched liquidity
-                        response
+                        let domain_liquidity = response
                             .liquidity
                             .iter()
                             .map(|liquidity| convert_dto_liquidity_to_domain(liquidity))
-                            .try_collect()?
+                            .try_collect()?;
+
+                        // Store the response for enhanced solutions
+                        fetched_liquidity_response = Some(response);
+
+                        domain_liquidity
                     }
                     Err(e) => {
                         tracing::warn!(
@@ -215,7 +242,9 @@ pub async fn into_domain(
         },
         gas_price: auction::GasPrice(eth::Ether(auction.effective_gas_price)),
         deadline: auction::Deadline(auction.deadline),
-    })
+    };
+
+    Ok((auction_domain, fetched_liquidity_response))
 }
 
 /// Helper function to convert DTO liquidity to domain liquidity
@@ -235,6 +264,73 @@ fn convert_dto_liquidity_to_domain(liquidity: &Liquidity) -> Result<liquidity::L
         Liquidity::ReClamm(liquidity) => reclamm_pool::to_domain(liquidity),
         Liquidity::QuantAmm(liquidity) => quant_amm_pool::to_domain(liquidity),
         Liquidity::StableSurge(liquidity) => stable_surge_pool::to_domain(liquidity),
+    }
+}
+
+/// Saves fetched liquidity data to a JSON file in the configured directory.
+/// This function runs in a background task and logs errors without failing the
+/// request.
+async fn save_liquidity_json(
+    liquidity: serde_json::Value,
+    auction_id: Option<i64>,
+    save_dir: &std::path::Path,
+) {
+    use tokio::fs;
+
+    // Determine filename based on auction ID
+    let base_filename = match auction_id {
+        Some(id) => id.to_string(),
+        None => {
+            // Use timestamp for quote auctions
+            let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S_%3f");
+            format!("quote_{}", timestamp)
+        }
+    };
+
+    let liquidity_file_path = save_dir.join(format!("{}_liquidity.json", base_filename));
+
+    // Create directory if it doesn't exist
+    if let Err(err) = fs::create_dir_all(save_dir).await {
+        tracing::warn!(
+            ?err,
+            directory = ?save_dir,
+            "Failed to create liquidity save directory"
+        );
+        return;
+    }
+
+    // Serialize liquidity to pretty JSON
+    let liquidity_json = match serde_json::to_string_pretty(&liquidity) {
+        Ok(content) => content,
+        Err(err) => {
+            tracing::warn!(?err, "Failed to serialize liquidity to JSON");
+            return;
+        }
+    };
+
+    let liquidity_count = liquidity
+        .get("liquidity")
+        .and_then(|l| l.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+
+    // Write liquidity file
+    match fs::write(&liquidity_file_path, liquidity_json).await {
+        Ok(_) => {
+            tracing::info!(
+                liquidity_file = ?liquidity_file_path,
+                auction_id = ?auction_id,
+                liquidity_count,
+                "💾 Saved fetched liquidity to JSON file"
+            );
+        }
+        Err(err) => {
+            tracing::warn!(
+                ?err,
+                file_path = ?liquidity_file_path,
+                "Failed to write liquidity JSON file"
+            );
+        }
     }
 }
 
@@ -301,6 +397,7 @@ mod weighted_product_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate).ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -340,6 +437,7 @@ mod stable_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate).ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -439,6 +537,7 @@ mod gyro_e_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate).ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -502,6 +601,7 @@ mod gyro_2clp_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate).ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -547,6 +647,7 @@ mod gyro_3clp_pool {
                             .ok_or("invalid scaling factor")?,
                     )
                     .ok_or("invalid scaling factor")?,
+                    rate: conv::decimal_to_rational(&token.rate).ok_or("invalid token rate")?,
                 })
             })
             .collect::<Result<Vec<_>, Error>>()?;
@@ -585,6 +686,7 @@ mod reclamm_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate).ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -644,6 +746,7 @@ mod stable_surge_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate).ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -685,6 +788,7 @@ mod quant_amm_pool {
                         scale: conv::decimal_to_rational(&token.scaling_factor)
                             .and_then(liquidity::ScalingFactor::new)
                             .ok_or("invalid token scaling factor")?,
+                        rate: conv::decimal_to_rational(&token.rate).ok_or("invalid token rate")?,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -723,5 +827,62 @@ mod quant_amm_pool {
                 current_timestamp: pool.current_timestamp,
             }),
         })
+    }
+}
+
+/// Creates an enhanced solutions JSON with full liquidity details embedded
+pub fn create_enhanced_solutions(
+    solutions: &solvers_dto::solution::Solutions,
+    liquidity_response: &crate::infra::liquidity_client::LiquidityResponse,
+) -> serde_json::Value {
+    // Convert to JSON value
+    let mut solutions_json = serde_json::to_value(solutions).unwrap();
+
+    // Build a map of liquidity ID -> full liquidity details
+    let mut liquidity_map: std::collections::HashMap<String, &solvers_dto::auction::Liquidity> =
+        std::collections::HashMap::new();
+
+    for liq in &liquidity_response.liquidity {
+        let id = extract_liquidity_id(liq);
+        liquidity_map.insert(id, liq);
+    }
+
+    // Enhance each solution's interactions
+    if let Some(solutions_array) = solutions_json["solutions"].as_array_mut() {
+        for solution in solutions_array {
+            if let Some(interactions) = solution["interactions"].as_array_mut() {
+                for interaction in interactions {
+                    if interaction["kind"] == "liquidity" {
+                        if let Some(id) = interaction["id"].as_str() {
+                            if let Some(liquidity_details) = liquidity_map.get(id) {
+                                // Embed full liquidity details
+                                interaction["liquidityDetails"] =
+                                    serde_json::to_value(liquidity_details).unwrap();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    solutions_json
+}
+
+fn extract_liquidity_id(liq: &solvers_dto::auction::Liquidity) -> String {
+    // Extract ID from each liquidity variant
+    match liq {
+        solvers_dto::auction::Liquidity::ConstantProduct(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::WeightedProduct(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::Stable(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::ConcentratedLiquidity(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::GyroE(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::Gyro2CLP(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::Gyro3CLP(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::LimitOrder(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::Erc4626(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::ReClamm(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::QuantAmm(p) => p.id.clone(),
+        solvers_dto::auction::Liquidity::StableSurge(p) => p.id.clone(),
     }
 }

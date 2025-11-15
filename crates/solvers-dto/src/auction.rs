@@ -203,7 +203,8 @@ pub struct ConstantProductReserve {
 pub struct WeightedProductPool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, WeightedProductReserve>,
@@ -219,6 +220,7 @@ pub struct WeightedProductReserve {
     pub balance: U256,
     pub scaling_factor: BigDecimal,
     pub weight: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -234,7 +236,8 @@ pub enum WeightedProductVersion {
 pub struct StablePool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, StableReserve>,
@@ -249,6 +252,7 @@ pub struct StableReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[serde_as]
@@ -257,7 +261,8 @@ pub struct StableReserve {
 pub struct StableSurgePool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, StableReserve>,
@@ -326,7 +331,8 @@ pub struct Erc4626Edge {
 pub struct GyroEPool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, GyroEReserve>,
@@ -356,6 +362,7 @@ pub struct GyroEReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -370,7 +377,8 @@ pub enum GyroEVersion {
 pub struct Gyro2CLPPool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, Gyro2CLPReserve>,
@@ -387,7 +395,8 @@ pub struct Gyro2CLPPool {
 pub struct Gyro3CLPPool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, Gyro3CLPReserve>,
@@ -404,6 +413,7 @@ pub struct Gyro2CLPReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -419,6 +429,7 @@ pub struct Gyro3CLPReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -455,6 +466,7 @@ pub struct ReClammReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[serde_as]
@@ -463,7 +475,8 @@ pub struct ReClammReserve {
 pub struct QuantAmmPool {
     pub id: String,
     pub address: H160,
-    pub balancer_pool_id: H256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balancer_pool_id: Option<H256>,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub tokens: HashMap<H160, QuantAmmReserve>,
@@ -485,6 +498,7 @@ pub struct QuantAmmReserve {
     #[serde_as(as = "HexOrDecimalU256")]
     pub balance: U256,
     pub scaling_factor: BigDecimal,
+    pub rate: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

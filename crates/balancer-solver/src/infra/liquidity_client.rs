@@ -71,7 +71,7 @@ pub struct LiquidityRequest {
 }
 
 /// Response from the liquidity-driver API
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LiquidityResponse {
     pub auction_id: u64,
     pub liquidity: Vec<solvers_dto::auction::Liquidity>,

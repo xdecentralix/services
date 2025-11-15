@@ -32,6 +32,7 @@ pub fn to_domain(id: liquidity::Id, pool: BalancerV3ReClammOrder) -> Result<liqu
                             scale: balancer::v3::ScalingFactor::from_raw(
                                 reserve.scaling_factor.as_uint256(),
                             )?,
+                            rate: reserve.rate.into(),
                         })
                     })
                     .collect::<Result<_>>()?,

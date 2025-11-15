@@ -95,6 +95,7 @@ pub struct InvalidReserves;
 pub struct Reserve {
     pub asset: eth::Asset,
     pub scale: ScalingFactor,
+    pub rate: eth::U256,
 }
 
 #[derive(Clone, Copy, Debug)]
