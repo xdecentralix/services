@@ -1603,6 +1603,7 @@ dependencies = [
 name = "balancer-solver"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "axum",
  "bigdecimal",

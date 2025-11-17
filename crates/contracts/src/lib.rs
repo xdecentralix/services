@@ -51,7 +51,6 @@ macro_rules! include_contracts {
 include_contracts! {
     BalancerV2Authorizer;
     BalancerV2Vault;
-    BalancerV3BatchRouter;
     BalancerV3Vault;
     BalancerV3WeightedPool;
     BalancerV3WeightedPoolFactory;

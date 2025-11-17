@@ -19,6 +19,7 @@ use {
         infra::metrics,
     },
     ethereum_types::U256,
+    ethrpc::alloy::conversions::IntoAlloy,
     reqwest::Url,
     std::{cmp, collections::HashSet, sync::Arc},
     tracing::Instrument,
@@ -147,7 +148,10 @@ impl Solver {
                 let web3 =
                     ethrpc::web3(Default::default(), Default::default(), node_url, "verifier");
                 let vault = contracts::BalancerV2Vault::at(&web3, vault_addr.0);
-                let batch_router = contracts::BalancerV3BatchRouter::at(&web3, batch_router_addr.0);
+                let batch_router = contracts::alloy::BalancerV3BatchRouter::Instance::new(
+                    batch_router_addr.0.into_alloy(),
+                    web3.alloy,
+                );
                 Some(crate::infra::solution_verifier::SolutionVerifier::new(
                     vault,
                     batch_router,

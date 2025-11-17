@@ -6,6 +6,7 @@ use {
             liquidity::{self, balancer},
         },
     },
+    ethrpc::alloy::conversions::IntoLegacy,
     shared::sources::balancer_v3::pool_fetching::StablePoolVersion,
     solver::liquidity::{BalancerV3StableSurgePoolOrder, balancer_v3},
 };
@@ -71,6 +72,7 @@ fn batch_router(pool: &BalancerV3StableSurgePoolOrder) -> eth::ContractAddress {
         .expect("downcast balancer v3 settlement handler")
         .batch_router()
         .address()
+        .into_legacy()
         .into()
 }
 

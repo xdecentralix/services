@@ -10,7 +10,6 @@ use {
     anyhow::{Context, Result},
     chain::Chain,
     contracts::{
-        BalancerV3BatchRouter,
         BalancerV3Gyro2CLPPoolFactory,
         BalancerV3GyroECLPPoolFactory,
         BalancerV3QuantAMMWeightedPoolFactory,
@@ -22,7 +21,10 @@ use {
         BalancerV3WeightedPoolFactory,
         GPv2Settlement,
     },
-    ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
+    ethrpc::{
+        alloy::conversions::IntoAlloy,
+        block_stream::{BlockRetrieving, CurrentBlockWatcher},
+    },
     shared::{
         http_solver::model::TokenAmount,
         sources::balancer_v3::{
@@ -85,7 +87,10 @@ fn to_interaction(
         // also baked into the Balancer V3 logic in the `shared` crate, so to
         // change this assumption, we would need to change it there as well.
         GPv2Settlement::at(&web3, receiver.0),
-        BalancerV3BatchRouter::at(&web3, pool.batch_router.into()),
+        contracts::alloy::BalancerV3BatchRouter::Instance::new(
+            pool.batch_router.0.into_alloy(),
+            ethrpc::mock::web3().alloy,
+        ),
         Allowances::empty(receiver.0),
     );
 
@@ -139,7 +144,10 @@ async fn init_liquidity(
     // Create Balancer V3 contracts configuration
     let contracts = BalancerContracts {
         vault: BalancerV3Vault::at(&web3, config.vault.into()),
-        batch_router: BalancerV3BatchRouter::at(&web3, config.batch_router.into()),
+        batch_router: contracts::alloy::BalancerV3BatchRouter::Instance::new(
+            config.batch_router.0.into_alloy(),
+            web3.alloy.clone(),
+        ),
         factories: [
             config
                 .weighted

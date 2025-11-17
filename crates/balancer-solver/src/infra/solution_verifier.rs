@@ -1,6 +1,14 @@
 use {
-    contracts::{BalancerV2Vault, BalancerV3BatchRouter},
-    ethcontract::{Account, Address, Bytes, H160, U256},
+    alloy::primitives,
+    contracts::{
+        BalancerV2Vault,
+        alloy::BalancerV3BatchRouter::{
+            self,
+            IBatchRouter::{SwapPathExactAmountIn, SwapPathStep},
+        },
+    },
+    ethcontract::{Address, Bytes, H160, U256},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     serde::{Deserialize, Serialize},
 };
 
@@ -45,11 +53,11 @@ pub enum PoolVersion {
 #[derive(Clone)]
 pub struct SolutionVerifier {
     vault: BalancerV2Vault,
-    batch_router: BalancerV3BatchRouter,
+    batch_router: BalancerV3BatchRouter::Instance,
 }
 
 impl SolutionVerifier {
-    pub fn new(vault: BalancerV2Vault, batch_router: BalancerV3BatchRouter) -> Self {
+    pub fn new(vault: BalancerV2Vault, batch_router: BalancerV3BatchRouter::Instance) -> Self {
         Self {
             vault,
             batch_router,
@@ -312,6 +320,7 @@ impl SolutionVerifier {
     }
 
     /// Quote V3 swap via Batch Router.querySwapExactIn
+    /// This uses a static call (eth_call) to query the expected output amount.
     async fn quote_v3_swap(
         &self,
         pool_address_str: &str,
@@ -322,37 +331,27 @@ impl SolutionVerifier {
         // Parse pool address from string
         let pool_address: H160 = pool_address_str.parse()?;
 
-        // Build SwapPathExactAmountIn
-        let path = (
-            input_token, // tokenIn
-            vec![(
-                pool_address, // pool
-                output_token, // tokenOut
-                false,        // isBuffer
-            )],
-            input_amount, // exactAmountIn
-            U256::zero(), // minAmountOut (no minimum for query)
+        // Build SwapPathExactAmountIn using alloy types
+        let path = SwapPathExactAmountIn {
+            tokenIn: input_token.into_alloy(),
+            steps: vec![SwapPathStep {
+                pool: pool_address.into_alloy(),
+                tokenOut: output_token.into_alloy(),
+                isBuffer: false,
+            }],
+            exactAmountIn: input_amount.into_alloy(),
+            minAmountOut: primitives::U256::ZERO,
+        };
+
+        // Build the call - .call() automatically makes it a static call (eth_call)
+        let call_builder = self.batch_router.querySwapExactIn(
+            vec![path.clone()],
+            *self.batch_router.address(), // sender (required for pools with hooks)
+            primitives::Bytes::new(),     // empty userData
         );
 
-        // Call querySwapExactIn
-        // IMPORTANT: Must set .from() to make this a proper staticcall
-        let query = self
-            .batch_router
-            .methods()
-            .query_swap_exact_in(
-                vec![path.clone()],
-                self.batch_router.address(), // sender (required for pools with hooks)
-                Bytes(vec![]),               // empty userData
-            )
-            .from(Account::Local(H160::zero(), None)); // Set from address for the eth_call
-
         // Capture contract call details for debugging
-        let calldata = query
-            .tx
-            .data
-            .clone()
-            .map(|d| format!("0x{}", hex::encode(d.0)))
-            .unwrap_or_else(|| "0x".to_string());
+        let calldata = format!("0x{}", hex::encode(call_builder.calldata()));
 
         let decoded_params = serde_json::json!({
             "paths": [{
@@ -365,23 +364,24 @@ impl SolutionVerifier {
                 "exactAmountIn": input_amount.to_string(),
                 "minAmountOut": "0"
             }],
-            "sender": format!("{:?}", self.batch_router.address()),
-            "userData": "0x",
-            "from": "0x0000000000000000000000000000000000000000"
+            "sender": format!("{:?}", self.batch_router.address().into_legacy()),
+            "userData": "0x"
         });
 
         let call_details = ContractCallDetails {
-            contract_address: format!("{:?}", self.batch_router.address()),
+            contract_address: format!("{:?}", self.batch_router.address().into_legacy()),
             contract_name: "BalancerV3BatchRouter".to_string(),
             function_name: "querySwapExactIn".to_string(),
             calldata,
             decoded_params,
         };
 
-        let result = query.call().await;
+        // Execute the static call
+        let result = call_builder.call().await;
 
         match result {
-            Ok((path_amounts_out, _tokens_out, _amounts_out)) => {
+            Ok(return_data) => {
+                let path_amounts_out = return_data.pathAmountsOut;
                 // Get the first path's output amount
                 if path_amounts_out.is_empty() {
                     return Err("No output amounts returned from querySwapExactIn".into());
@@ -390,14 +390,14 @@ impl SolutionVerifier {
             }
             Err(e) => {
                 // Return the error - call details will be saved separately in the JSON
-                Err(Box::new(e))
+                Err(format!("Query failed: {:?}", e).into())
             }
         }
     }
 }
 
 fn create_v3_call_details(
-    batch_router: &BalancerV3BatchRouter,
+    batch_router: &BalancerV3BatchRouter::Instance,
     pool_address: &str,
     input_token: &Address,
     output_token: &Address,
@@ -414,12 +414,12 @@ fn create_v3_call_details(
             "exactAmountIn": input_amount.to_string(),
             "minAmountOut": "0"
         }],
-        "sender": format!("{:?}", batch_router.address()),
+        "sender": format!("{:?}", batch_router.address().into_legacy()),
         "userData": "0x"
     });
 
     ContractCallDetails {
-        contract_address: format!("{:?}", batch_router.address()),
+        contract_address: format!("{:?}", batch_router.address().into_legacy()),
         contract_name: "BalancerV3BatchRouter".to_string(),
         function_name: "querySwapExactIn".to_string(),
         calldata: "(error - call details captured without execution)".to_string(),

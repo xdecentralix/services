@@ -1,9 +1,16 @@
 //! Module for Balancer V3 swap interactions.
 
 use {
-    contracts::{BalancerV3BatchRouter, GPv2Settlement},
+    alloy::primitives::U256,
+    contracts::{
+        GPv2Settlement,
+        alloy::BalancerV3BatchRouter::{
+            self,
+            IBatchRouter::{SwapPathExactAmountOut, SwapPathStep},
+        },
+    },
     ethcontract::{Bytes, H160},
-    primitive_types::U256,
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     shared::{
         http_solver::model::TokenAmount,
         interaction::{EncodedInteraction, Interaction},
@@ -14,7 +21,7 @@ use {
 #[derive(Clone, Debug)]
 pub struct BalancerV3SwapGivenOutInteraction {
     pub settlement: GPv2Settlement,
-    pub batch_router: BalancerV3BatchRouter,
+    pub batch_router: BalancerV3BatchRouter::Instance,
     pub pool: H160,
     pub asset_in_max: TokenAmount,
     pub asset_out: TokenAmount,
@@ -28,25 +35,33 @@ pub static NEVER: LazyLock<U256> = LazyLock::new(|| U256::from(1) << 255);
 
 impl BalancerV3SwapGivenOutInteraction {
     pub fn encode_swap(&self) -> EncodedInteraction {
-        let method = self.batch_router.swap_exact_out(
-            vec![(
-                // SwapPathExactAmountOut[]
-                self.asset_in_max.token, // tokenIn (H160)
-                vec![(
-                    // steps[]
-                    self.pool,            // pool (H160)
-                    self.asset_out.token, // tokenOut (H160)
-                    false,                // isBuffer (bool)
-                )],
-                self.asset_in_max.amount, // maxAmountIn (U256)
-                self.asset_out.amount,    // exactAmountOut (U256)
-            )],
-            *NEVER,                 // deadline (U256)
-            false,                  // wethIsEth (bool)
-            self.user_data.clone(), // userData (Bytes)
-        );
-        let calldata = method.tx.data.expect("no calldata").0;
-        (self.batch_router.address(), 0.into(), Bytes(calldata))
+        let swap_path = SwapPathExactAmountOut {
+            tokenIn: self.asset_in_max.token.into_alloy(),
+            steps: vec![SwapPathStep {
+                pool: self.pool.into_alloy(),
+                tokenOut: self.asset_out.token.into_alloy(),
+                isBuffer: false,
+            }]
+            .into(),
+            maxAmountIn: self.asset_in_max.amount.into_alloy(),
+            exactAmountOut: self.asset_out.amount.into_alloy(),
+        };
+        let method = self
+            .batch_router
+            .swapExactOut(
+                vec![swap_path].into(),
+                *NEVER,
+                false,
+                self.user_data.clone().into_alloy(),
+            )
+            .calldata()
+            .clone();
+
+        (
+            self.batch_router.address().into_legacy(),
+            0.into(),
+            Bytes(method.to_vec()),
+        )
     }
 }
 
@@ -62,7 +77,8 @@ mod tests {
 
     #[test]
     fn encode_unwrap_weth() {
-        let batch_router = dummy_contract!(BalancerV3BatchRouter, [0x01; 20]);
+        let batch_router =
+            BalancerV3BatchRouter::Instance::new([0x01; 20].into(), ethrpc::mock::web3().alloy);
         let interaction = BalancerV3SwapGivenOutInteraction {
             settlement: dummy_contract!(GPv2Settlement, [0x02; 20]),
             batch_router: batch_router.clone(),
@@ -75,7 +91,7 @@ mod tests {
         // V3 uses a different method signature, so the encoded calldata will be
         // different The test verifies that encoding works without errors
         let encoded = interaction.encode();
-        assert_eq!(encoded.0, batch_router.address());
+        assert_eq!(encoded.0, batch_router.address().into_legacy());
         assert_eq!(encoded.1, 0.into());
         assert!(!encoded.2.0.is_empty());
     }

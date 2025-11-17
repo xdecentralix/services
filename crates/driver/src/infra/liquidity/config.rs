@@ -390,10 +390,10 @@ impl BalancerV3 {
 
         Some(Self {
             vault: deployment_address(contracts::BalancerV3Vault::raw_contract(), chain)?,
-            batch_router: deployment_address(
-                contracts::BalancerV3BatchRouter::raw_contract(),
-                chain,
-            )?,
+            batch_router: ContractAddress::from(
+                contracts::alloy::BalancerV3BatchRouter::deployment_address(&chain.id())?
+                    .into_legacy(),
+            ),
             weighted: factory_addresses(
                 &[contracts::BalancerV3WeightedPoolFactory::raw_contract()],
             ),

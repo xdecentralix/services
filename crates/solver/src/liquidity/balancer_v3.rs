@@ -22,8 +22,9 @@ use {
         settlement::SettlementEncoder,
     },
     anyhow::Result,
-    contracts::{BalancerV3BatchRouter, GPv2Settlement},
+    contracts::{GPv2Settlement, alloy::BalancerV3BatchRouter},
     ethcontract::H160,
+    ethrpc::alloy::conversions::IntoLegacy,
     model::TokenPair,
     shared::{
         ethrpc::Web3,
@@ -37,7 +38,7 @@ use {
 /// A liquidity provider for Balancer V3 weighted pools.
 pub struct BalancerV3Liquidity {
     settlement: GPv2Settlement,
-    batch_router: BalancerV3BatchRouter,
+    batch_router: BalancerV3BatchRouter::Instance,
     pool_fetcher: Arc<dyn BalancerV3PoolFetching>,
     allowance_manager: Box<dyn AllowanceManaging>,
 }
@@ -47,7 +48,7 @@ impl BalancerV3Liquidity {
         web3: Web3,
         pool_fetcher: Arc<dyn BalancerV3PoolFetching>,
         settlement: GPv2Settlement,
-        batch_router: BalancerV3BatchRouter,
+        batch_router: BalancerV3BatchRouter::Instance,
     ) -> Self {
         let allowance_manager = AllowanceManager::new(web3, settlement.address());
         Self {
@@ -77,7 +78,7 @@ impl BalancerV3Liquidity {
 
         let allowances = self
             .allowance_manager
-            .get_allowances(tokens, self.batch_router.address())
+            .get_allowances(tokens, self.batch_router.address().into_legacy())
             .await?;
 
         let inner = Arc::new(Inner {
@@ -272,7 +273,7 @@ pub struct SettlementHandler {
 
 struct Inner {
     settlement: GPv2Settlement,
-    batch_router: BalancerV3BatchRouter,
+    batch_router: BalancerV3BatchRouter::Instance,
     allowances: Allowances,
 }
 
@@ -280,7 +281,7 @@ impl SettlementHandler {
     pub fn new(
         pool_id: H160,
         settlement: GPv2Settlement,
-        batch_router: BalancerV3BatchRouter,
+        batch_router: BalancerV3BatchRouter::Instance,
         allowances: Allowances,
     ) -> Self {
         SettlementHandler {
@@ -293,7 +294,7 @@ impl SettlementHandler {
         }
     }
 
-    pub fn batch_router(&self) -> &BalancerV3BatchRouter {
+    pub fn batch_router(&self) -> &BalancerV3BatchRouter::Instance {
         &self.inner.batch_router
     }
 
@@ -443,10 +444,10 @@ mod tests {
         },
     };
 
-    fn dummy_contracts() -> (GPv2Settlement, BalancerV3BatchRouter) {
+    fn dummy_contracts() -> (GPv2Settlement, BalancerV3BatchRouter::Instance) {
         (
             dummy_contract!(GPv2Settlement, H160([0xc0; 20])),
-            dummy_contract!(BalancerV3BatchRouter, H160([0xc1; 20])),
+            BalancerV3BatchRouter::Instance::new([0xc1; 20].into(), ethrpc::mock::web3().alloy),
         )
     }
 
@@ -564,7 +565,7 @@ mod tests {
                     H160([0x73; 20]),
                     H160([0xb0; 20]),
                 ]),
-                always(),
+                eq(H160([0xc1; 20])),
             )
             .returning(|_, _| Ok(Allowances::empty(H160([0xc1; 20]))));
 
@@ -681,7 +682,7 @@ mod tests {
 
         allowance_manager
             .expect_get_allowances()
-            .with(eq(hashset![token_a, token_b]), always())
+            .with(eq(hashset![token_a, token_b]), eq(H160([0xc1; 20])))
             .returning(|_, _| Ok(Allowances::empty(H160([0xc1; 20]))));
 
         let base_tokens = BaseTokens::new(token_a, &[]);
@@ -729,7 +730,7 @@ mod tests {
             settlement: settlement.clone(),
             batch_router: batch_router.clone(),
             allowances: Allowances::new(
-                batch_router.address(),
+                batch_router.address().into_legacy(),
                 hashmap! {
                     H160([0xaa; 20]) => 0.into(),
                     H160([0xbb; 20]) => 100.into(),
@@ -776,7 +777,7 @@ mod tests {
             settlement: settlement.clone(),
             batch_router: batch_router.clone(),
             allowances: Allowances::new(
-                batch_router.address(),
+                batch_router.address().into_legacy(),
                 hashmap! {
                     H160([0x70; 20]) => 0.into(),
                     H160([0x71; 20]) => 100.into(),
@@ -818,7 +819,7 @@ mod tests {
             [
                 Approval {
                     token: H160([0x70; 20]),
-                    spender: batch_router.address(),
+                    spender: batch_router.address().into_legacy(),
                 }
                 .encode(),
                 BalancerV3SwapGivenOutInteraction {

@@ -38,7 +38,6 @@ use {
     anyhow::{Context, Result},
     clap::ValueEnum,
     contracts::{
-        BalancerV3BatchRouter,
         BalancerV3Gyro2CLPPoolFactory,
         BalancerV3GyroECLPPoolFactory,
         BalancerV3QuantAMMWeightedPoolFactory,
@@ -49,6 +48,7 @@ use {
         BalancerV3StableSurgePoolFactoryV2,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
+        alloy::{BalancerV3BatchRouter, InstanceExt},
     },
     ethcontract::{BlockId, H160, H256, I256, Instance, U256, dyns::DynInstance},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
@@ -498,7 +498,7 @@ impl BalancerFactoryKind {
 /// All balancer V3 related contracts that we expect to exist.
 pub struct BalancerContracts {
     pub vault: BalancerV3Vault,
-    pub batch_router: BalancerV3BatchRouter,
+    pub batch_router: BalancerV3BatchRouter::Instance,
     pub factories: Vec<(BalancerFactoryKind, DynInstance)>,
 }
 
@@ -508,7 +508,7 @@ impl BalancerContracts {
         let vault = BalancerV3Vault::deployed(&web3)
             .await
             .context("Cannot retrieve balancer V3 vault")?;
-        let batch_router = BalancerV3BatchRouter::deployed(&web3)
+        let batch_router = BalancerV3BatchRouter::Instance::deployed(&web3.alloy)
             .await
             .context("Cannot retrieve balancer V3 batch router")?;
 
