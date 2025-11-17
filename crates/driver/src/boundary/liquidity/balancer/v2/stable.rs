@@ -53,7 +53,6 @@ fn vault(pool: &StablePoolOrder) -> eth::ContractAddress {
         .downcast_ref::<balancer_v2::SettlementHandler>()
         .expect("downcast balancer settlement handler")
         .vault()
-        .address()
         .into_legacy()
         .into()
 }

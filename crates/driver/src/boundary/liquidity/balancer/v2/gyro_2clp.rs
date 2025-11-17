@@ -77,7 +77,6 @@ fn vault(pool: &Gyro2CLPPoolOrder) -> eth::ContractAddress {
         .downcast_ref::<solver::liquidity::balancer_v2::SettlementHandler>()
         .expect("downcast balancer settlement handler")
         .vault()
-        .address()
         .into_legacy()
         .into()
 }
