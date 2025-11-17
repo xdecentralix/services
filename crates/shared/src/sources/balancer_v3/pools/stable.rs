@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn convert_graph_pool_to_stable_pool_info() {
         let pool = PoolData {
-            id: format!("0x{}", hex::encode(H160([1; 20]).0)),
+            id: format!("0x{}", const_hex::encode(H160([1; 20]).0)),
             address: H160([1; 20]),
             pool_type: "STABLE".to_string(),
             protocol_version: 3,

@@ -339,11 +339,11 @@ mod tests {
     fn create_stable_surge_pool_ts2() -> StableSurgePool {
         // Token addresses from reference
         let wbtc =
-            H160::from_slice(&hex::decode("2260fac5e5542a773aa44fbcfedf7c193bc2c599").unwrap());
+            H160::from_slice(&const_hex::decode("2260fac5e5542a773aa44fbcfedf7c193bc2c599").unwrap());
         let usdc =
-            H160::from_slice(&hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
+            H160::from_slice(&const_hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
         let weth =
-            H160::from_slice(&hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
+            H160::from_slice(&const_hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
 
         // Use exact values from reference, avoiding U256::from_str() issues
         let wbtc_balance = U256::from(335254153960139u128); // WBTC raw: 3.35254153960139 WBTC (8 decimals)  
@@ -374,11 +374,11 @@ mod tests {
     /// Create TS3 pool - Same tokens as TS2 but different balances/rates
     fn create_stable_surge_pool_ts3() -> StableSurgePool {
         let wbtc =
-            H160::from_slice(&hex::decode("2260fac5e5542a773aa44fbcfedf7c193bc2c599").unwrap());
+            H160::from_slice(&const_hex::decode("2260fac5e5542a773aa44fbcfedf7c193bc2c599").unwrap());
         let usdc =
-            H160::from_slice(&hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
+            H160::from_slice(&const_hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
         let weth =
-            H160::from_slice(&hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
+            H160::from_slice(&const_hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
 
         // Use raw balances calculated from scaled_18 values (same approach as TS2)
         let wbtc_balance = U256::from(44262u64); // WBTC raw: 0.00044262 WBTC (8 decimals)
@@ -487,9 +487,9 @@ mod tests {
         // works correctly as verified by integration tests.
         let pool = create_stable_surge_pool_ts2();
         let usdc =
-            H160::from_slice(&hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
+            H160::from_slice(&const_hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
         let weth =
-            H160::from_slice(&hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
+            H160::from_slice(&const_hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
         let amount_in = U256::from(100000000u64); // 100 USDC raw (6 decimals)
 
         let result = pool.get_amount_out(weth, (amount_in, usdc)).await.unwrap();
@@ -506,9 +506,9 @@ mod tests {
         // works correctly as verified by integration tests.
         let pool = create_stable_surge_pool_ts2();
         let usdc =
-            H160::from_slice(&hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
+            H160::from_slice(&const_hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
         let weth =
-            H160::from_slice(&hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
+            H160::from_slice(&const_hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
         let amount_in = U256::from(1000000000000000000u64); // 1 WETH raw (18 decimals)
 
         let result = pool.get_amount_out(usdc, (amount_in, weth)).await.unwrap();
@@ -525,9 +525,9 @@ mod tests {
         // correctly as verified by integration tests.
         let pool = create_stable_surge_pool_ts3();
         let usdc =
-            H160::from_slice(&hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
+            H160::from_slice(&const_hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
         let weth =
-            H160::from_slice(&hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
+            H160::from_slice(&const_hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
         let amount_in = U256::from(20000000000000000u64); // 0.02 WETH raw (18 decimals)
 
         let result = pool.get_amount_out(usdc, (amount_in, weth)).await.unwrap();
@@ -539,9 +539,9 @@ mod tests {
     async fn test_stable_surge_ts3_should_throw_error() {
         let pool = create_stable_surge_pool_ts3();
         let usdc =
-            H160::from_slice(&hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
+            H160::from_slice(&const_hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap());
         let weth =
-            H160::from_slice(&hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
+            H160::from_slice(&const_hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
         let amount_out = U256::from(37690905u64); // Try to get more USDC than available
 
         let result = pool.get_amount_in(weth, (amount_out, usdc)).await;

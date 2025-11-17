@@ -330,7 +330,7 @@ impl PoolData {
     pub fn id_as_h160(&self) -> Result<H160> {
         let id_str = self.id.trim_start_matches("0x");
         if id_str.len() == 40 {
-            let id_bytes = hex::decode(id_str).context("Failed to decode pool ID as hex")?;
+            let id_bytes = const_hex::decode(id_str).context("Failed to decode pool ID as hex")?;
             Ok(H160::from_slice(&id_bytes))
         } else {
             Err(anyhow::anyhow!(

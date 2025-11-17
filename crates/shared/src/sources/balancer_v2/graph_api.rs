@@ -316,7 +316,7 @@ impl PoolData {
 
         // For V2 pools, we expect 32 bytes (64 hex characters)
         if id_str.len() == 64 {
-            let id_bytes = hex::decode(id_str).context("Failed to decode pool ID as hex")?;
+            let id_bytes = const_hex::decode(id_str).context("Failed to decode pool ID as hex")?;
             Ok(H256::from_slice(&id_bytes))
         } else {
             Err(anyhow::anyhow!(

@@ -254,7 +254,7 @@ mod tests {
         };
 
         let pool = PoolData {
-            id: format!("0x{}", hex::encode(H160([1; 20]).0)),
+            id: format!("0x{}", const_hex::encode(H160([1; 20]).0)),
             address: H160([1; 20]),
             pool_type: "STABLE".to_string(),
             protocol_version: 3,
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn stable_surge_pool_requires_hook() {
         let pool = PoolData {
-            id: format!("0x{}", hex::encode(H160([1; 20]).0)),
+            id: format!("0x{}", const_hex::encode(H160([1; 20]).0)),
             address: H160([1; 20]),
             pool_type: "STABLE".to_string(),
             protocol_version: 3,
@@ -366,7 +366,7 @@ mod tests {
     #[test]
     fn stable_surge_pool_requires_hook_params() {
         let pool = PoolData {
-            id: format!("0x{}", hex::encode(H160([1; 20]).0)),
+            id: format!("0x{}", const_hex::encode(H160([1; 20]).0)),
             address: H160([1; 20]),
             pool_type: "STABLE".to_string(),
             protocol_version: 3,

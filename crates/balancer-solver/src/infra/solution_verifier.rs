@@ -229,9 +229,9 @@ impl SolutionVerifier {
     ) -> Result<(String, ContractCallDetails), Box<dyn std::error::Error>> {
         // Parse pool ID (it's a hex string starting with 0x)
         let pool_id_bytes = if balancer_pool_id.starts_with("0x") {
-            hex::decode(&balancer_pool_id[2..])?
+            const_hex::decode(&balancer_pool_id[2..])?
         } else {
-            hex::decode(balancer_pool_id)?
+            const_hex::decode(balancer_pool_id)?
         };
 
         if pool_id_bytes.len() != 32 {
@@ -270,7 +270,7 @@ impl SolutionVerifier {
         );
 
         // Capture contract call details for debugging
-        let calldata = format!("0x{}", hex::encode(call_builder.calldata()));
+        let calldata = format!("0x{}", const_hex::encode(call_builder.calldata()));
 
         let decoded_params = serde_json::json!({
             "kind": "GIVEN_IN (0)",
@@ -369,7 +369,7 @@ impl SolutionVerifier {
         );
 
         // Capture contract call details for debugging
-        let calldata = format!("0x{}", hex::encode(call_builder.calldata()));
+        let calldata = format!("0x{}", const_hex::encode(call_builder.calldata()));
 
         let decoded_params = serde_json::json!({
             "paths": [{

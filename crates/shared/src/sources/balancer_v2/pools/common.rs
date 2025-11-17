@@ -1001,7 +1001,7 @@ mod tests {
     #[test]
     fn convert_graph_pool_to_common_pool_info() {
         let pool = PoolData {
-            id: format!("0x{}", hex::encode(H256([4; 32]).0)),
+            id: format!("0x{}", const_hex::encode(H256([4; 32]).0)),
             address: H160([3; 20]),
             pool_type: "STABLE".to_string(),
             protocol_version: 2,
@@ -1058,7 +1058,7 @@ mod tests {
     #[test]
     fn pool_conversion_insufficient_tokens() {
         let pool = PoolData {
-            id: format!("0x{}", hex::encode(H256([2; 32]).0)),
+            id: format!("0x{}", const_hex::encode(H256([2; 32]).0)),
             address: H160([1; 20]),
             pool_type: "WEIGHTED".to_string(),
             protocol_version: 2,
@@ -1096,7 +1096,7 @@ mod tests {
     #[test]
     fn pool_conversion_invalid_decimals() {
         let pool = PoolData {
-            id: format!("0x{}", hex::encode(H256([2; 32]).0)),
+            id: format!("0x{}", const_hex::encode(H256([2; 32]).0)),
             address: H160([1; 20]),
             pool_type: "WEIGHTED".to_string(),
             protocol_version: 2,
