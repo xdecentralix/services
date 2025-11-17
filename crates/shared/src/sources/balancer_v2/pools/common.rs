@@ -433,6 +433,7 @@ mod tests {
             transports::mock::Asserter,
         },
         anyhow::bail,
+        contracts::alloy::BalancerV2Vault,
         ethcontract::{U256, transport::DynTransport},
         ethrpc::{alloy::MutWallet, mock::MockTransport},
         maplit::{btreemap, hashmap},

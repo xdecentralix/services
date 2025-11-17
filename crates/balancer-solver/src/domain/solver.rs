@@ -147,7 +147,10 @@ impl Solver {
             (Some(vault_addr), Some(batch_router_addr), Some(ref node_url)) => {
                 let web3 =
                     ethrpc::web3(Default::default(), Default::default(), node_url, "verifier");
-                let vault = contracts::BalancerV2Vault::at(&web3, vault_addr.0);
+                let vault = contracts::alloy::BalancerV2Vault::Instance::new(
+                    vault_addr.0.into_alloy(),
+                    web3.alloy.clone(),
+                );
                 let batch_router = contracts::alloy::BalancerV3BatchRouter::Instance::new(
                     batch_router_addr.0.into_alloy(),
                     web3.alloy,

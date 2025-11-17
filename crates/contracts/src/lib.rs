@@ -49,7 +49,6 @@ macro_rules! include_contracts {
 }
 
 include_contracts! {
-    BalancerV2Vault;
     BalancerV3Vault;
     BalancerV3WeightedPool;
     BalancerV3WeightedPoolFactory;
@@ -164,7 +163,6 @@ mod tests {
         ] {
             assert_has_deployment_address!(GPv2Settlement for *network);
             assert_has_deployment_address!(WETH9 for *network);
-            assert_has_deployment_address!(BalancerV2Vault for *network);
             assert!(
                 alloy::BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory::deployment_address(network).is_some()
             )
@@ -223,7 +221,6 @@ mod tests {
 
         for network in &[MAINNET, GNOSIS, SEPOLIA, ARBITRUM_ONE] {
             assert_has_deployment_information!(GPv2Settlement for *network);
-            assert_has_deployment_information!(BalancerV2Vault for *network);
         }
         assert!(alloy::BalancerV2WeightedPoolFactory::deployment_address(&MAINNET).is_some());
         for network in &[MAINNET, ARBITRUM_ONE] {

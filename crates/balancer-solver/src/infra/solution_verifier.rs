@@ -1,13 +1,13 @@
 use {
     alloy::primitives,
-    contracts::{
-        BalancerV2Vault,
-        alloy::BalancerV3BatchRouter::{
+    contracts::alloy::{
+        BalancerV2Vault::{self, IVault},
+        BalancerV3BatchRouter::{
             self,
             IBatchRouter::{SwapPathExactAmountIn, SwapPathStep},
         },
     },
-    ethcontract::{Address, Bytes, H160, U256},
+    ethcontract::{Address, H160, U256},
     ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     serde::{Deserialize, Serialize},
 };
@@ -52,12 +52,15 @@ pub enum PoolVersion {
 
 #[derive(Clone)]
 pub struct SolutionVerifier {
-    vault: BalancerV2Vault,
+    vault: BalancerV2Vault::Instance,
     batch_router: BalancerV3BatchRouter::Instance,
 }
 
 impl SolutionVerifier {
-    pub fn new(vault: BalancerV2Vault, batch_router: BalancerV3BatchRouter::Instance) -> Self {
+    pub fn new(
+        vault: BalancerV2Vault::Instance,
+        batch_router: BalancerV3BatchRouter::Instance,
+    ) -> Self {
         Self {
             vault,
             batch_router,
@@ -216,6 +219,7 @@ impl SolutionVerifier {
     }
 
     /// Quote V2 swap via Vault.queryBatchSwap
+    /// This uses a static call (eth_call) to query the expected output amount.
     async fn quote_v2_swap(
         &self,
         balancer_pool_id: &str,
@@ -237,35 +241,36 @@ impl SolutionVerifier {
         let mut pool_id = [0u8; 32];
         pool_id.copy_from_slice(&pool_id_bytes);
 
-        // Build assets array: [token_in, token_out]
-        let assets = vec![input_token, output_token];
+        // Build assets array using alloy types
+        let assets = vec![input_token.into_alloy(), output_token.into_alloy()];
 
-        // Create BatchSwapStep
-        let swap = self.vault.methods().query_batch_swap(
-            0u8.into(), // SwapKind.GIVEN_IN
-            vec![(
-                Bytes(pool_id),
-                0u64.into(), // assetInIndex
-                1u64.into(), // assetOutIndex
-                input_amount,
-                Bytes(vec![]), // empty userData
-            )],
+        // Create BatchSwapStep using alloy types
+        let swap_step = IVault::BatchSwapStep {
+            poolId: primitives::FixedBytes::from(pool_id),
+            assetInIndex: primitives::U256::from(0u64),
+            assetOutIndex: primitives::U256::from(1u64),
+            amount: input_amount.into_alloy(),
+            userData: primitives::Bytes::new(),
+        };
+
+        // Create FundManagement struct
+        let funds = IVault::FundManagement {
+            sender: primitives::Address::ZERO,
+            fromInternalBalance: false,
+            recipient: primitives::Address::ZERO,
+            toInternalBalance: false,
+        };
+
+        // Build the call - .call() automatically makes it a static call (eth_call)
+        let call_builder = self.vault.queryBatchSwap(
+            0u8, // SwapKind.GIVEN_IN
+            vec![swap_step.clone()],
             assets.clone(),
-            (
-                H160::zero(), // sender (not needed for query)
-                false,        // fromInternalBalance
-                H160::zero(), // recipient (not needed for query)
-                false,        // toInternalBalance
-            ),
+            funds,
         );
 
         // Capture contract call details for debugging
-        let calldata = swap
-            .tx
-            .data
-            .clone()
-            .map(|d| format!("0x{}", hex::encode(d.0)))
-            .unwrap_or_else(|| "0x".to_string());
+        let calldata = format!("0x{}", hex::encode(call_builder.calldata()));
 
         let decoded_params = serde_json::json!({
             "kind": "GIVEN_IN (0)",
@@ -277,8 +282,8 @@ impl SolutionVerifier {
                 "userData": "0x"
             }],
             "assets": vec![
-                format!("{:?}", assets[0]),
-                format!("{:?}", assets[1])
+                format!("{:?}", input_token),
+                format!("{:?}", output_token)
             ],
             "funds": {
                 "sender": "0x0000000000000000000000000000000000000000",
@@ -289,34 +294,47 @@ impl SolutionVerifier {
         });
 
         let call_details = ContractCallDetails {
-            contract_address: format!("{:?}", self.vault.address()),
+            contract_address: format!("{:?}", self.vault.address().into_legacy()),
             contract_name: "BalancerV2Vault".to_string(),
             function_name: "queryBatchSwap".to_string(),
             calldata,
             decoded_params,
         };
 
-        // Call the query (static call)
-        let deltas = swap.call().await?;
+        // Execute the static call
+        let result = call_builder.call().await;
 
-        // Parse output: assetDeltas[1] represents net token flow for output token
-        // In Balancer V2:
-        //   - Positive delta = tokens going INTO vault (user sends)
-        //   - Negative delta = tokens coming OUT of vault (user receives)
-        // For the output token in a swap, we expect a NEGATIVE delta
-        if deltas.len() < 2 {
-            return Err("Invalid deltas returned from queryBatchSwap".into());
+        match result {
+            Ok(deltas) => {
+                // Parse output: assetDeltas[1] represents net token flow for output token
+                // In Balancer V2:
+                //   - Positive delta = tokens going INTO vault (user sends)
+                //   - Negative delta = tokens coming OUT of vault (user receives)
+                // For the output token in a swap, we expect a NEGATIVE delta
+                if deltas.len() < 2 {
+                    return Err("Invalid deltas returned from queryBatchSwap".into());
+                }
+
+                let delta_out = deltas[1];
+
+                // Check if the signed value is negative
+                let amount_out = if delta_out.is_negative() {
+                    // Negative means tokens out - convert to unsigned by negating
+                    // For Signed types, we need to negate and convert to unsigned
+                    let abs_value = delta_out.abs();
+                    primitives::U256::from_limbs(abs_value.into_limbs())
+                } else {
+                    // Positive means tokens in, which is wrong for output token
+                    return Err("Expected negative output delta (tokens out of vault)".into());
+                };
+
+                Ok((amount_out.to_string(), call_details))
+            }
+            Err(e) => {
+                // Return the error - call details will be saved separately in the JSON
+                Err(format!("Query failed: {:?}", e).into())
+            }
         }
-
-        let amount_out = if deltas[1].is_negative() {
-            // Negative means tokens out - negate to get positive amount
-            (-deltas[1]).into_raw()
-        } else {
-            // Positive means tokens in, which is wrong for output token
-            return Err("Expected negative output delta (tokens out of vault)".into());
-        };
-
-        Ok((amount_out.to_string(), call_details))
     }
 
     /// Quote V3 swap via Batch Router.querySwapExactIn
