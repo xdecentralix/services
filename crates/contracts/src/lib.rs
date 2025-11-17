@@ -71,7 +71,6 @@ include_contracts! {
     CowAmmConstantProductFactory;
     CowAmmLegacyHelper;
     CowAmmUniswapV2PriceOracle;
-    CowProtocolToken;
     ERC20;
     GPv2AllowListAuthentication;
     GPv2Settlement;
@@ -82,7 +81,9 @@ include_contracts! {
 
 #[cfg(test)]
 mod tests {
-    use crate::alloy::networks::{ARBITRUM_ONE, AVALANCHE, BASE, BNB, GNOSIS, MAINNET, OPTIMISM, POLYGON, SEPOLIA};
+    use crate::alloy::networks::{
+        ARBITRUM_ONE, AVALANCHE, BASE, BNB, GNOSIS, MAINNET, OPTIMISM, POLYGON, SEPOLIA,
+    };
     use {
         super::*,
         ethcontract::{
@@ -160,9 +161,6 @@ mod tests {
             assert!(
                 alloy::BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory::deployment_address(network).is_some()
             )
-        }
-        for network in &[MAINNET, GNOSIS, SEPOLIA] {
-            assert_has_deployment_address!(CowProtocolToken for *network);
         }
         for network in &[MAINNET, ARBITRUM_ONE] {
             assert!(
