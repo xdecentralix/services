@@ -79,7 +79,6 @@ include_contracts! {
     IRateProvider;
     IUniswapV3Factory;
     Permit2;
-    UniswapV3QuoterV2;
     UniswapV3SwapRouterV2;
     WETH9;
 }

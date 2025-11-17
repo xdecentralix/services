@@ -6331,6 +6331,7 @@ dependencies = [
 name = "solvers"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "axum",
  "bigdecimal",
