@@ -77,15 +77,12 @@ include_contracts! {
     GPv2Settlement;
     IERC4626;
     IRateProvider;
-    IUniswapV3Factory;
     WETH9;
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::alloy::networks::{
-        ARBITRUM_ONE, AVALANCHE, BASE, BNB, GNOSIS, LENS, MAINNET, OPTIMISM, POLYGON, SEPOLIA,
-    };
+    use crate::alloy::networks::{ARBITRUM_ONE, AVALANCHE, BASE, BNB, GNOSIS, MAINNET, OPTIMISM, POLYGON, SEPOLIA};
     use {
         super::*,
         ethcontract::{
@@ -167,37 +164,20 @@ mod tests {
         for network in &[MAINNET, GNOSIS, SEPOLIA] {
             assert_has_deployment_address!(CowProtocolToken for *network);
         }
-        for network in &[MAINNET, SEPOLIA, ARBITRUM_ONE] {
-            for network in &[
-                MAINNET,
-                ARBITRUM_ONE,
-                POLYGON,
-                OPTIMISM,
-                BASE,
-                AVALANCHE,
-                BNB,
-                LENS,
-            ] {
-                assert_has_deployment_address!(IUniswapV3Factory for *network);
-            }
-            for network in &[MAINNET, ARBITRUM_ONE] {
-                assert!(
-                    alloy::BalancerV2WeightedPool2TokensFactory::deployment_address(network)
-                        .is_some()
-                );
-                assert!(
-                    alloy::BalancerV2LiquidityBootstrappingPoolFactory::deployment_address(network)
-                        .is_some()
-                );
-            }
+        for network in &[MAINNET, ARBITRUM_ONE] {
+            assert!(
+                alloy::BalancerV2WeightedPool2TokensFactory::deployment_address(network).is_some()
+            );
+            assert!(
+                alloy::BalancerV2LiquidityBootstrappingPoolFactory::deployment_address(network)
+                    .is_some()
+            );
+        }
 
-            assert!(alloy::BalancerV2WeightedPoolFactory::deployment_address(&MAINNET).is_some());
+        assert!(alloy::BalancerV2WeightedPoolFactory::deployment_address(&MAINNET).is_some());
 
-            for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
-                assert!(
-                    alloy::BalancerV2StablePoolFactoryV2::deployment_address(network).is_some()
-                );
-            }
+        for network in &[MAINNET, GNOSIS, ARBITRUM_ONE] {
+            assert!(alloy::BalancerV2StablePoolFactoryV2::deployment_address(network).is_some());
         }
     }
 
