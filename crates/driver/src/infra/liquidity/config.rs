@@ -203,7 +203,9 @@ impl UniswapV3 {
         max_pools_per_tick_query: usize,
     ) -> Option<Self> {
         Some(Self {
-            router: deployment_address(contracts::UniswapV3SwapRouterV2::raw_contract(), chain)?,
+            router: contracts::alloy::UniswapV3SwapRouterV2::deployment_address(&chain.id())?
+                .into_legacy()
+                .into(),
             max_pools_to_initialize: 100,
             graph_url: graph_url.clone(),
             reinit_interval: None,

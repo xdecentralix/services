@@ -79,7 +79,6 @@ include_contracts! {
     IRateProvider;
     IUniswapV3Factory;
     Permit2;
-    UniswapV3SwapRouterV2;
     WETH9;
 }
 
@@ -170,7 +169,6 @@ mod tests {
             assert_has_deployment_address!(CowProtocolToken for *network);
         }
         for network in &[MAINNET, SEPOLIA, ARBITRUM_ONE] {
-            assert_has_deployment_address!(UniswapV3SwapRouterV2 for *network);
             for network in &[
                 MAINNET,
                 ARBITRUM_ONE,
@@ -181,7 +179,6 @@ mod tests {
                 BNB,
                 LENS,
             ] {
-                assert_has_deployment_address!(UniswapV3SwapRouterV2 for *network);
                 assert_has_deployment_address!(IUniswapV3Factory for *network);
             }
             for network in &[MAINNET, ARBITRUM_ONE] {

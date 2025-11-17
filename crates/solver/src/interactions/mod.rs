@@ -14,7 +14,7 @@ pub use {
     erc20::Erc20ApproveInteraction,
     erc4626::{MintExactSharesInteraction, WithdrawExactAssetsInteraction},
     uniswap_v2::UniswapInteraction,
-    uniswap_v3::{ExactOutputSingleParams, UniswapV3Interaction},
+    uniswap_v3::UniswapV3Interaction,
     weth::UnwrapWethInteraction,
     zeroex::ZeroExInteraction,
 };
