@@ -9,6 +9,7 @@ use {
         sources::erc4626::registry::{Erc4626Registry, VaultMeta},
     },
     ethcontract::{H160, U256},
+    ethrpc::alloy::conversions::IntoAlloy,
     model::TokenPair,
     std::collections::HashMap,
 };
@@ -177,10 +178,10 @@ pub async fn build_edges(
         };
         let edge = Erc4626Edge::new(web3, &meta);
 
-        if let Some(pair) = TokenPair::new(meta.asset, meta.vault) {
+        if let Some(pair) = TokenPair::new(meta.asset.into_alloy(), meta.vault.into_alloy()) {
             map.entry(pair).or_default().push(edge.clone());
         }
-        if let Some(pair) = TokenPair::new(meta.vault, meta.asset) {
+        if let Some(pair) = TokenPair::new(meta.vault.into_alloy(), meta.asset.into_alloy()) {
             map.entry(pair).or_default().push(edge);
         }
 

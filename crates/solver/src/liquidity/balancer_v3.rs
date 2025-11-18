@@ -421,6 +421,7 @@ mod tests {
     use {
         super::*,
         crate::interactions::allowances::{Approval, MockAllowanceManaging},
+        ethrpc::alloy::conversions::IntoAlloy,
         maplit::{btreemap, hashmap, hashset},
         mockall::predicate::*,
         model::TokenPair,
@@ -451,7 +452,11 @@ mod tests {
     }
 
     fn token_pair(seed0: u8, seed1: u8) -> TokenPair {
-        TokenPair::new(H160([seed0; 20]), H160([seed1; 20])).unwrap()
+        TokenPair::new(
+            H160([seed0; 20]).into_alloy(),
+            H160([seed1; 20]).into_alloy(),
+        )
+        .unwrap()
     }
 
     #[tokio::test]
@@ -570,9 +575,9 @@ mod tests {
 
         let base_tokens = BaseTokens::new(H160([0xb0; 20]), &[]);
         let traded_pairs = [
-            TokenPair::new(H160([0x70; 20]), H160([0x71; 20])).unwrap(),
-            TokenPair::new(H160([0x70; 20]), H160([0x72; 20])).unwrap(),
-            TokenPair::new(H160([0xb0; 20]), H160([0x73; 20])).unwrap(),
+            TokenPair::new(H160([0x70; 20]).into_alloy(), H160([0x71; 20]).into_alloy()).unwrap(),
+            TokenPair::new(H160([0x70; 20]).into_alloy(), H160([0x72; 20]).into_alloy()).unwrap(),
+            TokenPair::new(H160([0xb0; 20]).into_alloy(), H160([0x73; 20]).into_alloy()).unwrap(),
         ];
         let pairs = base_tokens.relevant_pairs(traded_pairs.into_iter());
 
@@ -685,8 +690,9 @@ mod tests {
             .returning(|_, _| Ok(Allowances::empty(H160([0xc1; 20]))));
 
         let base_tokens = BaseTokens::new(token_a, &[]);
-        let pairs =
-            base_tokens.relevant_pairs([TokenPair::new(token_a, token_b).unwrap()].into_iter());
+        let pairs = base_tokens.relevant_pairs(
+            [TokenPair::new(token_a.into_alloy(), token_b.into_alloy()).unwrap()].into_iter(),
+        );
 
         let (settlement, batch_router) = dummy_contracts();
         let liquidity_provider = BalancerV3Liquidity {

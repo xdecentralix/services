@@ -85,7 +85,7 @@ impl LiquidityCollecting for Erc4626LiquiditySource {
                 for edge in edges_for_pair {
                     // Build wrap or unwrap order shell; exact amounts will be computed by route
                     // realization.
-                    if pair.get() == (edge.asset, edge.vault) {
+                    if pair.get() == (edge.asset.into_alloy(), edge.vault.into_alloy()) {
                         out.push(Liquidity::Erc4626(Box::new(Erc4626Order {
                             tokens: pair,
                             wrap: Some(Erc4626WrapOrder {
@@ -97,7 +97,7 @@ impl LiquidityCollecting for Erc4626LiquiditySource {
                             }),
                             unwrap: None,
                         })));
-                    } else if pair.get() == (edge.vault, edge.asset) {
+                    } else if pair.get() == (edge.vault.into_alloy(), edge.asset.into_alloy()) {
                         out.push(Liquidity::Erc4626(Box::new(Erc4626Order {
                             tokens: pair,
                             wrap: None,

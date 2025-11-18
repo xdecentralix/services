@@ -26,7 +26,7 @@ use {
         event_data::PoolCreated,
     },
     ethcontract::{Event, H160},
-    ethrpc::block_stream::RangeInclusive,
+    ethrpc::{alloy::conversions::IntoLegacy, block_stream::RangeInclusive},
     model::TokenPair,
     std::{
         cmp,
@@ -80,8 +80,8 @@ where
     fn pool_ids_for_token_pair(&self, token_pair: &TokenPair) -> impl Iterator<Item = H160> + '_ {
         let (token0, token1) = token_pair.get();
 
-        let pools0 = self.pools_by_token.get(&token0);
-        let pools1 = self.pools_by_token.get(&token1);
+        let pools0 = self.pools_by_token.get(&token0.into_legacy());
+        let pools1 = self.pools_by_token.get(&token1.into_legacy());
 
         pools0
             .zip(pools1)
@@ -230,6 +230,7 @@ mod tests {
             swap::fixed_point::Bfp,
         },
         ethcontract::H160,
+        ethrpc::alloy::conversions::IntoAlloy,
         maplit::{hashmap, hashset},
         mockall::predicate::eq,
         std::sync::Arc,
@@ -531,7 +532,9 @@ mod tests {
         let n = 3;
         let (pool_ids, pool_addresses, tokens, _, _) = pool_init_data(0, n);
         let token_pairs: Vec<TokenPair> = (0..n)
-            .map(|i| TokenPair::new(tokens[i], tokens[(i + 1) % n]).unwrap())
+            .map(|i| {
+                TokenPair::new(tokens[i].into_alloy(), tokens[(i + 1) % n].into_alloy()).unwrap()
+            })
             .collect();
 
         let mut registry = PoolStorage::new(

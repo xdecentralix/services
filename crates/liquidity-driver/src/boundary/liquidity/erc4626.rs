@@ -6,6 +6,7 @@ use {
     },
     anyhow::Result as AnyResult,
     chain::Chain,
+    ethrpc::alloy::conversions::IntoLegacy,
     shared::sources::erc4626::registry::Erc4626Registry,
     solver::{
         liquidity::erc4626::{Erc4626LiquiditySource, Erc4626Order},
@@ -99,7 +100,10 @@ pub fn to_domain(id: liquidity::Id, order: Erc4626Order) -> Result<liquidity::Li
         id,
         gas: 90_000u64.into(),
         kind: liquidity::Kind::Erc4626(liquidity::erc4626::Edge {
-            tokens: (eth::TokenAddress(a.into()), eth::TokenAddress(b.into())),
+            tokens: (
+                eth::TokenAddress(a.into_legacy().into()),
+                eth::TokenAddress(b.into_legacy().into()),
+            ),
         }),
     })
 }
