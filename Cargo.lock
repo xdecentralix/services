@@ -4410,6 +4410,7 @@ dependencies = [
 name = "model"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "app-data",
  "bigdecimal",
