@@ -87,10 +87,7 @@ fn to_interaction(
         // Note that this code assumes `receiver == sender`. This assumption is
         // also baked into the Balancer V3 logic in the `shared` crate, so to
         // change this assumption, we would need to change it there as well.
-        GPv2Settlement::Instance::new(
-            receiver.0.into_alloy(),
-            ethrpc::mock::web3().alloy.clone(),
-        ),
+        GPv2Settlement::Instance::new(receiver.0.into_alloy(), ethrpc::mock::web3().alloy.clone()),
         contracts::alloy::BalancerV3BatchRouter::Instance::new(
             pool.batch_router.0.into_alloy(),
             ethrpc::mock::web3().alloy,

@@ -79,7 +79,8 @@ mod tests {
     fn encode_unwrap_weth() {
         let batch_router =
             BalancerV3BatchRouter::Instance::new([0x01; 20].into(), ethrpc::mock::web3().alloy);
-        let settlement = GPv2Settlement::Instance::new([0x02; 20].into(), ethrpc::mock::web3().alloy);
+        let settlement =
+            GPv2Settlement::Instance::new([0x02; 20].into(), ethrpc::mock::web3().alloy);
         let interaction = BalancerV3SwapGivenOutInteraction {
             settlement,
             batch_router: batch_router.clone(),
