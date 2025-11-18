@@ -16,7 +16,11 @@ impl Interaction for MintExactSharesInteraction {
     fn encode(&self) -> EncodedInteraction {
         let method = self.vault.mint(self.shares_out, self.receiver);
         let calldata = method.tx.data.expect("no calldata").0;
-        (self.vault.address().into_alloy(), U256::ZERO, alloy::primitives::Bytes::from(calldata))
+        (
+            self.vault.address().into_alloy(),
+            U256::ZERO,
+            alloy::primitives::Bytes::from(calldata),
+        )
     }
 }
 
@@ -34,7 +38,11 @@ impl Interaction for WithdrawExactAssetsInteraction {
             .vault
             .withdraw(self.assets_out, self.receiver, self.owner);
         let calldata = method.tx.data.expect("no calldata").0;
-        (self.vault.address().into_alloy(), U256::ZERO, alloy::primitives::Bytes::from(calldata))
+        (
+            self.vault.address().into_alloy(),
+            U256::ZERO,
+            alloy::primitives::Bytes::from(calldata),
+        )
     }
 }
 
