@@ -50,7 +50,6 @@ pub struct Blockchain {
     pub balances: Balances::Instance,
     pub signatures: Signatures::Instance,
     pub flashloan_router: FlashLoanRouter::Instance,
-    pub ethflow: Option<ContractAddress>,
     pub domain_separator: boundary::DomainSeparator,
     #[allow(
         dead_code,
