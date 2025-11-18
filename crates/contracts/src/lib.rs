@@ -75,7 +75,6 @@ include_contracts! {
     GPv2Settlement;
     IERC4626;
     IRateProvider;
-    WETH9;
 }
 
 #[cfg(test)]
@@ -156,7 +155,6 @@ mod tests {
             BASE,
         ] {
             assert_has_deployment_address!(GPv2Settlement for *network);
-            assert_has_deployment_address!(WETH9 for *network);
             assert!(
                 alloy::BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory::deployment_address(network).is_some()
             )
