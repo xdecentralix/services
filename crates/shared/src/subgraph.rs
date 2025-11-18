@@ -77,12 +77,12 @@ impl SubgraphClient {
         T: DeserializeOwned,
     {
         let mut request = self.client.post(self.subgraph_url.clone());
-        
+
         // Add API key as Authorization header if present
         if let Some(ref api_key) = self.api_key {
             request = request.header("Authorization", format!("Bearer {}", api_key));
         }
-        
+
         match request
             .json(&Query {
                 query,

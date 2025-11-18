@@ -68,8 +68,12 @@ impl UniV3SubgraphClient {
         api_key: Option<String>,
         max_pools_per_tick_query: usize,
     ) -> Result<Self> {
-        let subgraph_client =
-            SubgraphClient::try_new(subgraph_url.clone(), client, api_key, max_pools_per_tick_query)?;
+        let subgraph_client = SubgraphClient::try_new(
+            subgraph_url.clone(),
+            client,
+            api_key,
+            max_pools_per_tick_query,
+        )?;
 
         Ok(Self {
             client: subgraph_client,
