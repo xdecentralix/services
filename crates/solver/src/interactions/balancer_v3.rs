@@ -2,12 +2,12 @@
 
 use {
     alloy::primitives::U256,
-    contracts::{
-        GPv2Settlement,
-        alloy::BalancerV3BatchRouter::{
+    contracts::alloy::{
+        BalancerV3BatchRouter::{
             self,
             IBatchRouter::{SwapPathExactAmountOut, SwapPathStep},
         },
+        GPv2Settlement,
     },
     ethcontract::{Bytes, H160},
     ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
@@ -20,7 +20,7 @@ use {
 
 #[derive(Clone, Debug)]
 pub struct BalancerV3SwapGivenOutInteraction {
-    pub settlement: GPv2Settlement,
+    pub settlement: GPv2Settlement::Instance,
     pub batch_router: BalancerV3BatchRouter::Instance,
     pub pool: H160,
     pub asset_in_max: TokenAmount,
@@ -73,14 +73,15 @@ impl Interaction for BalancerV3SwapGivenOutInteraction {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, contracts::dummy_contract, primitive_types::H160};
+    use {super::*, primitive_types::H160};
 
     #[test]
     fn encode_unwrap_weth() {
         let batch_router =
             BalancerV3BatchRouter::Instance::new([0x01; 20].into(), ethrpc::mock::web3().alloy);
+        let settlement = GPv2Settlement::Instance::new([0x02; 20].into(), ethrpc::mock::web3().alloy);
         let interaction = BalancerV3SwapGivenOutInteraction {
-            settlement: dummy_contract!(GPv2Settlement, [0x02; 20]),
+            settlement,
             batch_router: batch_router.clone(),
             pool: H160([0x03; 20]),
             asset_in_max: TokenAmount::new(H160([0x04; 20]), 1_337_000_000_000_000_000_000u128),

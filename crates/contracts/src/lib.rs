@@ -75,70 +75,15 @@ include_contracts! {
 
 #[cfg(test)]
 mod tests {
-    use crate::alloy::networks::{
-        ARBITRUM_ONE, AVALANCHE, BASE, BNB, GNOSIS, MAINNET, OPTIMISM, POLYGON, SEPOLIA,
-    };
     use {
         super::*,
-        ethcontract::{
-            common::DeploymentInformation,
-            futures::future::{self, FutureExt as _, Ready},
-            json::json,
-            jsonrpc::{Call, Id, MethodCall, Params, Value},
-            web3::{BatchTransport, RequestId, Transport, Web3, error::Result as Web3Result},
+        crate::alloy::networks::{
+            ARBITRUM_ONE, AVALANCHE, BASE, BNB, GNOSIS, MAINNET, OPTIMISM, POLYGON, SEPOLIA,
         },
     };
 
-    #[derive(Debug, Clone)]
-    struct ChainIdTransport(u64);
-
-    impl Transport for ChainIdTransport {
-        type Out = Ready<Web3Result<Value>>;
-
-        fn prepare(&self, method: &str, params: Vec<Value>) -> (RequestId, Call) {
-            assert_eq!(method, "eth_chainId");
-            assert_eq!(params.len(), 0);
-            (
-                0,
-                MethodCall {
-                    jsonrpc: None,
-                    method: method.to_string(),
-                    params: Params::Array(params),
-                    id: Id::Num(0),
-                }
-                .into(),
-            )
-        }
-
-        fn send(&self, _id: RequestId, _request: Call) -> Self::Out {
-            future::ready(Ok(json!(format!("{:x}", self.0))))
-        }
-    }
-
-    impl BatchTransport for ChainIdTransport {
-        type Batch = Ready<Web3Result<Vec<Web3Result<Value>>>>;
-
-        fn send_batch<T>(&self, requests: T) -> Self::Batch
-        where
-            T: IntoIterator<Item = (RequestId, Call)>,
-        {
-            future::ready(Ok(requests
-                .into_iter()
-                .map(|_| Ok(json!(format!("{:x}", self.0))))
-                .collect()))
-        }
-    }
-
     #[test]
     fn deployment_addresses() {
-        macro_rules! assert_has_deployment_address {
-            ($contract:ident for $network:expr_2021) => {{
-                let web3 = Web3::new(ChainIdTransport($network));
-                let deployed = $contract::deployed(&web3).now_or_never().unwrap();
-                assert!(deployed.is_ok());
-            }};
-        }
-
         for network in &[
             MAINNET,
             GNOSIS,
@@ -150,7 +95,11 @@ mod tests {
             POLYGON,
             BASE,
         ] {
-            assert_has_deployment_address!(GPv2Settlement for *network);
+            assert!(
+                alloy::GPv2Settlement::deployment_address(network).is_some(),
+                "GPv2Settlement should have deployment address for network {:?}",
+                network
+            );
             assert!(
                 alloy::BalancerV2NoProtocolFeeLiquidityBootstrappingPoolFactory::deployment_address(network).is_some()
             )
@@ -174,20 +123,6 @@ mod tests {
 
     #[test]
     fn deployment_information() {
-        macro_rules! assert_has_deployment_information {
-            ($contract:ident for $network:expr_2021) => {{
-                let web3 = Web3::new(ChainIdTransport($network));
-                let instance = $contract::deployed(&web3).now_or_never().unwrap().unwrap();
-                assert!(matches!(
-                    instance.deployment_information(),
-                    Some(DeploymentInformation::BlockNumber(_)),
-                ));
-            }};
-        }
-
-        for network in &[MAINNET, GNOSIS, SEPOLIA, ARBITRUM_ONE] {
-            assert_has_deployment_information!(GPv2Settlement for *network);
-        }
         assert!(alloy::BalancerV2WeightedPoolFactory::deployment_address(&MAINNET).is_some());
         for network in &[MAINNET, ARBITRUM_ONE] {
             assert!(

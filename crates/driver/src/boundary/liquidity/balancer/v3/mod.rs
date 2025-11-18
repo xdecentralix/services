@@ -19,7 +19,7 @@ use {
         BalancerV3StableSurgePoolFactoryV2,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
-        GPv2Settlement,
+        alloy::GPv2Settlement,
     },
     ethrpc::{
         alloy::conversions::IntoAlloy,
@@ -82,13 +82,15 @@ fn to_interaction(
     output: &liquidity::ExactOutput,
     receiver: &eth::Address,
 ) -> eth::Interaction {
-    let web3 = contracts::web3::dummy();
     let handler = balancer_v3::SettlementHandler::new(
         pool.id.into(),
         // Note that this code assumes `receiver == sender`. This assumption is
         // also baked into the Balancer V3 logic in the `shared` crate, so to
         // change this assumption, we would need to change it there as well.
-        GPv2Settlement::at(&web3, receiver.0),
+        GPv2Settlement::Instance::new(
+            receiver.0.into_alloy(),
+            ethrpc::mock::web3().alloy.clone(),
+        ),
         contracts::alloy::BalancerV3BatchRouter::Instance::new(
             pool.batch_router.0.into_alloy(),
             ethrpc::mock::web3().alloy,

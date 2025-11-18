@@ -9,7 +9,8 @@ use {
         settlement::SettlementEncoder,
     },
     anyhow::Result,
-    contracts::{ERC20, GPv2Settlement, IERC4626},
+    contracts::{ERC20, IERC4626, alloy::GPv2Settlement},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     model::TokenPair,
     primitive_types::U256,
     shared::{
@@ -31,7 +32,7 @@ pub struct Erc4626WrapOrder {
     pub shares_out: U256,
     pub assets_in_max: U256,
     #[cfg_attr(test, derivative(PartialEq = "ignore"))]
-    pub settlement: GPv2Settlement,
+    pub settlement: GPv2Settlement::Instance,
 }
 
 #[cfg_attr(test, derive(derivative::Derivative))]
@@ -42,7 +43,7 @@ pub struct Erc4626UnwrapOrder {
     pub vault: IERC4626,
     pub assets_out: U256,
     #[cfg_attr(test, derivative(PartialEq = "ignore"))]
-    pub settlement: GPv2Settlement,
+    pub settlement: GPv2Settlement::Instance,
 }
 
 #[cfg_attr(test, derive(derivative::Derivative))]
@@ -117,7 +118,7 @@ impl LiquidityCollecting for Erc4626LiquiditySource {
 #[derive(Clone, Debug)]
 pub struct Erc4626LiquiditySource {
     pub web3: Web3,
-    pub settlement: GPv2Settlement,
+    pub settlement: GPv2Settlement::Instance,
     pub registry: Erc4626Registry,
 }
 
@@ -129,9 +130,9 @@ impl SettlementHandling<Erc4626WrapOrder> for Erc4626WrapOrder {
     fn encode(&self, execution: Self, encoder: &mut SettlementEncoder) -> Result<()> {
         // bounded approve underlying -> vault for assets_in_max
         let approve = Erc20ApproveInteraction {
-            token: execution.underlying.clone(),
-            spender: execution.vault.address(),
-            amount: execution.assets_in_max,
+            token: execution.underlying.address().into_alloy(),
+            spender: execution.vault.address().into_alloy(),
+            amount: execution.assets_in_max.into_alloy(),
         };
         encoder.append_to_execution_plan(Arc::new(approve));
 
@@ -139,7 +140,7 @@ impl SettlementHandling<Erc4626WrapOrder> for Erc4626WrapOrder {
         let interaction = MintExactSharesInteraction {
             vault: execution.vault.clone(),
             shares_out: execution.shares_out,
-            receiver: execution.settlement.address(),
+            receiver: execution.settlement.address().into_legacy(),
         };
         encoder.append_to_execution_plan(Arc::new(interaction));
         Ok(())
@@ -152,7 +153,7 @@ impl SettlementHandling<Erc4626UnwrapOrder> for Erc4626UnwrapOrder {
     }
 
     fn encode(&self, execution: Self, encoder: &mut SettlementEncoder) -> Result<()> {
-        let settlement = execution.settlement.address();
+        let settlement = execution.settlement.address().into_legacy();
         let interaction = WithdrawExactAssetsInteraction {
             vault: execution.vault.clone(),
             assets_out: execution.assets_out,

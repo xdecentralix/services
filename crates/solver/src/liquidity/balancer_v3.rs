@@ -22,7 +22,7 @@ use {
         settlement::SettlementEncoder,
     },
     anyhow::Result,
-    contracts::{GPv2Settlement, alloy::BalancerV3BatchRouter},
+    contracts::alloy::{BalancerV3BatchRouter, GPv2Settlement},
     ethcontract::H160,
     ethrpc::alloy::conversions::IntoLegacy,
     model::TokenPair,
@@ -37,7 +37,7 @@ use {
 
 /// A liquidity provider for Balancer V3 weighted pools.
 pub struct BalancerV3Liquidity {
-    settlement: GPv2Settlement,
+    settlement: GPv2Settlement::Instance,
     batch_router: BalancerV3BatchRouter::Instance,
     pool_fetcher: Arc<dyn BalancerV3PoolFetching>,
     allowance_manager: Box<dyn AllowanceManaging>,
@@ -47,10 +47,10 @@ impl BalancerV3Liquidity {
     pub fn new(
         web3: Web3,
         pool_fetcher: Arc<dyn BalancerV3PoolFetching>,
-        settlement: GPv2Settlement,
+        settlement: GPv2Settlement::Instance,
         batch_router: BalancerV3BatchRouter::Instance,
     ) -> Self {
-        let allowance_manager = AllowanceManager::new(web3, settlement.address());
+        let allowance_manager = AllowanceManager::new(web3, settlement.address().into_legacy());
         Self {
             settlement,
             batch_router,
@@ -272,7 +272,7 @@ pub struct SettlementHandler {
 }
 
 struct Inner {
-    settlement: GPv2Settlement,
+    settlement: GPv2Settlement::Instance,
     batch_router: BalancerV3BatchRouter::Instance,
     allowances: Allowances,
 }
@@ -280,7 +280,7 @@ struct Inner {
 impl SettlementHandler {
     pub fn new(
         pool_id: H160,
-        settlement: GPv2Settlement,
+        settlement: GPv2Settlement::Instance,
         batch_router: BalancerV3BatchRouter::Instance,
         allowances: Allowances,
     ) -> Self {
@@ -421,7 +421,6 @@ mod tests {
     use {
         super::*,
         crate::interactions::allowances::{Approval, MockAllowanceManaging},
-        contracts::dummy_contract,
         maplit::{btreemap, hashmap, hashset},
         mockall::predicate::*,
         model::TokenPair,
@@ -444,9 +443,9 @@ mod tests {
         },
     };
 
-    fn dummy_contracts() -> (GPv2Settlement, BalancerV3BatchRouter::Instance) {
+    fn dummy_contracts() -> (GPv2Settlement::Instance, BalancerV3BatchRouter::Instance) {
         (
-            dummy_contract!(GPv2Settlement, H160([0xc0; 20])),
+            GPv2Settlement::Instance::new([0xc0; 20].into(), ethrpc::mock::web3().alloy),
             BalancerV3BatchRouter::Instance::new([0xc1; 20].into(), ethrpc::mock::web3().alloy),
         )
     }
