@@ -275,7 +275,7 @@ fn run() -> Result<()> {
             "Manually vendored ABI and bytecode for hooks trampoline contract",
         )
         .manual(
-            "ILiquoriceSettlement",
+            "LiquoriceSettlement",
             "Liquorice does not publish its code",
         )
         .npm(
