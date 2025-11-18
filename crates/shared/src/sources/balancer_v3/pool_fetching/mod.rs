@@ -373,7 +373,7 @@ impl FetchedBalancerPools {
     }
 }
 
-#[mockall::automock]
+#[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 #[async_trait::async_trait]
 pub trait BalancerV3PoolFetching: Send + Sync {
     async fn fetch(
