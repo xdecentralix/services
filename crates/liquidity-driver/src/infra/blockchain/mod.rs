@@ -174,7 +174,7 @@ impl Ethereum {
     }
 
     /// Create access list used by a transaction.
-    #[instrument(skip(self), ret(level = Level::DEBUG))]
+    #[instrument(skip(self, tx), ret(level = Level::DEBUG))]
     pub async fn create_access_list<T>(&self, tx: T) -> Result<eth::AccessList, Error>
     where
         CallRequest: From<T>,

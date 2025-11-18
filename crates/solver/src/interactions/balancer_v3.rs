@@ -10,7 +10,7 @@ use {
         GPv2Settlement,
     },
     ethcontract::{Bytes, H160},
-    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
+    ethrpc::alloy::conversions::IntoAlloy,
     shared::{
         http_solver::model::TokenAmount,
         interaction::{EncodedInteraction, Interaction},
@@ -58,9 +58,9 @@ impl BalancerV3SwapGivenOutInteraction {
             .clone();
 
         (
-            self.batch_router.address().into_legacy(),
-            0.into(),
-            Bytes(method.to_vec()),
+            *self.batch_router.address(),
+            U256::ZERO,
+            alloy::primitives::Bytes::from(method.to_vec()),
         )
     }
 }
@@ -93,8 +93,8 @@ mod tests {
         // V3 uses a different method signature, so the encoded calldata will be
         // different The test verifies that encoding works without errors
         let encoded = interaction.encode();
-        assert_eq!(encoded.0, batch_router.address().into_legacy());
-        assert_eq!(encoded.1, 0.into());
-        assert!(!encoded.2.0.is_empty());
+        assert_eq!(encoded.0, *batch_router.address());
+        assert_eq!(encoded.1, U256::ZERO);
+        assert!(!encoded.2.is_empty());
     }
 }

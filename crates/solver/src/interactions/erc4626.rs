@@ -1,6 +1,7 @@
 use {
+    alloy::primitives::U256,
     contracts::IERC4626,
-    ethcontract::Bytes,
+    ethrpc::alloy::conversions::IntoAlloy,
     shared::interaction::{EncodedInteraction, Interaction},
 };
 
@@ -15,7 +16,7 @@ impl Interaction for MintExactSharesInteraction {
     fn encode(&self) -> EncodedInteraction {
         let method = self.vault.mint(self.shares_out, self.receiver);
         let calldata = method.tx.data.expect("no calldata").0;
-        (self.vault.address(), 0.into(), Bytes(calldata))
+        (self.vault.address().into_alloy(), U256::ZERO, alloy::primitives::Bytes::from(calldata))
     }
 }
 
@@ -33,7 +34,7 @@ impl Interaction for WithdrawExactAssetsInteraction {
             .vault
             .withdraw(self.assets_out, self.receiver, self.owner);
         let calldata = method.tx.data.expect("no calldata").0;
-        (self.vault.address(), 0.into(), Bytes(calldata))
+        (self.vault.address().into_alloy(), U256::ZERO, alloy::primitives::Bytes::from(calldata))
     }
 }
 
@@ -55,10 +56,10 @@ mod tests {
             receiver: H160([0x22; 20]),
         };
         let (target, value, calldata) = interaction.encode();
-        assert_eq!(target, vault.address());
-        assert_eq!(value, 0.into());
+        assert_eq!(target, vault.address().into_alloy());
+        assert_eq!(value, alloy::primitives::U256::ZERO);
         // selector 0x94bf804d (mint(uint256,address))
-        assert_eq!(&calldata.0[0..4], &hex!("94bf804d"));
+        assert_eq!(&calldata[0..4], &hex!("94bf804d"));
     }
 
     #[test]
@@ -71,9 +72,9 @@ mod tests {
             owner: H160([0x55; 20]),
         };
         let (target, value, calldata) = interaction.encode();
-        assert_eq!(target, vault.address());
-        assert_eq!(value, 0.into());
+        assert_eq!(target, vault.address().into_alloy());
+        assert_eq!(value, alloy::primitives::U256::ZERO);
         // selector 0xb460af94 (withdraw(uint256,address,address))
-        assert_eq!(&calldata.0[0..4], &hex!("b460af94"));
+        assert_eq!(&calldata[0..4], &hex!("b460af94"));
     }
 }
