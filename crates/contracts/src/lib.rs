@@ -67,10 +67,6 @@ include_contracts! {
     BalancerV3ReClammPoolFactoryV2;
     BalancerV3QuantAMMWeightedPoolFactory;
     BalancerV3QuantAMMWeightedPool;
-    CowAmm;
-    CowAmmConstantProductFactory;
-    CowAmmLegacyHelper;
-    CowAmmUniswapV2PriceOracle;
     ERC20;
     GPv2Settlement;
     IERC4626;
