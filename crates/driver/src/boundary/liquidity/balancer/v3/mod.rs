@@ -66,6 +66,8 @@ fn chain_to_gql_chain(chain: &Chain) -> GqlChain {
         Chain::Avalanche => GqlChain::AVALANCHE,
         Chain::Hardhat => GqlChain::MAINNET, // Hardhat is a local testnet, default to mainnet
         Chain::Lens => GqlChain::LENS,
+        Chain::Linea => GqlChain::LINEA,
+        Chain::Plasma => GqlChain::PLASMA,
     }
 }
 

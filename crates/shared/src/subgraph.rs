@@ -9,7 +9,7 @@ use {
 };
 
 pub const QUERY_PAGE_SIZE: usize = 1000;
-const MAX_NUMBER_OF_RETRIES: usize = 10;
+const MAX_NUMBER_OF_ATTEMPTS_DEFAULT: usize = 10;
 
 /// A general client for querying subgraphs.
 pub struct SubgraphClient {
@@ -17,6 +17,7 @@ pub struct SubgraphClient {
     subgraph_url: Url,
     api_key: Option<String>,
     max_pools_per_tick_query: usize,
+    max_number_of_attempts: usize,
 }
 
 pub trait ContainsId {
@@ -42,6 +43,7 @@ impl SubgraphClient {
             subgraph_url,
             api_key,
             max_pools_per_tick_query,
+            max_number_of_attempts: MAX_NUMBER_OF_ATTEMPTS_DEFAULT,
         })
     }
 
@@ -53,30 +55,54 @@ impl SubgraphClient {
         // for long lasting queries subgraph call might randomly fail
         // introduced retry mechanism that should efficiently help since failures are
         // quick and we need 1 or 2 retries to succeed.
-        for _ in 0..MAX_NUMBER_OF_RETRIES {
-            let mut request_builder = self.client.post(self.subgraph_url.clone()).json(&Query {
-                query,
-                variables: variables.clone(),
-            });
-
-            // Add Authorization header if API key is provided
-            if let Some(api_key) = &self.api_key {
-                request_builder =
-                    request_builder.header("Authorization", format!("Bearer {}", api_key));
-            }
-
-            match request_builder
-                .send()
-                .await?
-                .json::<QueryResponse<T>>()
-                .await?
-                .into_result()
-            {
+        let mut error: Option<anyhow::Error> = None;
+        for _ in 0..self.max_number_of_attempts {
+            match self.query_without_retry(query, &variables).await {
                 Ok(result) => return Ok(result),
-                Err(err) => tracing::warn!("failed to query subgraph: {}", err),
+                Err(err) => error = Some(err),
             }
         }
-        Err(anyhow::anyhow!("failed to execute query on subgraph"))
+        Err(anyhow::anyhow!(format!(
+            "failed to execute query on subgraph: {}",
+            error.unwrap()
+        )))
+    }
+
+    pub async fn query_without_retry<T>(
+        &self,
+        query: &str,
+        variables: &Option<Map<String, Value>>,
+    ) -> Result<T>
+    where
+        T: DeserializeOwned,
+    {
+        let mut request = self.client.post(self.subgraph_url.clone());
+        
+        // Add API key as Authorization header if present
+        if let Some(ref api_key) = self.api_key {
+            request = request.header("Authorization", format!("Bearer {}", api_key));
+        }
+        
+        match request
+            .json(&Query {
+                query,
+                variables: variables.clone(),
+            })
+            .send()
+            .await?
+            .json::<QueryResponse<T>>()
+            .await?
+            .into_result()
+        {
+            Ok(result) => Ok(result),
+            Err(err) => {
+                tracing::warn!("failed to query subgraph: {}", err);
+                Err(anyhow::anyhow!(format!(
+                    "failed to execute query on subgraph: {}",
+                    err
+                )))
+            }
+        }
     }
 
     /// Performs the specified GraphQL query on the current subgraph.

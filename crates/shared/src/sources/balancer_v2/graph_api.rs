@@ -102,6 +102,8 @@ pub enum GqlChain {
     FANTOM,
     SEPOLIA,
     LENS,
+    LINEA,
+    PLASMA,
 }
 
 impl BalancerApiClient {
