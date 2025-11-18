@@ -3,7 +3,7 @@ use {
         domain::{self, eth, liquidity},
         util::Bytes,
     },
-    ethrpc::alloy::conversions::IntoLegacy,
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
 };
 
 /// Interaction with a smart contract which is needed to execute this solution
@@ -70,7 +70,7 @@ impl Interaction {
                                 eth::Allowance {
                                     token: interaction.input.token,
                                     spender: address.into(),
-                                    amount: interaction.input.amount.into(),
+                                    amount: interaction.input.amount.0.into_alloy(),
                                 }
                                 .into(),
                             ]
@@ -89,7 +89,7 @@ impl Interaction {
                             eth::Allowance {
                                 token: interaction.input.token,
                                 spender: address.into(),
-                                amount: eth::U256::max_value(),
+                                amount: alloy::primitives::U256::MAX,
                             }
                             .into(),
                         ]
