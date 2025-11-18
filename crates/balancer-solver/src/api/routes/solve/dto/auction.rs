@@ -153,6 +153,15 @@ pub async fn into_domain(
                         token: eth::TokenAddress(hint.token),
                         amount: hint.amount,
                     }),
+                wrappers: order
+                    .wrappers
+                    .clone()
+                    .iter()
+                    .map(|w| order::WrapperCall {
+                        address: w.address,
+                        data: w.data.clone(),
+                    })
+                    .collect(),
             })
             .collect(),
         liquidity: {
