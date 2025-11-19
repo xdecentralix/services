@@ -649,11 +649,61 @@ async fn verify_and_save_swap_log(
 ) {
     use tokio::fs;
 
+    // Load liquidity file to get balancerPoolId mappings
+    let liquidity_map = if let Some(id) = auction_id {
+        let liquidity_file = save_dir.join(format!("{}_liquidity.json", id));
+        match fs::read_to_string(&liquidity_file).await {
+            Ok(contents) => match serde_json::from_str::<serde_json::Value>(&contents) {
+                Ok(liq_json) => {
+                    let mut map = std::collections::HashMap::new();
+                    if let Some(liquidity_array) = liq_json["liquidity"].as_array() {
+                        for pool in liquidity_array {
+                            if let (Some(id), Some(balancer_pool_id)) = (
+                                pool["id"].as_str(),
+                                pool["balancerPoolId"].as_str(),
+                            ) {
+                                map.insert(id.to_string(), balancer_pool_id.to_string());
+                            }
+                        }
+                    }
+                    map
+                }
+                Err(err) => {
+                    tracing::warn!(?err, "Failed to parse liquidity JSON");
+                    std::collections::HashMap::new()
+                }
+            },
+            Err(err) => {
+                tracing::debug!(?err, "Could not read liquidity file for swap log verification");
+                std::collections::HashMap::new()
+            }
+        }
+    } else {
+        std::collections::HashMap::new()
+    };
+
+    // Enrich swap records with balancerPoolId from liquidity file
+    let enriched_swaps: Vec<_> = swap_records
+        .into_iter()
+        .map(|mut swap| {
+            if let Some(balancer_pool_id) = liquidity_map.get(&swap.liquidity_id) {
+                // Add balancerPoolId to pool_params
+                if let Some(params) = swap.pool_params.as_object_mut() {
+                    params.insert(
+                        "balancerPoolId".to_string(),
+                        serde_json::Value::String(balancer_pool_id.clone()),
+                    );
+                }
+            }
+            swap
+        })
+        .collect();
+
     // Convert swap records to JSON format expected by verifier
     let swap_log_json = serde_json::json!({
         "auction_id": auction_id,
-        "swaps_count": swap_records.len(),
-        "swaps": swap_records,
+        "swaps_count": enriched_swaps.len(),
+        "swaps": enriched_swaps,
     });
 
     // Verify swap logs
