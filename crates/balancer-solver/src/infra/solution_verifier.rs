@@ -214,7 +214,10 @@ impl SolutionVerifier {
 
     /// Verify a single swap log entry
     async fn verify_swap_log_entry(&self, swap: &serde_json::Value) -> SwapLogVerification {
-        let liquidity_id = swap["liquidity_id"].as_str().unwrap_or("unknown").to_string();
+        let liquidity_id = swap["liquidity_id"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string();
         let kind = swap["kind"].as_str().unwrap_or("unknown").to_string();
         let pool_address = swap["address"].as_str().unwrap_or("").to_string();
         let input_token_str = swap["input_token"].as_str().unwrap_or("");
@@ -289,8 +292,8 @@ impl SolutionVerifier {
 
         match quote_result {
             Ok((quoted_amount, _call_details)) => {
-                let expected_u256 = U256::from_dec_str(expected_output.as_ref().unwrap())
-                    .unwrap_or_default();
+                let expected_u256 =
+                    U256::from_dec_str(expected_output.as_ref().unwrap()).unwrap_or_default();
                 let diff_bps = calculate_difference_bps(&expected_u256, &quoted_amount);
 
                 SwapLogVerification {

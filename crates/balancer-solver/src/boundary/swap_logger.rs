@@ -35,6 +35,26 @@ pub struct SwapRecord {
 
     /// Pool-specific parameters
     pub pool_params: serde_json::Value,
+
+    /// Debug metadata (only included for problematic swaps)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debug: Option<DebugMetadata>,
+}
+
+/// Debug metadata for investigating swap calculation issues
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugMetadata {
+    /// Whether the input amount was zero
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zero_input: Option<bool>,
+
+    /// Path information if this is part of a multi-hop route
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path_info: Option<String>,
+
+    /// Reason for failure or unexpected behavior
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 }
 
 /// Thread-safe swap logger that collects swap records during solving

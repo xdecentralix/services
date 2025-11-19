@@ -34,6 +34,20 @@ pub fn to_boundary_pool(address: H160, pool: &liquidity::quantamm::Pool) -> Opti
         })
         .collect::<Option<_>>()?;
 
+    // Check if weight/multiplier conversions will succeed
+    let first_four_ok = pool
+        .first_four_weights_and_multipliers
+        .iter()
+        .all(|r| to_signed_i256(r).is_some());
+    let second_four_ok = pool
+        .second_four_weights_and_multipliers
+        .iter()
+        .all(|r| to_signed_i256(r).is_some());
+    
+    if !first_four_ok || !second_four_ok {
+        return None;
+    }
+
     Some(Pool {
         common,
         reserves,

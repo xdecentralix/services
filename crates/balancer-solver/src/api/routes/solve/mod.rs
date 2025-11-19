@@ -164,10 +164,11 @@ pub async fn solve(
                         crate::domain::auction::Id::Quote => None,
                     };
                     let verifier_for_swap_log = state.verifier().cloned();
-                    
+
                     tokio::spawn(async move {
-                        save_swap_log(swap_records.clone(), auction_id_num, &save_dir_for_swap_log).await;
-                        
+                        save_swap_log(swap_records.clone(), auction_id_num, &save_dir_for_swap_log)
+                            .await;
+
                         // Verify swap log if verifier is configured
                         if let Some(verifier) = verifier_for_swap_log {
                             verify_and_save_swap_log(
@@ -658,10 +659,9 @@ async fn verify_and_save_swap_log(
                     let mut map = std::collections::HashMap::new();
                     if let Some(liquidity_array) = liq_json["liquidity"].as_array() {
                         for pool in liquidity_array {
-                            if let (Some(id), Some(balancer_pool_id)) = (
-                                pool["id"].as_str(),
-                                pool["balancerPoolId"].as_str(),
-                            ) {
+                            if let (Some(id), Some(balancer_pool_id)) =
+                                (pool["id"].as_str(), pool["balancerPoolId"].as_str())
+                            {
                                 map.insert(id.to_string(), balancer_pool_id.to_string());
                             }
                         }
@@ -674,7 +674,10 @@ async fn verify_and_save_swap_log(
                 }
             },
             Err(err) => {
-                tracing::debug!(?err, "Could not read liquidity file for swap log verification");
+                tracing::debug!(
+                    ?err,
+                    "Could not read liquidity file for swap log verification"
+                );
                 std::collections::HashMap::new()
             }
         }

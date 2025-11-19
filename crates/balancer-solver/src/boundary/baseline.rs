@@ -154,13 +154,32 @@ impl<'a> Solver<'a> {
                     liquidity.kind_str(),
                     "gyroE" | "gyro2CLP" | "gyro3CLP" | "quantAmm" | "stableSurge"
                 );
-                
+
                 let result = liquidity
                     .get_amount_out(buy_token.into_legacy(), (sell_amount, sell_token))
                     .await;
                 
                 // Only log if this is a pool type we're interested in
                 if should_log {
+                    // Build debug metadata for problematic swaps
+                    let debug = if sell_amount.is_zero() || (result.is_some() && result.as_ref().unwrap().is_zero()) {
+                        let mut note = Vec::new();
+                        if sell_amount.is_zero() {
+                            note.push("Input amount is zero - likely from failed previous hop or pathfinding issue");
+                        }
+                        if result.is_some() && result.as_ref().unwrap().is_zero() {
+                            note.push("Output is zero despite calculation succeeding");
+                        }
+                        
+                        Some(swap_logger::DebugMetadata {
+                            zero_input: if sell_amount.is_zero() { Some(true) } else { None },
+                            path_info: Some(format!("Segment in path, sell_token: {:#x}, buy_token: {:#x}", sell_token, buy_token.into_legacy())),
+                            note: if note.is_empty() { None } else { Some(note.join("; ")) },
+                        })
+                    } else {
+                        None
+                    };
+                    
                     logger.log_swap(swap_logger::SwapRecord {
                         liquidity_id: liquidity.id.0.clone(),
                         kind: liquidity.kind_str().to_string(),
@@ -170,9 +189,10 @@ impl<'a> Solver<'a> {
                         output_token: format!("{:#x}", buy_token.into_legacy()),
                         output_amount: result.as_ref().map(|amt| amt.to_string()),
                         pool_params: extract_pool_params(reference_liquidity),
+                        debug,
                     });
                 }
-                
+
                 result?
             } else {
                 liquidity
