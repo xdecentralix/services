@@ -561,6 +561,7 @@ fn extract_pool_params(liquidity: &liquidity::Liquidity) -> serde_json::Value {
         liquidity::State::WeightedProduct(pool) => {
             json!({
                 "kind": "weightedProduct",
+                "balancerPoolId": &liquidity.id.0,
                 "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
                 "reserves": pool.reserves.iter().map(|r| json!({
                     "token": format!("{:#x}", r.asset.token.0),
@@ -572,6 +573,7 @@ fn extract_pool_params(liquidity: &liquidity::Liquidity) -> serde_json::Value {
         liquidity::State::Stable(pool) => {
             json!({
                 "kind": "stable",
+                "balancerPoolId": &liquidity.id.0,
                 "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
                 "amplificationParameter": format!("{}/{}", pool.amplification_parameter.numer(), pool.amplification_parameter.denom()),
                 "reserves": pool.reserves.iter().map(|r| json!({
@@ -585,6 +587,7 @@ fn extract_pool_params(liquidity: &liquidity::Liquidity) -> serde_json::Value {
         liquidity::State::GyroE(pool) => {
             json!({
                 "kind": "gyroE",
+                "balancerPoolId": &liquidity.id.0,
                 "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
                 "reserves": pool.reserves.iter().map(|r| json!({
                     "token": format!("{:#x}", r.asset.token.0),
@@ -604,6 +607,7 @@ fn extract_pool_params(liquidity: &liquidity::Liquidity) -> serde_json::Value {
         liquidity::State::Gyro2CLP(pool) => {
             json!({
                 "kind": "gyro2CLP",
+                "balancerPoolId": &liquidity.id.0,
                 "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
                 "reserves": pool.reserves.iter().map(|r| json!({
                     "token": format!("{:#x}", r.asset.token.0),
@@ -616,6 +620,7 @@ fn extract_pool_params(liquidity: &liquidity::Liquidity) -> serde_json::Value {
         liquidity::State::Gyro3CLP(pool) => {
             json!({
                 "kind": "gyro3CLP",
+                "balancerPoolId": &liquidity.id.0,
                 "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
                 "reserves": pool.reserves.iter().map(|r| json!({
                     "token": format!("{:#x}", r.asset.token.0),
