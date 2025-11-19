@@ -528,7 +528,7 @@ fn convert_domain_to_dto(
                         solvers_dto::auction::QuantAmmVersion::V1
                     }
                 },
-                max_trade_size_ratio: scaling_factor_to_decimal_v3(pool.max_trade_size_ratio),
+                max_trade_size_ratio: fee_to_decimal_v3(pool.max_trade_size_ratio),
                 first_four_weights_and_multipliers: pool
                     .first_four_weights_and_multipliers
                     .iter()
