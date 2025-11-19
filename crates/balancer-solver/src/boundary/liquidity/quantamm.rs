@@ -43,7 +43,7 @@ pub fn to_boundary_pool(address: H160, pool: &liquidity::quantamm::Pool) -> Opti
         .second_four_weights_and_multipliers
         .iter()
         .all(|r| to_signed_i256(r).is_some());
-    
+
     if !first_four_ok || !second_four_ok {
         return None;
     }
