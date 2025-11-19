@@ -102,8 +102,14 @@ pub async fn solve(
         };
 
         let auction_id = auction.id;
+
+        // Create swap logger if auction save directory is configured
+        let swap_logger = state
+            .auction_save_directory()
+            .map(|_| crate::boundary::swap_logger::SwapLogger::new());
+
         let solutions = state
-            .solve(auction)
+            .solve_with_logger(auction, swap_logger.clone())
             .instrument(tracing::info_span!("auction", id = %auction_id))
             .await;
 
@@ -140,12 +146,27 @@ pub async fn solve(
             let save_dir_for_competition = save_dir.clone();
             let save_dir_for_enhanced = save_dir.clone();
             let save_dir_for_verify = save_dir.clone();
+            let save_dir_for_swap_log = save_dir.clone();
 
             tokio::spawn(async move {
                 if let Some(solutions) = solutions_json {
                     save_auction_and_solutions(auction_json, solutions, &save_dir).await;
                 }
             });
+
+            // Save swap log if logger was used
+            if let Some(logger) = swap_logger {
+                let swap_records = logger.get_records();
+                if !swap_records.is_empty() {
+                    let auction_id_num = match auction_id {
+                        crate::domain::auction::Id::Solve(id) => Some(id),
+                        crate::domain::auction::Id::Quote => None,
+                    };
+                    tokio::spawn(async move {
+                        save_swap_log(swap_records, auction_id_num, &save_dir_for_swap_log).await;
+                    });
+                }
+            }
 
             // Spawn background task to fetch competition data
             let cow_api_url = state.cow_api_base_url();
@@ -221,6 +242,71 @@ pub async fn solve(
     handle_request
         .instrument(tracing::info_span!("/solve"))
         .await
+}
+
+/// Saves swap log data to JSON file in the configured directory.
+/// This function runs in a background task and logs errors without failing the
+/// request.
+async fn save_swap_log(
+    swap_records: Vec<crate::boundary::swap_logger::SwapRecord>,
+    auction_id: Option<i64>,
+    save_dir: &std::path::Path,
+) {
+    use tokio::fs;
+
+    // Determine filename based on auction ID
+    let base_filename = match auction_id {
+        Some(id) => id.to_string(),
+        None => {
+            // Use timestamp for quote auctions
+            let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S_%3f");
+            format!("quote_{}", timestamp)
+        }
+    };
+
+    let swap_log_file_path = save_dir.join(format!("{}_swap_log.json", base_filename));
+
+    // Create directory if it doesn't exist
+    if let Err(err) = fs::create_dir_all(save_dir).await {
+        tracing::warn!(
+            ?err,
+            directory = ?save_dir,
+            "Failed to create swap log save directory"
+        );
+        return;
+    }
+
+    // Serialize swap log to pretty JSON
+    let swap_log_json = match serde_json::to_string_pretty(&serde_json::json!({
+        "auction_id": auction_id,
+        "swaps_count": swap_records.len(),
+        "swaps": swap_records,
+    })) {
+        Ok(content) => content,
+        Err(err) => {
+            tracing::warn!(?err, "Failed to serialize swap log to JSON");
+            return;
+        }
+    };
+
+    // Write swap log file
+    match fs::write(&swap_log_file_path, swap_log_json).await {
+        Ok(_) => {
+            tracing::info!(
+                swap_log_file = ?swap_log_file_path,
+                auction_id = ?auction_id,
+                swaps_count = swap_records.len(),
+                "💾 Saved swap log to JSON file"
+            );
+        }
+        Err(err) => {
+            tracing::warn!(
+                ?err,
+                file_path = ?swap_log_file_path,
+                "Failed to write swap log JSON file"
+            );
+        }
+    }
 }
 
 /// Saves auction and solutions to separate JSON files in the configured

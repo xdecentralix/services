@@ -232,6 +232,15 @@ impl Solver {
     /// Solves the specified auction, returning a vector of all possible
     /// solutions.
     pub async fn solve(&self, auction: auction::Auction) -> Vec<solution::Solution> {
+        self.solve_with_logger(auction, None).await
+    }
+
+    /// Solve an auction with optional swap logging for debugging
+    pub async fn solve_with_logger(
+        &self,
+        auction: auction::Auction,
+        swap_logger: Option<crate::boundary::swap_logger::SwapLogger>,
+    ) -> Vec<solution::Solution> {
         metrics::solve(&auction);
         let deadline = auction.deadline.clone();
         // Make sure to push the CPU-heavy code to a separate thread in order to
@@ -249,7 +258,10 @@ impl Solver {
         let inner = self.0.clone();
         let span = tracing::Span::current();
         let background_work = async move {
-            inner.solve(auction, sender).instrument(span).await;
+            inner
+                .solve(auction, sender, swap_logger)
+                .instrument(span)
+                .await;
         };
 
         let mut handle = tokio::spawn(background_work);
@@ -274,14 +286,20 @@ impl Inner {
         &self,
         auction: auction::Auction,
         sender: tokio::sync::mpsc::UnboundedSender<solution::Solution>,
+        swap_logger: Option<crate::boundary::swap_logger::SwapLogger>,
     ) {
-        let boundary_solver = boundary::baseline::Solver::new(
+        let mut boundary_solver = boundary::baseline::Solver::new(
             &self.weth,
             &self.base_tokens,
             &auction.liquidity,
             self.uni_v3_quoter_v2.clone(),
             self.erc4626_web3.as_ref(),
         );
+
+        // Attach swap logger if provided
+        if let Some(logger) = swap_logger {
+            boundary_solver = boundary_solver.with_swap_logger(logger);
+        }
 
         for (i, order) in auction.orders.into_iter().enumerate() {
             let sell_token = order.sell.token;

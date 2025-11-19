@@ -3,5 +3,6 @@
 
 pub mod baseline;
 pub mod liquidity;
+pub mod swap_logger;
 
 pub type Result<T> = anyhow::Result<T>;
