@@ -148,22 +148,31 @@ impl<'a> Solver<'a> {
 
             // Log the swap attempt if logging is enabled
             let buy_amount = if let Some(ref logger) = self.swap_logger {
+                // Only log specific pool types to reduce file size
+                // Focus on GyroE and other advanced pool types that need investigation
+                let should_log = matches!(
+                    liquidity.kind_str(),
+                    "gyroE" | "gyro2CLP" | "gyro3CLP" | "quantAmm" | "stableSurge"
+                );
+                
                 let result = liquidity
                     .get_amount_out(buy_token.into_legacy(), (sell_amount, sell_token))
                     .await;
-
-                // Log the swap with result
-                logger.log_swap(swap_logger::SwapRecord {
-                    liquidity_id: liquidity.id.0.clone(),
-                    kind: liquidity.kind_str().to_string(),
-                    address: format!("{:#x}", liquidity.address()),
-                    input_token: format!("{:#x}", sell_token),
-                    input_amount: sell_amount.to_string(),
-                    output_token: format!("{:#x}", buy_token.into_legacy()),
-                    output_amount: result.as_ref().map(|amt| amt.to_string()),
-                    pool_params: extract_pool_params(reference_liquidity),
-                });
-
+                
+                // Only log if this is a pool type we're interested in
+                if should_log {
+                    logger.log_swap(swap_logger::SwapRecord {
+                        liquidity_id: liquidity.id.0.clone(),
+                        kind: liquidity.kind_str().to_string(),
+                        address: format!("{:#x}", liquidity.address()),
+                        input_token: format!("{:#x}", sell_token),
+                        input_amount: sell_amount.to_string(),
+                        output_token: format!("{:#x}", buy_token.into_legacy()),
+                        output_amount: result.as_ref().map(|amt| amt.to_string()),
+                        pool_params: extract_pool_params(reference_liquidity),
+                    });
+                }
+                
                 result?
             } else {
                 liquidity
