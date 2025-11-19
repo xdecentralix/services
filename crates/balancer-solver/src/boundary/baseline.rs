@@ -163,6 +163,7 @@ impl<'a> Solver<'a> {
                 if should_log {
                     // Build debug metadata for problematic swaps
                     let debug = if sell_amount.is_zero()
+                        || result.is_none()
                         || (result.is_some() && result.as_ref().unwrap().is_zero())
                     {
                         let mut note = Vec::new();
@@ -172,8 +173,13 @@ impl<'a> Solver<'a> {
                                  pathfinding issue",
                             );
                         }
-                        if result.is_some() && result.as_ref().unwrap().is_zero() {
-                            note.push("Output is zero despite calculation succeeding");
+                        if result.is_none() {
+                            note.push("get_amount_out returned None - swap calculation failed");
+                        } else if result.is_some() && result.as_ref().unwrap().is_zero() {
+                            note.push(
+                                "Output is zero despite calculation succeeding - check math \
+                                 implementation",
+                            );
                         }
 
                         Some(swap_logger::DebugMetadata {

@@ -702,10 +702,25 @@ async fn verify_and_save_swap_log(
         })
         .collect();
 
+    // Add debug summary statistics
+    let debug_stats = {
+        let mut stats = std::collections::HashMap::new();
+        for swap in &enriched_swaps {
+            if swap.input_amount == "0" {
+                let counter = stats.entry(swap.kind.clone()).or_insert(0);
+                *counter += 1;
+            }
+        }
+        stats
+    };
+
     // Convert swap records to JSON format expected by verifier
     let swap_log_json = serde_json::json!({
         "auction_id": auction_id,
         "swaps_count": enriched_swaps.len(),
+        "debug_summary": {
+            "zero_input_swaps_by_kind": debug_stats,
+        },
         "swaps": enriched_swaps,
     });
 

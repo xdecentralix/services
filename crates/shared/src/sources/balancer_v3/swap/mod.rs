@@ -1540,7 +1540,17 @@ impl BaselineSolvable for QuantAmmPoolRef<'_> {
         if amount_out.is_zero() {
             return Some(U256::zero());
         }
-        self.get_amount_in_inner(in_token, amount_out, out_token)
+        let result = self.get_amount_in_inner(in_token, amount_out, out_token);
+        if result.is_none() {
+            tracing::debug!(
+                in_token = ?in_token,
+                out_token = ?out_token,
+                amount_out = %amount_out,
+                reserves_count = self.reserves.len(),
+                "QuantAmm get_amount_in_inner returned None"
+            );
+        }
+        result
     }
 
     async fn gas_cost(&self) -> usize {
