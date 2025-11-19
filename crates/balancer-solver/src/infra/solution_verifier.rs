@@ -21,6 +21,42 @@ pub struct VerificationResult {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct SwapLogVerificationResult {
+    pub auction_id: Option<i64>,
+    pub total_swaps: usize,
+    pub verified: usize,
+    pub failed: usize,
+    pub by_pool_type: std::collections::HashMap<String, PoolTypeStats>,
+    pub swaps: Vec<SwapLogVerification>,
+    pub verification_timestamp: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PoolTypeStats {
+    pub total: usize,
+    pub verified: usize,
+    pub perfect_matches: usize,
+    pub within_1bps: usize,
+    pub within_10bps: usize,
+    pub errors: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SwapLogVerification {
+    pub liquidity_id: String,
+    pub kind: String,
+    pub pool_address: String,
+    pub token_in: Address,
+    pub token_out: Address,
+    pub amount_in: String,
+    pub expected_amount_out: Option<String>,
+    pub quoted_amount_out: Option<String>,
+    pub difference_bps: Option<i64>,
+    pub verified: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SwapVerification {
     pub interaction_index: usize,
     pub pool_id: String,
@@ -100,6 +136,190 @@ impl SolutionVerifier {
             swaps,
             total_gas_estimate: None,
             verification_timestamp: chrono::Utc::now().timestamp() as u64,
+        }
+    }
+
+    /// Verify swap logs from the swap logger
+    pub async fn verify_swap_logs(
+        &self,
+        swap_log_json: &serde_json::Value,
+    ) -> SwapLogVerificationResult {
+        let auction_id = swap_log_json["auction_id"].as_i64();
+        let swaps_array = match swap_log_json["swaps"].as_array() {
+            Some(arr) => arr,
+            None => {
+                return SwapLogVerificationResult {
+                    auction_id,
+                    total_swaps: 0,
+                    verified: 0,
+                    failed: 0,
+                    by_pool_type: std::collections::HashMap::new(),
+                    swaps: vec![],
+                    verification_timestamp: chrono::Utc::now().timestamp() as u64,
+                };
+            }
+        };
+
+        let mut verifications = Vec::new();
+        let mut pool_type_stats: std::collections::HashMap<String, PoolTypeStats> =
+            std::collections::HashMap::new();
+
+        for swap in swaps_array {
+            let verification = self.verify_swap_log_entry(swap).await;
+
+            // Update pool type stats
+            let kind = verification.kind.clone();
+            let stats = pool_type_stats.entry(kind).or_insert(PoolTypeStats {
+                total: 0,
+                verified: 0,
+                perfect_matches: 0,
+                within_1bps: 0,
+                within_10bps: 0,
+                errors: 0,
+            });
+
+            stats.total += 1;
+            if verification.verified {
+                stats.verified += 1;
+                if let Some(diff_bps) = verification.difference_bps {
+                    let abs_diff = diff_bps.abs();
+                    if abs_diff == 0 {
+                        stats.perfect_matches += 1;
+                    } else if abs_diff <= 1 {
+                        stats.within_1bps += 1;
+                    } else if abs_diff <= 10 {
+                        stats.within_10bps += 1;
+                    }
+                }
+            } else {
+                stats.errors += 1;
+            }
+
+            verifications.push(verification);
+        }
+
+        let verified_count = verifications.iter().filter(|v| v.verified).count();
+        let failed_count = verifications.len() - verified_count;
+
+        SwapLogVerificationResult {
+            auction_id,
+            total_swaps: verifications.len(),
+            verified: verified_count,
+            failed: failed_count,
+            by_pool_type: pool_type_stats,
+            swaps: verifications,
+            verification_timestamp: chrono::Utc::now().timestamp() as u64,
+        }
+    }
+
+    /// Verify a single swap log entry
+    async fn verify_swap_log_entry(&self, swap: &serde_json::Value) -> SwapLogVerification {
+        let liquidity_id = swap["liquidity_id"].as_str().unwrap_or("unknown").to_string();
+        let kind = swap["kind"].as_str().unwrap_or("unknown").to_string();
+        let pool_address = swap["address"].as_str().unwrap_or("").to_string();
+        let input_token_str = swap["input_token"].as_str().unwrap_or("");
+        let output_token_str = swap["output_token"].as_str().unwrap_or("");
+        let input_amount_str = swap["input_amount"].as_str().unwrap_or("0");
+        let expected_output = swap["output_amount"].as_str().map(|s| s.to_string());
+
+        // Parse addresses
+        let input_token: Address = input_token_str.parse().unwrap_or_default();
+        let output_token: Address = output_token_str.parse().unwrap_or_default();
+        let input_amount = U256::from_dec_str(input_amount_str).unwrap_or_default();
+
+        // Skip if the swap failed in the solver (output_amount is null)
+        if expected_output.is_none() {
+            return SwapLogVerification {
+                liquidity_id,
+                kind,
+                pool_address: pool_address.clone(),
+                token_in: input_token,
+                token_out: output_token,
+                amount_in: input_amount_str.to_string(),
+                expected_amount_out: None,
+                quoted_amount_out: None,
+                difference_bps: None,
+                verified: false,
+                error: Some("Swap failed in solver (no output calculated)".to_string()),
+            };
+        }
+
+        // Try to extract pool details
+        let pool_params = swap.get("pool_params");
+        let balancer_pool_id = pool_params
+            .and_then(|p| p.get("balancerPoolId"))
+            .and_then(|id| id.as_str());
+
+        // Detect pool version: if no balancerPoolId, it's V3
+        let pool_version = if balancer_pool_id.is_none() {
+            PoolVersion::V3
+        } else {
+            Self::detect_pool_version(balancer_pool_id.unwrap())
+        };
+
+        // Quote the swap
+        let quote_result = match pool_version {
+            PoolVersion::V2 => {
+                if let Some(pool_id) = balancer_pool_id {
+                    self.quote_v2_swap(
+                        pool_id,
+                        H160::from(input_token.0),
+                        H160::from(output_token.0),
+                        input_amount,
+                    )
+                    .await
+                } else {
+                    Err("Missing balancerPoolId for V2 pool".into())
+                }
+            }
+            PoolVersion::V3 => {
+                if !pool_address.is_empty() {
+                    self.quote_v3_swap(
+                        &pool_address,
+                        H160::from(input_token.0),
+                        H160::from(output_token.0),
+                        input_amount,
+                    )
+                    .await
+                } else {
+                    Err("Missing pool address for V3 pool".into())
+                }
+            }
+        };
+
+        match quote_result {
+            Ok((quoted_amount, _call_details)) => {
+                let expected_u256 = U256::from_dec_str(expected_output.as_ref().unwrap())
+                    .unwrap_or_default();
+                let diff_bps = calculate_difference_bps(&expected_u256, &quoted_amount);
+
+                SwapLogVerification {
+                    liquidity_id,
+                    kind,
+                    pool_address,
+                    token_in: input_token,
+                    token_out: output_token,
+                    amount_in: input_amount_str.to_string(),
+                    expected_amount_out: expected_output,
+                    quoted_amount_out: Some(quoted_amount),
+                    difference_bps: diff_bps,
+                    verified: true,
+                    error: None,
+                }
+            }
+            Err(e) => SwapLogVerification {
+                liquidity_id,
+                kind,
+                pool_address,
+                token_in: input_token,
+                token_out: output_token,
+                amount_in: input_amount_str.to_string(),
+                expected_amount_out: expected_output,
+                quoted_amount_out: None,
+                difference_bps: None,
+                verified: false,
+                error: Some(e.to_string()),
+            },
         }
     }
 

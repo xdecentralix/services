@@ -147,6 +147,7 @@ pub async fn solve(
             let save_dir_for_enhanced = save_dir.clone();
             let save_dir_for_verify = save_dir.clone();
             let save_dir_for_swap_log = save_dir.clone();
+            let save_dir_for_swap_log_verify = save_dir.clone();
 
             tokio::spawn(async move {
                 if let Some(solutions) = solutions_json {
@@ -154,7 +155,7 @@ pub async fn solve(
                 }
             });
 
-            // Save swap log if logger was used
+            // Save swap log if logger was used, and optionally verify it
             if let Some(logger) = swap_logger {
                 let swap_records = logger.get_records();
                 if !swap_records.is_empty() {
@@ -162,8 +163,21 @@ pub async fn solve(
                         crate::domain::auction::Id::Solve(id) => Some(id),
                         crate::domain::auction::Id::Quote => None,
                     };
+                    let verifier_for_swap_log = state.verifier().cloned();
+                    
                     tokio::spawn(async move {
-                        save_swap_log(swap_records, auction_id_num, &save_dir_for_swap_log).await;
+                        save_swap_log(swap_records.clone(), auction_id_num, &save_dir_for_swap_log).await;
+                        
+                        // Verify swap log if verifier is configured
+                        if let Some(verifier) = verifier_for_swap_log {
+                            verify_and_save_swap_log(
+                                swap_records,
+                                auction_id_num,
+                                verifier,
+                                &save_dir_for_swap_log_verify,
+                            )
+                            .await;
+                        }
                     });
                 }
             }
@@ -622,6 +636,68 @@ async fn verify_and_save_solutions(
         }
         Err(err) => {
             tracing::warn!(?err, "Failed to write verification file");
+        }
+    }
+}
+
+/// Verifies swap logs against on-chain contract calls and saves the results.
+async fn verify_and_save_swap_log(
+    swap_records: Vec<crate::boundary::swap_logger::SwapRecord>,
+    auction_id: Option<i64>,
+    verifier: crate::infra::solution_verifier::SolutionVerifier,
+    save_dir: &std::path::Path,
+) {
+    use tokio::fs;
+
+    // Convert swap records to JSON format expected by verifier
+    let swap_log_json = serde_json::json!({
+        "auction_id": auction_id,
+        "swaps_count": swap_records.len(),
+        "swaps": swap_records,
+    });
+
+    // Verify swap logs
+    let verification_result = verifier.verify_swap_logs(&swap_log_json).await;
+
+    // Determine filename
+    let filename = match auction_id {
+        Some(id) => format!("{}_swap_log_verification.json", id),
+        None => {
+            let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S_%3f");
+            format!("quote_{}_swap_log_verification.json", timestamp)
+        }
+    };
+    let file_path = save_dir.join(filename);
+
+    // Create directory if needed
+    if let Err(err) = fs::create_dir_all(save_dir).await {
+        tracing::warn!(?err, directory = ?save_dir, "Failed to create directory");
+        return;
+    }
+
+    // Serialize to pretty JSON
+    let json_string = match serde_json::to_string_pretty(&verification_result) {
+        Ok(s) => s,
+        Err(err) => {
+            tracing::warn!(?err, "Failed to serialize swap log verification");
+            return;
+        }
+    };
+
+    // Write to file
+    match fs::write(&file_path, json_string).await {
+        Ok(_) => {
+            tracing::info!(
+                auction_id = ?auction_id,
+                file_path = ?file_path,
+                swaps_verified = verification_result.verified,
+                swaps_failed = verification_result.failed,
+                total_swaps = verification_result.total_swaps,
+                "✅ Saved swap log verification results"
+            );
+        }
+        Err(err) => {
+            tracing::warn!(?err, "Failed to write swap log verification file");
         }
     }
 }

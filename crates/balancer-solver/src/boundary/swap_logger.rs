@@ -5,7 +5,6 @@
 //! on-chain contracts.
 
 use {
-    ethereum_types::{H160, U256},
     serde::{Deserialize, Serialize},
     std::sync::{Arc, Mutex},
 };
