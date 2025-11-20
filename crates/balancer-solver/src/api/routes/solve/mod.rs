@@ -710,31 +710,24 @@ async fn verify_and_save_swap_log(
                 swap_json["pool_version"] = serde_json::Value::String(pool_version.to_string());
 
                 // Extract rate information for input and output tokens
-                if let Some(tokens) = pool_data["tokens"].as_array() {
+                // Tokens can be either an object (dict) or array depending on format
+                if let Some(tokens_obj) = pool_data["tokens"].as_object() {
                     let input_token = swap.input_token.to_lowercase();
                     let output_token = swap.output_token.to_lowercase();
 
-                    let mut token_in_rate = None;
-                    let mut token_out_rate = None;
-                    let mut token_in_rate_provider = None;
-                    let mut token_out_rate_provider = None;
-                    let mut token_in_scaling_factor = None;
-                    let mut token_out_scaling_factor = None;
+                    // Tokens stored as {address: {rate, scalingFactor, ...}}
+                    let token_in_data = tokens_obj.get(&input_token)
+                        .or_else(|| tokens_obj.get(&swap.input_token));
+                    let token_out_data = tokens_obj.get(&output_token)
+                        .or_else(|| tokens_obj.get(&swap.output_token));
 
-                    for token in tokens {
-                        if let Some(addr) = token["address"].as_str() {
-                            let addr_lower = addr.to_lowercase();
-                            if addr_lower == input_token {
-                                token_in_rate = token["rate"].as_str().map(|s| s.to_string());
-                                token_in_rate_provider = token["rateProvider"].as_str().map(|s| s.to_string());
-                                token_in_scaling_factor = token["scalingFactor"].as_str().map(|s| s.to_string());
-                            } else if addr_lower == output_token {
-                                token_out_rate = token["rate"].as_str().map(|s| s.to_string());
-                                token_out_rate_provider = token["rateProvider"].as_str().map(|s| s.to_string());
-                                token_out_scaling_factor = token["scalingFactor"].as_str().map(|s| s.to_string());
-                            }
-                        }
-                    }
+                    let token_in_rate = token_in_data.and_then(|t| t["rate"].as_str()).map(|s| s.to_string());
+                    let token_in_rate_provider = token_in_data.and_then(|t| t["rateProvider"].as_str()).map(|s| s.to_string());
+                    let token_in_scaling_factor = token_in_data.and_then(|t| t["scalingFactor"].as_str()).map(|s| s.to_string());
+
+                    let token_out_rate = token_out_data.and_then(|t| t["rate"].as_str()).map(|s| s.to_string());
+                    let token_out_rate_provider = token_out_data.and_then(|t| t["rateProvider"].as_str()).map(|s| s.to_string());
+                    let token_out_scaling_factor = token_out_data.and_then(|t| t["scalingFactor"].as_str()).map(|s| s.to_string());
 
                     // Add rate info if we found any rate data
                     if token_in_rate.is_some() || token_out_rate.is_some() {
