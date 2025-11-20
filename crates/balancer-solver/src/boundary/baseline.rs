@@ -148,11 +148,17 @@ impl<'a> Solver<'a> {
 
             // Log the swap attempt if logging is enabled
             let buy_amount = if let Some(ref logger) = self.swap_logger {
-                // Only log specific pool types to reduce file size
-                // Focus on GyroE and other advanced pool types that need investigation
+                // Configure which pool types to log (set to log all by default)
                 let should_log = matches!(
                     liquidity.kind_str(),
-                    "gyroE" | "gyro2CLP" | "gyro3CLP" | "quantAmm" | "stableSurge"
+                    "weightedProduct"
+                        | "stable"
+                        | "gyroE"
+                        | "gyro2CLP"
+                        | "gyro3CLP"
+                        | "reClamm"
+                        | "quantAmm"
+                        | "erc4626"
                 );
 
                 let result = liquidity
