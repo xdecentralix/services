@@ -1526,9 +1526,6 @@ impl BaselineSolvable for QuantAmmPoolRef<'_> {
         out_token: H160,
         (amount_in, in_token): (U256, H160),
     ) -> Option<U256> {
-        if amount_in.is_zero() {
-            return Some(U256::zero());
-        }
         self.get_amount_out_inner(out_token, amount_in, in_token)
     }
 
@@ -1537,9 +1534,6 @@ impl BaselineSolvable for QuantAmmPoolRef<'_> {
         in_token: H160,
         (amount_out, out_token): (U256, H160),
     ) -> Option<U256> {
-        if amount_out.is_zero() {
-            return Some(U256::zero());
-        }
         let result = self.get_amount_in_inner(in_token, amount_out, out_token);
         if result.is_none() {
             tracing::debug!(
