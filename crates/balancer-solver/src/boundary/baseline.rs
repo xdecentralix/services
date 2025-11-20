@@ -615,6 +615,8 @@ fn extract_pool_params(liquidity: &liquidity::Liquidity) -> serde_json::Value {
                     "token": format!("{:#x}", r.asset.token.0),
                     "balance": r.asset.amount.to_string(),
                     "weight": format!("{}/{}", r.weight.numer(), r.weight.denom()),
+                    "scalingFactor": format!("{}/{}", r.scale.get().numer(), r.scale.get().denom()),
+                    "rate": format!("{}/{}", r.rate.numer(), r.rate.denom()),
                 })).collect::<Vec<_>>(),
             })
         }

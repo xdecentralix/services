@@ -46,6 +46,7 @@ pub struct SwapLogVerification {
     pub liquidity_id: String,
     pub kind: String,
     pub pool_address: String,
+    pub pool_version: Option<String>,
     pub token_in: Address,
     pub token_out: Address,
     pub amount_in: String,
@@ -54,6 +55,17 @@ pub struct SwapLogVerification {
     pub difference_bps: Option<i64>,
     pub verified: bool,
     pub error: Option<String>,
+    pub rate_info: Option<RateInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RateInfo {
+    pub token_in_rate: String,
+    pub token_out_rate: String,
+    pub token_in_rate_provider: String,
+    pub token_out_rate_provider: String,
+    pub token_in_scaling_factor: String,
+    pub token_out_scaling_factor: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -230,12 +242,40 @@ impl SolutionVerifier {
         let output_token: Address = output_token_str.parse().unwrap_or_default();
         let input_amount = U256::from_dec_str(input_amount_str).unwrap_or_default();
 
+        // Extract rate information if present
+        let rate_info = swap.get("rate_info").and_then(|ri| {
+            Some(RateInfo {
+                token_in_rate: ri["token_in_rate"].as_str().unwrap_or("").to_string(),
+                token_out_rate: ri["token_out_rate"].as_str().unwrap_or("").to_string(),
+                token_in_rate_provider: ri["token_in_rate_provider"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string(),
+                token_out_rate_provider: ri["token_out_rate_provider"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string(),
+                token_in_scaling_factor: ri["token_in_scaling_factor"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string(),
+                token_out_scaling_factor: ri["token_out_scaling_factor"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string(),
+            })
+        });
+
+        // Extract pool version if present
+        let pool_version = swap.get("pool_version").and_then(|v| v.as_str()).map(|s| s.to_string());
+
         // Skip if the swap failed in the solver (output_amount is null)
         if expected_output.is_none() {
             return SwapLogVerification {
                 liquidity_id,
                 kind,
                 pool_address: pool_address.clone(),
+                pool_version,
                 token_in: input_token,
                 token_out: output_token,
                 amount_in: input_amount_str.to_string(),
@@ -244,6 +284,7 @@ impl SolutionVerifier {
                 difference_bps: None,
                 verified: false,
                 error: Some("Swap failed in solver (no output calculated)".to_string()),
+                rate_info,
             };
         }
 
@@ -254,14 +295,22 @@ impl SolutionVerifier {
             .and_then(|id| id.as_str());
 
         // Detect pool version: if no balancerPoolId, it's V3
-        let pool_version = if balancer_pool_id.is_none() {
+        let pool_version_enum = if balancer_pool_id.is_none() {
             PoolVersion::V3
         } else {
             Self::detect_pool_version(balancer_pool_id.unwrap())
         };
 
+        // Convert enum to string, preferring the one from swap data if available
+        let pool_version_str = pool_version.or_else(|| {
+            Some(match pool_version_enum {
+                PoolVersion::V2 => "V2".to_string(),
+                PoolVersion::V3 => "V3".to_string(),
+            })
+        });
+
         // Quote the swap
-        let quote_result = match pool_version {
+        let quote_result = match pool_version_enum {
             PoolVersion::V2 => {
                 if let Some(pool_id) = balancer_pool_id {
                     self.quote_v2_swap(
@@ -300,6 +349,7 @@ impl SolutionVerifier {
                     liquidity_id,
                     kind,
                     pool_address,
+                    pool_version: pool_version_str.clone(),
                     token_in: input_token,
                     token_out: output_token,
                     amount_in: input_amount_str.to_string(),
@@ -308,12 +358,14 @@ impl SolutionVerifier {
                     difference_bps: diff_bps,
                     verified: true,
                     error: None,
+                    rate_info: rate_info.clone(),
                 }
             }
             Err(e) => SwapLogVerification {
                 liquidity_id,
                 kind,
                 pool_address,
+                pool_version: pool_version_str,
                 token_in: input_token,
                 token_out: output_token,
                 amount_in: input_amount_str.to_string(),
@@ -322,6 +374,7 @@ impl SolutionVerifier {
                 difference_bps: None,
                 verified: false,
                 error: Some(e.to_string()),
+                rate_info,
             },
         }
     }

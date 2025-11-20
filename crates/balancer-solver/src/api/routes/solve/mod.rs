@@ -650,7 +650,7 @@ async fn verify_and_save_swap_log(
 ) {
     use tokio::fs;
 
-    // Load liquidity file to get balancerPoolId mappings
+    // Load liquidity file to get pool data including rates
     let liquidity_map = if let Some(id) = auction_id {
         let liquidity_file = save_dir.join(format!("{}_liquidity.json", id));
         match fs::read_to_string(&liquidity_file).await {
@@ -659,10 +659,8 @@ async fn verify_and_save_swap_log(
                     let mut map = std::collections::HashMap::new();
                     if let Some(liquidity_array) = liq_json["liquidity"].as_array() {
                         for pool in liquidity_array {
-                            if let (Some(id), Some(balancer_pool_id)) =
-                                (pool["id"].as_str(), pool["balancerPoolId"].as_str())
-                            {
-                                map.insert(id.to_string(), balancer_pool_id.to_string());
+                            if let Some(pool_id) = pool["id"].as_str() {
+                                map.insert(pool_id.to_string(), pool.clone());
                             }
                         }
                     }
@@ -685,20 +683,74 @@ async fn verify_and_save_swap_log(
         std::collections::HashMap::new()
     };
 
-    // Enrich swap records with balancerPoolId from liquidity file
-    let enriched_swaps: Vec<_> = swap_records
+    // Enrich swap records with pool data from liquidity file
+    let enriched_swaps: Vec<serde_json::Value> = swap_records
         .into_iter()
-        .map(|mut swap| {
-            if let Some(balancer_pool_id) = liquidity_map.get(&swap.liquidity_id) {
-                // Add balancerPoolId to pool_params
-                if let Some(params) = swap.pool_params.as_object_mut() {
-                    params.insert(
-                        "balancerPoolId".to_string(),
-                        serde_json::Value::String(balancer_pool_id.clone()),
-                    );
+        .map(|swap| {
+            let mut swap_json = serde_json::to_value(&swap).unwrap_or_default();
+            
+            if let Some(pool_data) = liquidity_map.get(&swap.liquidity_id) {
+                // Add balancerPoolId to pool_params if present
+                if let Some(balancer_pool_id) = pool_data["balancerPoolId"].as_str() {
+                    if let Some(params) = swap_json["pool_params"].as_object_mut() {
+                        params.insert(
+                            "balancerPoolId".to_string(),
+                            serde_json::Value::String(balancer_pool_id.to_string()),
+                        );
+                    }
+                }
+
+                // Determine pool version based on balancerPoolId presence
+                let pool_version = if pool_data["balancerPoolId"].is_null() {
+                    "V3"
+                } else {
+                    let pool_id = pool_data["balancerPoolId"].as_str().unwrap_or("");
+                    if pool_id.len() > 42 { "V2" } else { "V3" }
+                };
+                swap_json["pool_version"] = serde_json::Value::String(pool_version.to_string());
+
+                // Extract rate information for input and output tokens
+                if let Some(tokens) = pool_data["tokens"].as_array() {
+                    let input_token = swap.input_token.to_lowercase();
+                    let output_token = swap.output_token.to_lowercase();
+
+                    let mut token_in_rate = None;
+                    let mut token_out_rate = None;
+                    let mut token_in_rate_provider = None;
+                    let mut token_out_rate_provider = None;
+                    let mut token_in_scaling_factor = None;
+                    let mut token_out_scaling_factor = None;
+
+                    for token in tokens {
+                        if let Some(addr) = token["address"].as_str() {
+                            let addr_lower = addr.to_lowercase();
+                            if addr_lower == input_token {
+                                token_in_rate = token["rate"].as_str().map(|s| s.to_string());
+                                token_in_rate_provider = token["rateProvider"].as_str().map(|s| s.to_string());
+                                token_in_scaling_factor = token["scalingFactor"].as_str().map(|s| s.to_string());
+                            } else if addr_lower == output_token {
+                                token_out_rate = token["rate"].as_str().map(|s| s.to_string());
+                                token_out_rate_provider = token["rateProvider"].as_str().map(|s| s.to_string());
+                                token_out_scaling_factor = token["scalingFactor"].as_str().map(|s| s.to_string());
+                            }
+                        }
+                    }
+
+                    // Add rate info if we found any rate data
+                    if token_in_rate.is_some() || token_out_rate.is_some() {
+                        swap_json["rate_info"] = serde_json::json!({
+                            "token_in_rate": token_in_rate.unwrap_or_else(|| "".to_string()),
+                            "token_out_rate": token_out_rate.unwrap_or_else(|| "".to_string()),
+                            "token_in_rate_provider": token_in_rate_provider.unwrap_or_else(|| "".to_string()),
+                            "token_out_rate_provider": token_out_rate_provider.unwrap_or_else(|| "".to_string()),
+                            "token_in_scaling_factor": token_in_scaling_factor.unwrap_or_else(|| "".to_string()),
+                            "token_out_scaling_factor": token_out_scaling_factor.unwrap_or_else(|| "".to_string()),
+                        });
+                    }
                 }
             }
-            swap
+            
+            swap_json
         })
         .collect();
 
@@ -706,8 +758,9 @@ async fn verify_and_save_swap_log(
     let debug_stats = {
         let mut stats = std::collections::HashMap::new();
         for swap in &enriched_swaps {
-            if swap.input_amount == "0" {
-                let counter = stats.entry(swap.kind.clone()).or_insert(0);
+            if swap["input_amount"].as_str() == Some("0") {
+                let kind = swap["kind"].as_str().unwrap_or("unknown").to_string();
+                let counter = stats.entry(kind).or_insert(0);
                 *counter += 1;
             }
         }
