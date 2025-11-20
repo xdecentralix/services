@@ -132,16 +132,19 @@ impl SolutionVerifier {
         solution: &serde_json::Value,
         solution_index: usize,
     ) -> VerificationResult {
-        let mut swaps = Vec::new();
+        let swaps = if let Some(interactions) = solution["interactions"].as_array() {
+            // Execute all swap verifications in parallel
+            let verification_futures: Vec<_> = interactions
+                .iter()
+                .enumerate()
+                .filter(|(_, interaction)| interaction["kind"] == "liquidity")
+                .map(|(idx, interaction)| self.verify_swap(interaction, idx))
+                .collect();
 
-        if let Some(interactions) = solution["interactions"].as_array() {
-            for (idx, interaction) in interactions.iter().enumerate() {
-                if interaction["kind"] == "liquidity" {
-                    let verification = self.verify_swap(interaction, idx).await;
-                    swaps.push(verification);
-                }
-            }
-        }
+            futures::future::join_all(verification_futures).await
+        } else {
+            Vec::new()
+        };
 
         VerificationResult {
             solution_index,
@@ -172,13 +175,19 @@ impl SolutionVerifier {
             }
         };
 
-        let mut verifications = Vec::new();
+        // Execute all verifications in parallel using futures::join_all
+        let verification_futures: Vec<_> = swaps_array
+            .iter()
+            .map(|swap| self.verify_swap_log_entry(swap))
+            .collect();
+
+        let verifications = futures::future::join_all(verification_futures).await;
+
+        // Calculate stats after all verifications are complete
         let mut pool_type_stats: std::collections::HashMap<String, PoolTypeStats> =
             std::collections::HashMap::new();
 
-        for swap in swaps_array {
-            let verification = self.verify_swap_log_entry(swap).await;
-
+        for verification in &verifications {
             // Update pool type stats
             let kind = verification.kind.clone();
             let stats = pool_type_stats.entry(kind).or_insert(PoolTypeStats {
@@ -206,8 +215,6 @@ impl SolutionVerifier {
             } else {
                 stats.errors += 1;
             }
-
-            verifications.push(verification);
         }
 
         let verified_count = verifications.iter().filter(|v| v.verified).count();
