@@ -277,4 +277,45 @@ mod tests {
         )
         .unwrap_err();
     }
+
+    #[test]
+    fn test_tiny_swap_one_usdc_unit() {
+        // Test the exact scenario: 1 raw USDC unit (0.000001 USDC) swap
+        // Pool: ~1M USDC / ~1000 ETH, 50/50 weights
+
+        // Balances (already scaled to 18 decimals in Bfp format)
+        let balance_in = Bfp::from_wei(1_000_000_000_000_000_000_000_000_u128.into()); // 1M USDC
+        let balance_out = Bfp::from_wei(1_000_000_000_000_000_000_000_u128.into()); // 1000 ETH
+
+        // Weights (50/50)
+        let weight_in = Bfp::from_wei(1_000_000_000_000_000_000_u128.into()); // 1.0
+        let weight_out = Bfp::from_wei(1_000_000_000_000_000_000_u128.into()); // 1.0
+
+        // Amount: 1 USDC unit scaled to 18 decimals = 10^12
+        let amount_in = Bfp::from_wei(1_000_000_000_000_u128.into());
+
+        println!("\n=== Testing tiny swap: 1 USDC unit ===");
+        println!("balance_in:  {}", balance_in.as_uint256());
+        println!("balance_out: {}", balance_out.as_uint256());
+        println!("amount_in:   {}", amount_in.as_uint256());
+
+        let result = calc_out_given_in(balance_in, weight_in, balance_out, weight_out, amount_in);
+
+        match result {
+            Ok(amount_out) => {
+                println!("amount_out:  {}", amount_out.as_uint256());
+                assert!(
+                    amount_out.as_uint256() > 0.into(),
+                    "Expected non-zero output for tiny swap, got zero!"
+                );
+                println!(
+                    "✅ Tiny swap succeeded with non-zero output: {}",
+                    amount_out.as_uint256()
+                );
+            }
+            Err(e) => {
+                panic!("calc_out_given_in failed: {:?}", e);
+            }
+        }
+    }
 }
