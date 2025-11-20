@@ -8,7 +8,12 @@
 //! - ensure that we are using the latest up-to-date pool data by using events
 //!   from the node
 
-const QUERY_PAGE_SIZE: usize = 100;
+/// Page size for pagination when fetching pools from the V3 API.
+/// Set to 250 as a balance between:
+/// - Performance: 3 requests for ~652 pools (vs 7 requests with size 100)
+/// - Resilience: Can handle growth to 2,500 pools before requiring changes
+/// - Safety: Avoids silently missing pools if count exceeds a single page
+const QUERY_PAGE_SIZE: usize = 250;
 
 /// Custom deserializer that converts empty strings to None for optional SBfp
 /// fields. This ensures consistency with V2 and provides robust handling of any
@@ -119,7 +124,6 @@ impl BalancerApiClient {
                         "where" => json!({
                             "includeHooks": "STABLE_SURGE",
                             "chainIn": [self.chain],
-                             "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE", "RECLAMM", "QUANT_AMM_WEIGHTED", "GYRO"],
                             "protocolVersionIn": [3] // V3 protocol
                         }),
                     }),
