@@ -102,7 +102,9 @@ fn to_raw_undo_rate_round_up_bfp(
 }
 
 // Rate rounding function from Balancer math library
-#[allow(dead_code)]
+// Rates calculated by an external rate provider have rounding errors. Intuitively, a rate provider
+// rounds the rate down so the pool math is executed with conservative amounts. However, when upscaling or
+// downscaling the amount out, the rate should be rounded up to make sure the amounts scaled are conservative.
 fn compute_rate_round_up(rate: U256) -> U256 {
     let rounded_rate = (rate / U256::exp10(18)) * U256::exp10(18);
     if rounded_rate == rate { rate } else { rate + 1 }
@@ -148,7 +150,9 @@ impl TokenState {
     /// div. https://github.com/balancer-labs/balancer-v2-monorepo/blob/c18ff2686c61a8cbad72cdcfc65e9b11476fdbc3/pkg/pool-utils/contracts/BasePool.sol#L542-L544
     fn downscale_down(&self, amount: Bfp) -> Result<U256, Error> {
         if self.rate != U256::exp10(18) {
-            let rate_bfp = Bfp::from_wei(self.rate);
+            // Round rate up when downscaling output amounts to be conservative
+            let rounded_rate = compute_rate_round_up(self.rate);
+            let rate_bfp = Bfp::from_wei(rounded_rate);
             let result = to_raw_undo_rate_round_down_bfp(amount, self.scaling_factor, rate_bfp)?;
             Ok(result.as_uint256())
         } else {
