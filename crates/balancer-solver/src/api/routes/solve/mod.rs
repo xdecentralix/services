@@ -688,7 +688,7 @@ async fn verify_and_save_swap_log(
         .into_iter()
         .map(|swap| {
             let mut swap_json = serde_json::to_value(&swap).unwrap_or_default();
-            
+
             if let Some(pool_data) = liquidity_map.get(&swap.liquidity_id) {
                 // Add balancerPoolId to pool_params if present
                 if let Some(balancer_pool_id) = pool_data["balancerPoolId"].as_str() {
@@ -742,7 +742,7 @@ async fn verify_and_save_swap_log(
                     }
                 }
             }
-            
+
             swap_json
         })
         .collect();

@@ -127,7 +127,7 @@ impl BalancerApiClient {
                 .await?
                 .aggregator_pools;
 
-            let no_more_pages = page.len() != QUERY_PAGE_SIZE;
+            let no_more_pages = page.is_empty();
             pools.extend(page);
 
             if no_more_pages {

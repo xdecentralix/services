@@ -267,7 +267,10 @@ impl SolutionVerifier {
         });
 
         // Extract pool version if present
-        let pool_version = swap.get("pool_version").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let pool_version = swap
+            .get("pool_version")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
 
         // Skip if the swap failed in the solver (output_amount is null)
         if expected_output.is_none() {

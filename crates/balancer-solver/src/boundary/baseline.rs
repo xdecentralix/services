@@ -310,6 +310,30 @@ fn to_boundary_liquidity(
                         }
                     }
                 }
+                liquidity::State::StableSurge(pool) => {
+                    // StableSurge pools use the same math as stable pools but with dynamic fees
+                    // For quoting purposes, we treat them as stable pools with the current fee
+                    let stable_pool = liquidity::stable::Pool {
+                        reserves: pool.reserves.clone(),
+                        amplification_parameter: pool.amplification_parameter,
+                        fee: pool.fee,
+                    };
+                    if let Some(boundary_pool) = boundary::liquidity::stable::to_boundary_pool(
+                        liquidity.address,
+                        &stable_pool,
+                    ) {
+                        for pair in pool.reserves.token_pairs() {
+                            let token_pair = to_boundary_token_pair(&pair);
+                            onchain_liquidity.entry(token_pair).or_default().push(
+                                OnchainLiquidity {
+                                    id: liquidity.id.clone(),
+                                    token_pair,
+                                    source: LiquiditySource::Stable(boundary_pool.clone()),
+                                },
+                            );
+                        }
+                    }
+                }
                 liquidity::State::LimitOrder(limit_order) => {
                     if let Some(token_pair) = TokenPair::new(
                         limit_order.maker.token.0.into_alloy(),
@@ -625,6 +649,21 @@ fn extract_pool_params(liquidity: &liquidity::Liquidity) -> serde_json::Value {
                 "kind": "stable",
                 "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
                 "amplificationParameter": format!("{}/{}", pool.amplification_parameter.numer(), pool.amplification_parameter.denom()),
+                "reserves": pool.reserves.iter().map(|r| json!({
+                    "token": format!("{:#x}", r.asset.token.0),
+                    "balance": r.asset.amount.to_string(),
+                    "scalingFactor": format!("{}/{}", r.scale.get().numer(), r.scale.get().denom()),
+                    "rate": format!("{}/{}", r.rate.numer(), r.rate.denom()),
+                })).collect::<Vec<_>>(),
+            })
+        }
+        liquidity::State::StableSurge(pool) => {
+            json!({
+                "kind": "stableSurge",
+                "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
+                "amplificationParameter": format!("{}/{}", pool.amplification_parameter.numer(), pool.amplification_parameter.denom()),
+                "surgeThresholdPercentage": format!("{}/{}", pool.surge_threshold_percentage.numer(), pool.surge_threshold_percentage.denom()),
+                "maxSurgeFeePercentage": format!("{}/{}", pool.max_surge_fee_percentage.numer(), pool.max_surge_fee_percentage.denom()),
                 "reserves": pool.reserves.iter().map(|r| json!({
                     "token": format!("{:#x}", r.asset.token.0),
                     "balance": r.asset.amount.to_string(),
