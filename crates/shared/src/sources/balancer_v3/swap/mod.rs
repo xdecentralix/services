@@ -65,8 +65,9 @@ fn to_scaled_18_apply_rate_round_down_bfp(
     // return MathSol.mulDownFixed(amount * scalingFactor, tokenRate);
     // = (amount * scalingFactor * tokenRate) / WAD
     // Rust Bfp `mul_down` does (a * b) / WAD.
-    // We want (amount * scaling_factor * rate) / WAD^2 (since scaling_factor is already WAD-scaled in Rust).
-    // But wait, if we use `Bfp` operations, `amount.mul_down(sf).mul_down(rate)` is `(A*S/W)*R/W = A*S*R/W^2`.
+    // We want (amount * scaling_factor * rate) / WAD^2 (since scaling_factor is
+    // already WAD-scaled in Rust). But wait, if we use `Bfp` operations,
+    // `amount.mul_down(sf).mul_down(rate)` is `(A*S/W)*R/W = A*S*R/W^2`.
     // This matches the unit analysis.
     // The issue is DOUBLE rounding.
     // We should multiply all numerators first, then divide.
@@ -76,10 +77,12 @@ fn to_scaled_18_apply_rate_round_down_bfp(
         .ok_or(Error::MulOverflow)?
         .checked_mul(rate.as_uint256())
         .ok_or(Error::MulOverflow)?;
-    
+
     let denominator = U256::exp10(36); // WAD * WAD
-    let result = numerator.checked_div(denominator).ok_or(Error::ZeroDivision)?;
-    
+    let result = numerator
+        .checked_div(denominator)
+        .ok_or(Error::ZeroDivision)?;
+
     Ok(Bfp::from_wei(result))
 }
 
@@ -98,15 +101,19 @@ fn to_scaled_18_apply_rate_round_up_bfp(
         .ok_or(Error::MulOverflow)?
         .checked_mul(rate.as_uint256())
         .ok_or(Error::MulOverflow)?;
-    
+
     let denominator = U256::exp10(36); // WAD * WAD
-    
+
     // Div Up
     if denominator == U256::zero() {
         return Err(Error::ZeroDivision);
     }
-    let result = (numerator.checked_add(denominator).ok_or(Error::AddOverflow)? - U256::one()) / denominator;
-    
+    let result = (numerator
+        .checked_add(denominator)
+        .ok_or(Error::AddOverflow)?
+        - U256::one())
+        / denominator;
+
     Ok(Bfp::from_wei(result))
 }
 
@@ -120,25 +127,28 @@ fn to_raw_undo_rate_round_down_bfp(
     // Matches V3 Vault `toRawUndoRateRoundDown` logic:
     // return MathSol.divDownFixed(amount, scalingFactor * tokenRate);
     // = (amount * WAD) / (scalingFactor * tokenRate)
-    // Rust scaling_factor is WAD-based (10^18 for 1.0), while TS might be 1.0 based.
-    // Assuming Rust scaling_factor matches V2 style (10^30 for USDC), we need to divide by WAD effectively.
-    // If we simply do (amount * WAD * WAD) / (scaling_factor * rate), we match the units.
-    
+    // Rust scaling_factor is WAD-based (10^18 for 1.0), while TS might be 1.0
+    // based. Assuming Rust scaling_factor matches V2 style (10^30 for USDC), we
+    // need to divide by WAD effectively. If we simply do (amount * WAD * WAD) /
+    // (scaling_factor * rate), we match the units.
+
     let numerator = amount
         .as_uint256()
         .checked_mul(U256::exp10(36)) // WAD * WAD
         .ok_or(Error::MulOverflow)?;
-        
+
     let denominator = scaling_factor
         .as_uint256()
         .checked_mul(rate.as_uint256())
         .ok_or(Error::MulOverflow)?;
-        
+
     if denominator == U256::zero() {
         return Err(Error::ZeroDivision);
     }
-    
-    let result = numerator.checked_div(denominator).ok_or(Error::ZeroDivision)?;
+
+    let result = numerator
+        .checked_div(denominator)
+        .ok_or(Error::ZeroDivision)?;
     Ok(Bfp::from_wei(result))
 }
 
@@ -150,23 +160,27 @@ fn to_raw_undo_rate_round_up_bfp(
 ) -> Result<Bfp, Error> {
     // Matches V3 Vault `toRawUndoRateRoundUp` logic:
     // return MathSol.divUpFixed(amount, scalingFactor * tokenRate);
-    
+
     let numerator = amount
         .as_uint256()
         .checked_mul(U256::exp10(36)) // WAD * WAD
         .ok_or(Error::MulOverflow)?;
-        
+
     let denominator = scaling_factor
         .as_uint256()
         .checked_mul(rate.as_uint256())
         .ok_or(Error::MulOverflow)?;
-        
+
     if denominator == U256::zero() {
         return Err(Error::ZeroDivision);
     }
-    
+
     // Div Up
-    let result = (numerator.checked_add(denominator).ok_or(Error::AddOverflow)? - U256::one()) / denominator;
+    let result = (numerator
+        .checked_add(denominator)
+        .ok_or(Error::AddOverflow)?
+        - U256::one())
+        / denominator;
     Ok(Bfp::from_wei(result))
 }
 

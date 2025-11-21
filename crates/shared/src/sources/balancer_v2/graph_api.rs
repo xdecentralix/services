@@ -138,7 +138,8 @@ impl BalancerApiClient {
                         "where" => json!({
                             "chainIn": [self.chain],
                             "poolTypeIn": ["WEIGHTED", "STABLE", "LIQUIDITY_BOOTSTRAPPING", "COMPOSABLE_STABLE", "GYROE", "GYRO"],
-                            "protocolVersionIn": [2]
+                            "protocolVersionIn": [2],
+                            "minTvl": 10.0
                         }),
                     }),
                 )

@@ -124,7 +124,8 @@ impl BalancerApiClient {
                         "where" => json!({
                             "includeHooks": "STABLE_SURGE",
                             "chainIn": [self.chain],
-                            "protocolVersionIn": [3] // V3 protocol
+                            "protocolVersionIn": [3], // V3 protocol
+                            "minTvl": 10.0
                         }),
                     }),
                 )
