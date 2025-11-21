@@ -56,11 +56,35 @@ where
     }
 }
 
+/// Custom deserializer for Bfp that treats the input string as a wei value (raw
+/// integer). This is needed because the API returns some fields (like
+/// maxTradeSizeRatio) as raw wei but formatted as a string (sometimes with
+/// ".000" decimals). E.g., "100000000000000000.000000000000000000" (10^17)
+/// should be parsed as 0.1 tokens (10^17 wei), not 10^17 tokens.
+fn deserialize_optional_bfp_from_wei<'de, D>(deserializer: D) -> Result<Option<Bfp>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt_s = Option::<String>::deserialize(deserializer)?;
+    match opt_s {
+        None => Ok(None),
+        Some(s) => {
+            if s.is_empty() {
+                return Ok(None);
+            }
+            // Handle potential decimal point (take integer part)
+            let integer_part = s.split('.').next().unwrap_or("0");
+            let wei = U256::from_dec_str(integer_part).map_err(serde::de::Error::custom)?;
+            Ok(Some(Bfp::from_wei(wei)))
+        }
+    }
+}
+
 use {
     super::swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     crate::subgraph::SubgraphClient,
     anyhow::{Context, Result},
-    ethcontract::H160,
+    ethcontract::{H160, U256},
     reqwest::{Client, Url},
     serde::{Deserialize, Deserializer, Serialize},
     serde_json::json,
@@ -248,8 +272,7 @@ pub struct PoolData {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct QuantAmmWeightedParams {
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_bfp_from_wei")]
     pub max_trade_size_ratio: Option<Bfp>,
 }
 
