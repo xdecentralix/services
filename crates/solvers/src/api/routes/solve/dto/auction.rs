@@ -584,8 +584,8 @@ mod quant_amm_pool {
                 },
                 max_trade_size_ratio: {
                     let ratio_wei = &pool.max_trade_size_ratio;
-                    let scale = BigDecimal::from_str("1000000000000000000")
-                        .map_err(|_| "invalid scale")?;
+                    let scale =
+                        BigDecimal::from_str("1000000000000000000").map_err(|_| "invalid scale")?;
                     let ratio = ratio_wei / scale;
                     conv::decimal_to_rational(&ratio).ok_or("invalid max_trade_size_ratio")?
                 },
