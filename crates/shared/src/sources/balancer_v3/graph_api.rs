@@ -125,7 +125,7 @@ impl BalancerApiClient {
                             "includeHooks": "STABLE_SURGE",
                             "chainIn": [self.chain],
                             "protocolVersionIn": [3], // V3 protocol
-                            "minTvl": 10.0
+                            "minTvl": 50.0
                         }),
                     }),
                 )

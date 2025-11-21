@@ -139,7 +139,7 @@ impl BalancerApiClient {
                             "chainIn": [self.chain],
                             "poolTypeIn": ["WEIGHTED", "STABLE", "LIQUIDITY_BOOTSTRAPPING", "COMPOSABLE_STABLE", "GYROE", "GYRO"],
                             "protocolVersionIn": [2],
-                            "minTvl": 10.0
+                            "minTvl": 50.0
                         }),
                     }),
                 )
