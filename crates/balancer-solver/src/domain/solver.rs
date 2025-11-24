@@ -168,11 +168,12 @@ impl Solver {
                 );
                 let batch_router = contracts::alloy::BalancerV3BatchRouter::Instance::new(
                     batch_router_addr.0.into_alloy(),
-                    web3.alloy,
+                    web3.alloy.clone(),
                 );
                 Some(crate::infra::solution_verifier::SolutionVerifier::new(
                     vault,
                     batch_router,
+                    web3,
                 ))
             }
             _ => None,

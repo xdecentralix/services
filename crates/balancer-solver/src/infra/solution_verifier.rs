@@ -96,22 +96,26 @@ pub struct ContractCallDetails {
 pub enum PoolVersion {
     V2,
     V3,
+    ERC4626,
 }
 
 #[derive(Clone)]
 pub struct SolutionVerifier {
     vault: BalancerV2Vault::Instance,
     batch_router: BalancerV3BatchRouter::Instance,
+    web3: shared::ethrpc::Web3,
 }
 
 impl SolutionVerifier {
     pub fn new(
         vault: BalancerV2Vault::Instance,
         batch_router: BalancerV3BatchRouter::Instance,
+        web3: shared::ethrpc::Web3,
     ) -> Self {
         Self {
             vault,
             batch_router,
+            web3,
         }
     }
 
@@ -304,6 +308,59 @@ impl SolutionVerifier {
             .and_then(|p| p.get("balancerPoolId"))
             .and_then(|id| id.as_str());
 
+        // Check if this is an ERC4626 vault swap - verify with preview functions
+        if kind == "erc4626" {
+            let quote_result = self
+                .quote_erc4626_swap(
+                    &pool_address,
+                    H160::from(input_token.0),
+                    H160::from(output_token.0),
+                    input_amount,
+                )
+                .await;
+
+            match quote_result {
+                Ok((quoted_amount, _call_details)) => {
+                    let expected_u256 =
+                        U256::from_dec_str(expected_output.as_ref().unwrap()).unwrap_or_default();
+                    let diff_bps = calculate_difference_bps(&expected_u256, &quoted_amount);
+
+                    return SwapLogVerification {
+                        liquidity_id,
+                        kind,
+                        pool_address,
+                        pool_version: Some("ERC4626".to_string()),
+                        token_in: input_token,
+                        token_out: output_token,
+                        amount_in: input_amount_str.to_string(),
+                        expected_amount_out: expected_output,
+                        quoted_amount_out: Some(quoted_amount),
+                        difference_bps: diff_bps,
+                        verified: true,
+                        error: None,
+                        rate_info,
+                    };
+                }
+                Err(e) => {
+                    return SwapLogVerification {
+                        liquidity_id,
+                        kind,
+                        pool_address,
+                        pool_version: Some("ERC4626".to_string()),
+                        token_in: input_token,
+                        token_out: output_token,
+                        amount_in: input_amount_str.to_string(),
+                        expected_amount_out: expected_output,
+                        quoted_amount_out: None,
+                        difference_bps: None,
+                        verified: false,
+                        error: Some(format!("ERC4626 preview failed: {}", e)),
+                        rate_info,
+                    };
+                }
+            }
+        }
+
         // Detect pool version: if no balancerPoolId, it's V3
         let pool_version_enum = if balancer_pool_id.is_none() {
             PoolVersion::V3
@@ -316,6 +373,7 @@ impl SolutionVerifier {
             Some(match pool_version_enum {
                 PoolVersion::V2 => "V2".to_string(),
                 PoolVersion::V3 => "V3".to_string(),
+                PoolVersion::ERC4626 => "ERC4626".to_string(),
             })
         });
 
@@ -347,6 +405,10 @@ impl SolutionVerifier {
                     Err("Missing pool address for V3 pool".into())
                 }
             }
+            PoolVersion::ERC4626 => {
+                // This should not happen as ERC4626 is handled earlier
+                Err("ERC4626 should be handled before this point".into())
+            }
         };
 
         match quote_result {
@@ -364,7 +426,7 @@ impl SolutionVerifier {
                     token_out: output_token,
                     amount_in: input_amount_str.to_string(),
                     expected_amount_out: expected_output,
-                    quoted_amount_out: Some(quoted_amount),
+                    quoted_amount_out: Some(quoted_amount.to_string()),
                     difference_bps: diff_bps,
                     verified: true,
                     error: None,
@@ -412,15 +474,54 @@ impl SolutionVerifier {
         // Try to extract liquidityDetails (enhanced solutions)
         let pool_details = interaction.get("liquidityDetails");
 
-        // Extract pool address and Balancer pool ID from liquidityDetails if available
-        let (pool_address_opt, balancer_pool_id_opt) = if let Some(details) = pool_details {
+        // Extract pool address, Balancer pool ID, and kind from liquidityDetails if
+        // available
+        let (pool_address_opt, balancer_pool_id_opt, kind_opt) = if let Some(details) = pool_details
+        {
             (
                 details["address"].as_str(),
                 details["balancerPoolId"].as_str(),
+                details["kind"].as_str(),
             )
         } else {
-            (None, None)
+            (None, None, None)
         };
+
+        // Check if this is an ERC4626 swap
+        if kind_opt == Some("erc4626") {
+            let pool_address = pool_address_opt.unwrap_or("");
+            let quoted_amount = self
+                .quote_erc4626_swap(
+                    pool_address,
+                    H160::from(input_token.0),
+                    H160::from(output_token.0),
+                    input_amount,
+                )
+                .await;
+
+            let (quoted_amount_out, difference_bps, quote_error, contract_call) =
+                match quoted_amount {
+                    Ok((quote, call_details)) => {
+                        let diff = calculate_difference_bps(&output_amount, &quote);
+                        (Some(quote), diff, None, Some(call_details))
+                    }
+                    Err(e) => (None, None, Some(e.to_string()), None),
+                };
+
+            return SwapVerification {
+                interaction_index,
+                pool_id: pool_id.to_string(),
+                pool_version: PoolVersion::ERC4626,
+                token_in: input_token,
+                token_out: output_token,
+                amount_in: input_amount_str.to_string(),
+                expected_amount_out: output_amount_str.to_string(),
+                quoted_amount_out,
+                difference_bps,
+                quote_error,
+                contract_call,
+            };
+        }
 
         // Determine pool version:
         // - If balancerPoolId is None/null, it's a V3 pool (V3 pools don't have
@@ -459,6 +560,10 @@ impl SolutionVerifier {
                 } else {
                     Err("Missing pool address for V3 pool in liquidityDetails".into())
                 }
+            }
+            PoolVersion::ERC4626 => {
+                // This should not happen in verify_swap as ERC4626 is handled earlier
+                Err("ERC4626 should be handled before this point".into())
             }
         };
 
@@ -697,6 +802,54 @@ impl SolutionVerifier {
                 Err(format!("Query failed: {:?}", e).into())
             }
         }
+    }
+
+    /// Quote an ERC4626 vault swap (wrap or unwrap)
+    async fn quote_erc4626_swap(
+        &self,
+        vault_address_str: &str,
+        input_token: H160,
+        output_token: H160,
+        input_amount: U256,
+    ) -> Result<(String, ContractCallDetails), Box<dyn std::error::Error>> {
+        // Parse vault address
+        let vault_address: H160 = vault_address_str.parse()?;
+
+        // Create ERC4626 contract instance
+        let erc4626 = contracts::IERC4626::at(&self.web3, vault_address);
+
+        // Get asset address to determine direction
+        let asset_address = erc4626.asset().call().await?;
+
+        // Determine if this is a wrap (asset -> vault) or unwrap (vault -> asset)
+        let (quoted_amount, function_name) =
+            if input_token == asset_address && output_token == vault_address {
+                // Wrap: asset -> vault shares (call previewDeposit)
+                let shares = erc4626.preview_deposit(input_amount).call().await?;
+                (shares, "previewDeposit")
+            } else if input_token == vault_address && output_token == asset_address {
+                // Unwrap: vault shares -> asset (call previewRedeem)
+                let assets = erc4626.preview_redeem(input_amount).call().await?;
+                (assets, "previewRedeem")
+            } else {
+                return Err(format!(
+                    "ERC4626 token mismatch: input={:?}, output={:?}, asset={:?}, vault={:?}",
+                    input_token, output_token, asset_address, vault_address
+                )
+                .into());
+            };
+
+        let call_details = ContractCallDetails {
+            contract_address: format!("{:#x}", vault_address),
+            contract_name: "IERC4626".to_string(),
+            function_name: function_name.to_string(),
+            calldata: format!("assets={}", input_amount.to_string()),
+            decoded_params: serde_json::json!({
+                "assets_or_shares": input_amount.to_string(),
+            }),
+        };
+
+        Ok((quoted_amount.to_string(), call_details))
     }
 }
 
