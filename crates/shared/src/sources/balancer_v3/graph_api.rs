@@ -174,17 +174,21 @@ impl BalancerApiClient {
         }
 
         tracing::info!(
-            "Fetched {} pools, enriching Gyro pools with detailed parameters",
+            "Fetched {} pools, enriching pools with detailed parameters",
             pools.len()
         );
 
-        // Step 2: Enrich Gyro pools with detailed parameters
-        // Filter pools that need detailed parameters (GYROE, GYRO/2CLP)
+        // Step 2: Enrich pools with detailed parameters
+        // Filter pools that need detailed parameters (GYROE, GYRO/2CLP,
+        // QUANT_AMM_WEIGHTED)
         let pools_needing_details: Vec<_> = pools
             .iter()
             .enumerate()
             .filter_map(|(idx, p)| {
-                if matches!(p.pool_type.as_str(), "GYROE" | "GYRO") {
+                if matches!(
+                    p.pool_type.as_str(),
+                    "GYROE" | "GYRO" | "QUANT_AMM_WEIGHTED"
+                ) {
                     Some((idx, p.id.clone(), p.pool_type.clone()))
                 } else {
                     None
@@ -194,7 +198,7 @@ impl BalancerApiClient {
 
         if !pools_needing_details.is_empty() {
             tracing::info!(
-                "Fetching detailed parameters for {} Gyro pools (rate-limited to {} concurrent \
+                "Fetching detailed parameters for {} pools (rate-limited to {} concurrent \
                  requests)",
                 pools_needing_details.len(),
                 MAX_CONCURRENT_DETAIL_QUERIES
@@ -236,13 +240,15 @@ impl BalancerApiClient {
 
     /// Fetches detailed pool data for a specific pool using poolGetPool query
     /// with inline fragments. This is necessary because poolGetPools
-    /// returns GqlPoolMinimal without Gyro-specific parameters.
+    /// returns GqlPoolMinimal without type-specific parameters (Gyro, QuantAMM,
+    /// etc.).
     async fn get_pool_details(&self, pool_id: &str, pool_type: &str) -> Result<PoolData> {
         use self::pool_detail_query::*;
 
         let query = match pool_type {
             "GYROE" => QUERY_GYRO_E,
             "GYRO" => QUERY_GYRO_2CLP,
+            "QUANT_AMM_WEIGHTED" => QUERY_QUANT_AMM,
             _ => {
                 return Err(anyhow::anyhow!(
                     "Unsupported pool type for detail query: {}",
@@ -509,9 +515,6 @@ mod pools_query {
                     swapEnabled
                 }
                 createTime
-                quantAmmWeightedParams {
-                    maxTradeSizeRatio
-                }
                 hook {
                     address
                     params {
@@ -617,6 +620,44 @@ mod pool_detail_query {
                 ... on GqlPoolGyro {
                     sqrtAlpha
                     sqrtBeta
+                }
+            }
+        }
+    "#;
+
+    // Step 2 query: Fetch detailed QuantAMM Weighted pool data
+    pub const QUERY_QUANT_AMM: &str = r#"
+        query poolGetPool($id: String!, $chain: GqlChain!) {
+            poolGetPool(id: $id, chain: $chain) {
+                id
+                address
+                type
+                protocolVersion
+                factory
+                chain
+                poolTokens {
+                    address
+                    decimals
+                    weight
+                    priceRateProvider
+                }
+                dynamicData {
+                    swapEnabled
+                }
+                createTime
+                hook {
+                    address
+                    params {
+                        ... on StableSurgeHookParams {
+                            maxSurgeFeePercentage
+                            surgeThresholdPercentage
+                        }
+                    }
+                }
+                ... on GqlPoolQuantAmmWeighted {
+                    quantAmmWeightedParams {
+                        maxTradeSizeRatio
+                    }
                 }
             }
         }
