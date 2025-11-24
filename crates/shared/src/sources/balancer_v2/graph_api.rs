@@ -18,7 +18,13 @@ use {
     serde::{Deserialize, Deserializer, Serialize},
     serde_json::json,
     serde_with::{DisplayFromStr, serde_as},
-    std::collections::HashMap,
+    std::{
+        collections::HashMap,
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+    },
 };
 
 const QUERY_PAGE_SIZE: usize = 250;
@@ -196,20 +202,39 @@ impl BalancerApiClient {
             );
 
             // Fetch details with controlled concurrency to avoid rate limits
+            let total_to_fetch = pools_needing_details.len();
+            let processed = Arc::new(AtomicUsize::new(0));
+            
             let enriched_pools = stream::iter(pools_needing_details)
                 .map(|(idx, pool_id, pool_type)| async move {
                     let detailed = self.get_pool_details(&pool_id, &pool_type).await;
                     (idx, detailed)
                 })
                 .buffer_unordered(MAX_CONCURRENT_DETAIL_QUERIES)
+                .inspect({
+                    let processed = Arc::clone(&processed);
+                    move |_| {
+                        let count = processed.fetch_add(1, Ordering::Relaxed) + 1;
+                        if count % 10 == 0 || count == total_to_fetch {
+                            tracing::debug!(
+                                "Pool enrichment progress: {}/{} pools fetched",
+                                count,
+                                total_to_fetch
+                            );
+                        }
+                    }
+                })
                 .collect::<Vec<_>>()
                 .await;
 
             // Merge detailed data back into pools
+            let mut successful = 0;
+            let mut failed = 0;
             for (idx, detailed_result) in enriched_pools {
                 match detailed_result {
                     Ok(detailed) => {
                         pools[idx] = detailed;
+                        successful += 1;
                     }
                     Err(err) => {
                         tracing::warn!(
@@ -217,10 +242,18 @@ impl BalancerApiClient {
                             pools[idx].id,
                             err
                         );
+                        failed += 1;
                         // Continue with minimal data for this pool
                     }
                 }
             }
+            
+            tracing::info!(
+                "Completed pool enrichment: {}/{} successful, {} failed",
+                successful,
+                total_to_fetch,
+                failed
+            );
         }
 
         Ok(RegisteredPools {
