@@ -9,7 +9,7 @@
 //!   from the node
 
 /// Page size for pagination when fetching pools from the V3 API.
-const QUERY_PAGE_SIZE: usize = 100;
+const QUERY_PAGE_SIZE: usize = 250;
 
 /// Custom deserializer that converts empty strings to None for optional SBfp
 /// fields. This ensures consistency with V2 and provides robust handling of any
@@ -142,10 +142,10 @@ impl BalancerApiClient {
                         "orderBy" => "totalLiquidity",
                         "orderDirection" => "desc",
                         "where" => json!({
-                            "includeHooks": "STABLE_SURGE",
                             "chainIn": [self.chain],
-                            "protocolVersionIn": [3], // V3 protocol
-                            "minTvl": 50.0
+                            "protocolVersionIn": [3] // V3 protocol
+                            // Using poolGetPools instead of aggregatorPools to get all pools
+                            // StableSurge pools can be identified by checking hook field
                         }),
                     }),
                 )
@@ -377,14 +377,14 @@ mod pools_query {
     use serde::Deserialize;
 
     pub const QUERY: &str = r#"
-        query aggregatorPools(
+        query poolGetPools(
             $first: Int,
             $skip: Int,
             $orderBy: GqlPoolOrderBy,
             $orderDirection: GqlPoolOrderDirection,
-            $where: GqlAggregatorPoolFilter
+            $where: GqlPoolFilter
         ) {
-            aggregatorPools(
+            poolGetPools(
                 first: $first
                 skip: $skip
                 orderBy: $orderBy
@@ -441,7 +441,7 @@ mod pools_query {
 
     #[derive(Debug, Deserialize)]
     pub struct Data {
-        #[serde(rename = "aggregatorPools")]
+        #[serde(rename = "poolGetPools")]
         pub aggregator_pools: Vec<super::PoolData>,
     }
 }

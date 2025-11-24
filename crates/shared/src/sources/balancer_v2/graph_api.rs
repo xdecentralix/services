@@ -20,7 +20,7 @@ use {
     std::collections::HashMap,
 };
 
-const QUERY_PAGE_SIZE: usize = 100;
+const QUERY_PAGE_SIZE: usize = 250;
 
 /// Custom deserializer that converts empty strings to None for optional SBfp
 /// fields. This fixes the inconsistency in the V2 API where 2-CLP pools return
@@ -340,14 +340,14 @@ mod pools_query {
     use {super::PoolData, serde::Deserialize};
 
     pub const QUERY: &str = r#"
-        query aggregatorPools(
+        query poolGetPools(
             $first: Int,
             $skip: Int,
             $orderBy: GqlPoolOrderBy,
             $orderDirection: GqlPoolOrderDirection,
-            $where: GqlAggregatorPoolFilter
+            $where: GqlPoolFilter
         ) {
-            aggregatorPools(
+            poolGetPools(
                 first: $first
                 skip: $skip
                 orderBy: $orderBy
@@ -393,7 +393,7 @@ mod pools_query {
 
     #[derive(Debug, Deserialize, Eq, PartialEq)]
     pub struct Data {
-        #[serde(rename = "aggregatorPools")]
+        #[serde(rename = "poolGetPools")]
         pub aggregator_pools: Vec<PoolData>,
     }
 }
