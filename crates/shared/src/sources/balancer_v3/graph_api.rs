@@ -452,7 +452,7 @@ mod tests {
     #[test]
     fn decode_pools_data() {
         let json = r#"{
-            "aggregatorPools": [
+            "poolGetPools": [
                 {
                     "id": "0x1111111111111111111111111111111111111111",
                     "address": "0x1111111111111111111111111111111111111111",
@@ -493,7 +493,7 @@ mod tests {
 
         // Test that both null and empty strings are handled correctly in V3
         let mixed_json = json!({
-            "aggregatorPools": [
+            "poolGetPools": [
                 {
                     "id": "0x1111111111111111111111111111111111111111",
                     "address": "0x1111111111111111111111111111111111111111",
@@ -571,7 +571,7 @@ mod tests {
     #[test]
     fn decode_stable_surge_hook_data() {
         let json = r#"{
-            "aggregatorPools": [
+            "poolGetPools": [
                 {
                     "id": "0x1111111111111111111111111111111111111111",
                     "address": "0x1111111111111111111111111111111111111111",

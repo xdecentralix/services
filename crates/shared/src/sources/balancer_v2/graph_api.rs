@@ -408,7 +408,7 @@ mod tests {
 
         assert_eq!(
             serde_json::from_value::<Data>(json!({
-                "aggregatorPools": [
+                "poolGetPools": [
                     {
                         "type": "WEIGHTED",
                         "address": "0x2222222222222222222222222222222222222222",
@@ -685,7 +685,7 @@ mod tests {
 
         // Test with actual high-precision values like from your API
         let gyro_eclp_json = json!({
-            "aggregatorPools": [
+            "poolGetPools": [
                 {
                     "type": "GYROE",
                     "address": "0x80fd5bc9d4fA6C22132f8bb2d9d30B01c3336FB3",
@@ -763,7 +763,7 @@ mod tests {
         // Test that empty strings in Gyro parameters are converted to None (the actual
         // issue we're fixing)
         let gyro_2clp_json = json!({
-            "aggregatorPools": [
+            "poolGetPools": [
                 {
                     "type": "GYRO",
                     "address": "0xdac42eeb17758daa38caf9a3540c808247527ae3",
