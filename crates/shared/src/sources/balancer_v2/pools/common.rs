@@ -167,19 +167,24 @@ impl<Factory> PoolInfoFetcher<Factory> {
         };
 
         let rate_providers = pool.rate_providers.clone();
+        let pool_address = pool.address;
+        let pool_tokens_for_logging = pool.tokens.clone();
         let web3 = self.web3.clone();
         let fetch_rates = async move {
             let mut rates = Vec::new();
-            for rate_provider in rate_providers {
-                if rate_provider == H160::zero() {
+            for (token_index, (rate_provider, token)) in rate_providers.iter().zip(pool_tokens_for_logging.iter()).enumerate() {
+                if *rate_provider == H160::zero() {
                     rates.push(U256::exp10(18)); // Default rate of 1.0 as rate provider is not set
                 } else {
-                    let rate_contract = IRateProvider::at(&web3, rate_provider);
+                    let rate_contract = IRateProvider::at(&web3, *rate_provider);
                     match rate_contract.get_rate().block(legacy_block).call().await {
                         Ok(rate) => rates.push(rate),
                         Err(error) => {
-                            tracing::debug!(
+                            tracing::warn!(
                                 %rate_provider,
+                                %pool_address,
+                                %token,
+                                token_index,
                                 ?error,
                                 "rate provider call failed, using default rate of 1.0"
                             );
