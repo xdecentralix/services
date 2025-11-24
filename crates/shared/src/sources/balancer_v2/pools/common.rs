@@ -172,7 +172,11 @@ impl<Factory> PoolInfoFetcher<Factory> {
         let web3 = self.web3.clone();
         let fetch_rates = async move {
             let mut rates = Vec::new();
-            for (token_index, (rate_provider, token)) in rate_providers.iter().zip(pool_tokens_for_logging.iter()).enumerate() {
+            for (token_index, (rate_provider, token)) in rate_providers
+                .iter()
+                .zip(pool_tokens_for_logging.iter())
+                .enumerate()
+            {
                 if *rate_provider == H160::zero() {
                     rates.push(U256::exp10(18)); // Default rate of 1.0 as rate provider is not set
                 } else {
