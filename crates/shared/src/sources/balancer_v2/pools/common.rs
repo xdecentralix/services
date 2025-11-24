@@ -185,12 +185,13 @@ impl<Factory> PoolInfoFetcher<Factory> {
                         Ok(rate) => rates.push(rate),
                         Err(error) => {
                             tracing::warn!(
-                                rate_provider = format!("{:#x}", rate_provider),
-                                pool_address = format!("{:#x}", pool_address),
-                                token = format!("{:#x}", token),
-                                token_index,
                                 ?error,
-                                "rate provider call failed, using default rate of 1.0"
+                                "rate provider call failed, using default rate of 1.0 | \
+                                 rate_provider={:#x} pool={:#x} token={:#x} token_index={}",
+                                rate_provider,
+                                pool_address,
+                                token,
+                                token_index
                             );
                             rates.push(U256::exp10(18)); // Default on error
                         }
