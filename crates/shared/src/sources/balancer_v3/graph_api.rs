@@ -9,11 +9,7 @@
 //!   from the node
 
 /// Page size for pagination when fetching pools from the V3 API.
-/// Set to 250 as a balance between:
-/// - Performance: 3 requests for ~652 pools (vs 7 requests with size 100)
-/// - Resilience: Can handle growth to 2,500 pools before requiring changes
-/// - Safety: Avoids silently missing pools if count exceeds a single page
-const QUERY_PAGE_SIZE: usize = 250;
+const QUERY_PAGE_SIZE: usize = 100;
 
 /// Custom deserializer that converts empty strings to None for optional SBfp
 /// fields. This ensures consistency with V2 and provides robust handling of any
@@ -156,7 +152,7 @@ impl BalancerApiClient {
                 .await?
                 .aggregator_pools;
 
-            let no_more_pages = page.is_empty();
+            let no_more_pages = page.len() != QUERY_PAGE_SIZE;
             pools.extend(page);
 
             if no_more_pages {
