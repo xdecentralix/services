@@ -21,8 +21,8 @@ use {
     std::{
         collections::HashMap,
         sync::{
-            atomic::{AtomicUsize, Ordering},
             Arc,
+            atomic::{AtomicUsize, Ordering},
         },
     },
 };
@@ -204,7 +204,7 @@ impl BalancerApiClient {
             // Fetch details with controlled concurrency to avoid rate limits
             let total_to_fetch = pools_needing_details.len();
             let processed = Arc::new(AtomicUsize::new(0));
-            
+
             let enriched_pools = stream::iter(pools_needing_details)
                 .map(|(idx, pool_id, pool_type)| async move {
                     let detailed = self.get_pool_details(&pool_id, &pool_type).await;
@@ -247,7 +247,7 @@ impl BalancerApiClient {
                     }
                 }
             }
-            
+
             tracing::info!(
                 "Completed pool enrichment: {}/{} successful, {} failed",
                 successful,
