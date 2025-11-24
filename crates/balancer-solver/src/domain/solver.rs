@@ -47,6 +47,17 @@ pub struct Config {
     pub vault_address: Option<eth::Address>,
     pub batch_router_address: Option<eth::Address>,
     pub node_url: Option<Url>,
+    pub logging: LoggingConfig,
+}
+
+#[derive(Clone)]
+pub struct LoggingConfig {
+    pub auction_files: bool,
+    pub competition: bool,
+    pub swap_logs: bool,
+    pub swap_log_verification: bool,
+    pub solution_verification: bool,
+    pub enhanced_solutions: bool,
 }
 
 struct Inner {
@@ -94,6 +105,9 @@ struct Inner {
 
     /// Optional solution verifier for on-chain quote verification
     verifier: Option<crate::infra::solution_verifier::SolutionVerifier>,
+
+    /// Logging and verification feature toggles
+    logging: LoggingConfig,
 }
 
 impl Solver {
@@ -177,6 +191,7 @@ impl Solver {
             liquidity_client,
             auction_save_directory: config.auction_save_directory,
             verifier,
+            logging: config.logging,
         }))
     }
 
@@ -227,6 +242,11 @@ impl Solver {
     /// Returns a reference to the solution verifier if configured
     pub fn verifier(&self) -> Option<&crate::infra::solution_verifier::SolutionVerifier> {
         self.0.verifier.as_ref()
+    }
+
+    /// Returns logging configuration
+    pub fn logging(&self) -> &LoggingConfig {
+        &self.0.logging
     }
 
     /// Solves the specified auction, returning a vector of all possible

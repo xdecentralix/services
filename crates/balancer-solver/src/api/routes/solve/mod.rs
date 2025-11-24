@@ -67,6 +67,24 @@ pub async fn solve(
             );
         }
         let liquidity_client = state.liquidity_client();
+        let logging = state.logging().clone();
+        let save_dir = state.auction_save_directory().map(|p| p.to_path_buf());
+        let swap_logger = if logging.swap_logs && save_dir.is_some() {
+            Some(crate::boundary::swap_logger::SwapLogger::new())
+        } else {
+            None
+        };
+        let verifier = state.verifier().cloned();
+        let swap_log_verifier = if logging.swap_log_verification {
+            verifier.clone()
+        } else {
+            None
+        };
+        let solution_verifier = if logging.solution_verification {
+            verifier
+        } else {
+            None
+        };
 
         // Get base tokens and protocols from solver configuration if available
         let base_tokens = {
@@ -87,7 +105,7 @@ pub async fn solve(
             liquidity_client,
             base_tokens.as_deref(),
             protocols.as_deref(),
-            state.auction_save_directory(),
+            save_dir.as_deref(),
         )
         .await
         {
@@ -102,11 +120,6 @@ pub async fn solve(
         };
 
         let auction_id = auction.id;
-
-        // Create swap logger if auction save directory is configured
-        let swap_logger = state
-            .auction_save_directory()
-            .map(|_| crate::boundary::swap_logger::SwapLogger::new());
 
         let solutions = state
             .solve_with_logger(auction, swap_logger.clone())
@@ -139,112 +152,137 @@ pub async fn solve(
         );
 
         // Save auction and solutions to JSON if configured (non-blocking)
-        if let (Some(save_dir), Some(auction_json)) = (state.auction_save_directory(), auction_json)
-        {
+        if let (Some(save_dir), Some(auction_json)) = (save_dir.clone(), auction_json) {
             let solutions_json = serde_json::to_value(&solutions_dto).ok();
-            let save_dir = save_dir.to_path_buf();
             let save_dir_for_competition = save_dir.clone();
             let save_dir_for_enhanced = save_dir.clone();
-            let save_dir_for_verify = save_dir.clone();
+            let save_dir_for_enhanced_verify = save_dir.clone();
+            let save_dir_for_base_verify = save_dir.clone();
             let save_dir_for_swap_log = save_dir.clone();
             let save_dir_for_swap_log_verify = save_dir.clone();
+            let save_dir_for_auction_files = save_dir.clone();
 
-            tokio::spawn(async move {
-                if let Some(solutions) = solutions_json {
-                    save_auction_and_solutions(auction_json, solutions, &save_dir).await;
-                }
-            });
+            if logging.auction_files {
+                tokio::spawn(async move {
+                    if let Some(solutions) = solutions_json {
+                        save_auction_and_solutions(
+                            auction_json,
+                            solutions,
+                            &save_dir_for_auction_files,
+                        )
+                        .await;
+                    }
+                });
+            }
 
             // Save swap log if logger was used, and optionally verify it
-            if let Some(logger) = swap_logger {
-                let swap_records = logger.get_records();
-                if !swap_records.is_empty() {
-                    let auction_id_num = match auction_id {
-                        crate::domain::auction::Id::Solve(id) => Some(id),
-                        crate::domain::auction::Id::Quote => None,
-                    };
-                    let verifier_for_swap_log = state.verifier().cloned();
+            if logging.swap_logs {
+                if let Some(logger) = swap_logger.clone() {
+                    let swap_records = logger.get_records();
+                    if !swap_records.is_empty() {
+                        let auction_id_num = match auction_id {
+                            crate::domain::auction::Id::Solve(id) => Some(id),
+                            crate::domain::auction::Id::Quote => None,
+                        };
+                        let verifier_for_swap_log = swap_log_verifier.clone();
 
-                    tokio::spawn(async move {
-                        save_swap_log(swap_records.clone(), auction_id_num, &save_dir_for_swap_log)
-                            .await;
-
-                        // Verify swap log if verifier is configured
-                        if let Some(verifier) = verifier_for_swap_log {
-                            verify_and_save_swap_log(
-                                swap_records,
+                        tokio::spawn(async move {
+                            save_swap_log(
+                                swap_records.clone(),
                                 auction_id_num,
-                                verifier,
-                                &save_dir_for_swap_log_verify,
+                                &save_dir_for_swap_log,
                             )
                             .await;
+
+                            // Verify swap log if verifier is configured
+                            if let Some(verifier) = verifier_for_swap_log {
+                                verify_and_save_swap_log(
+                                    swap_records,
+                                    auction_id_num,
+                                    verifier,
+                                    &save_dir_for_swap_log_verify,
+                                )
+                                .await;
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Spawn background task to fetch competition data
+            if logging.competition {
+                let cow_api_url = state.cow_api_base_url();
+                tokio::spawn(async move {
+                    fetch_and_save_competition_data(
+                        auction_id,
+                        cow_api_url,
+                        &save_dir_for_competition,
+                    )
+                    .await;
+                });
+            }
+
+            // Spawn background task to create enhanced solutions if liquidity was fetched
+            // If verifier is also configured, verify using the enhanced solutions
+            let had_liquidity = fetched_liquidity.is_some();
+            if logging.enhanced_solutions {
+                if let Some(liq_response) = fetched_liquidity {
+                    let verifier_opt = solution_verifier.clone();
+                    let solutions_json_for_enhanced = serde_json::to_value(&solutions_dto).ok();
+
+                    tokio::spawn(async move {
+                        if let Some(solutions_json) = solutions_json_for_enhanced {
+                            // Deserialize back to Solutions for the function
+                            if let Ok(solutions_for_enhance) =
+                                serde_json::from_value::<dto::Solutions>(solutions_json)
+                            {
+                                // Create enhanced solutions with liquidityDetails
+                                let enhanced = dto::auction::create_enhanced_solutions(
+                                    &solutions_for_enhance,
+                                    &liq_response,
+                                );
+
+                                // Save enhanced solutions file
+                                save_enhanced_solutions_json(
+                                    enhanced.clone(),
+                                    auction_id,
+                                    &save_dir_for_enhanced,
+                                )
+                                .await;
+
+                                // Verify using enhanced solutions if verifier is configured
+                                if let Some(verifier) = verifier_opt {
+                                    verify_and_save_solutions(
+                                        enhanced,
+                                        verifier,
+                                        auction_id,
+                                        &save_dir_for_enhanced_verify,
+                                    )
+                                    .await;
+                                }
+                            }
                         }
                     });
                 }
             }
 
-            // Spawn background task to fetch competition data
-            let cow_api_url = state.cow_api_base_url();
-            tokio::spawn(async move {
-                fetch_and_save_competition_data(auction_id, cow_api_url, &save_dir_for_competition)
-                    .await;
-            });
-
-            // Spawn background task to create enhanced solutions if liquidity was fetched
-            // If verifier is also configured, verify using the enhanced solutions
-            if let Some(liq_response) = fetched_liquidity {
-                let verifier_opt = state.verifier().cloned();
-                let solutions_json_for_enhanced = serde_json::to_value(&solutions_dto).ok();
-
-                tokio::spawn(async move {
-                    if let Some(solutions_json) = solutions_json_for_enhanced {
-                        // Deserialize back to Solutions for the function
-                        if let Ok(solutions_for_enhance) =
-                            serde_json::from_value::<dto::Solutions>(solutions_json)
-                        {
-                            // Create enhanced solutions with liquidityDetails
-                            let enhanced = dto::auction::create_enhanced_solutions(
-                                &solutions_for_enhance,
-                                &liq_response,
-                            );
-
-                            // Save enhanced solutions file
-                            save_enhanced_solutions_json(
-                                enhanced.clone(),
+            if let Some(verifier) = solution_verifier {
+                // No liquidity fetched or enhanced solutions disabled - verify basic solutions
+                let should_skip_base = logging.enhanced_solutions && had_liquidity;
+                let solutions_json_for_verify = serde_json::to_value(&solutions_dto).ok();
+                if !should_skip_base {
+                    tokio::spawn(async move {
+                        if let Some(solutions_json) = solutions_json_for_verify {
+                            verify_and_save_solutions(
+                                solutions_json,
+                                verifier,
                                 auction_id,
-                                &save_dir_for_enhanced,
+                                &save_dir_for_base_verify,
                             )
                             .await;
-
-                            // Verify using enhanced solutions if verifier is configured
-                            if let Some(verifier) = verifier_opt {
-                                verify_and_save_solutions(
-                                    enhanced,
-                                    verifier,
-                                    auction_id,
-                                    &save_dir_for_verify,
-                                )
-                                .await;
-                            }
                         }
-                    }
-                });
-            } else if let Some(verifier) = state.verifier() {
-                // No liquidity fetched, but verifier configured - use basic solutions
-                let solutions_json_for_verify = serde_json::to_value(&solutions_dto).ok();
-                let verifier = verifier.clone();
-
-                tokio::spawn(async move {
-                    if let Some(solutions_json) = solutions_json_for_verify {
-                        verify_and_save_solutions(
-                            solutions_json,
-                            verifier,
-                            auction_id,
-                            &save_dir_for_verify,
-                        )
-                        .await;
-                    }
-                });
+                    });
+                }
             }
         }
 

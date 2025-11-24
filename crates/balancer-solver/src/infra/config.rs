@@ -73,6 +73,34 @@ struct Config {
 
     /// Node URL for solution verification
     node_url: Option<Url>,
+
+    /// Feature toggles for logging and verification artifacts
+    #[serde(default)]
+    logging: LoggingSection,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "kebab-case", default)]
+struct LoggingSection {
+    auction_files: bool,
+    competition: bool,
+    swap_logs: bool,
+    swap_log_verification: bool,
+    solution_verification: bool,
+    enhanced_solutions: bool,
+}
+
+impl Default for LoggingSection {
+    fn default() -> Self {
+        Self {
+            auction_files: true,
+            competition: true,
+            swap_logs: true,
+            swap_log_verification: true,
+            solution_verification: true,
+            enhanced_solutions: true,
+        }
+    }
 }
 
 /// Configuration for the liquidity client
@@ -141,6 +169,14 @@ pub async fn load(path: &Path) -> solver::Config {
         vault_address: config.vault_address.map(eth::Address),
         batch_router_address: config.batch_router_address.map(eth::Address),
         node_url: config.node_url,
+        logging: solver::LoggingConfig {
+            auction_files: config.logging.auction_files,
+            competition: config.logging.competition,
+            swap_logs: config.logging.swap_logs,
+            swap_log_verification: config.logging.swap_log_verification,
+            solution_verification: config.logging.solution_verification,
+            enhanced_solutions: config.logging.enhanced_solutions,
+        },
     }
 }
 
