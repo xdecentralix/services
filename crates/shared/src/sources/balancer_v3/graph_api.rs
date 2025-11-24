@@ -143,9 +143,8 @@ impl BalancerApiClient {
                         "orderDirection" => "desc",
                         "where" => json!({
                             "chainIn": [self.chain],
-                            "protocolVersionIn": [3] // V3 protocol
-                            // Using poolGetPools instead of aggregatorPools to get all pools
-                            // StableSurge pools can be identified by checking hook field
+                            "protocolVersionIn": [3], // V3 protocol
+                            "minTvl": 50.0
                         }),
                     }),
                 )
