@@ -320,6 +320,7 @@ pub struct ForeignLimitOrder {
 #[serde(rename_all = "camelCase")]
 pub struct Erc4626Edge {
     pub id: String,
+    pub address: H160,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub vault: H160,

@@ -348,7 +348,7 @@ mod erc4626 {
     pub fn to_domain(edge: &Erc4626Edge) -> Result<liquidity::Liquidity, Error> {
         Ok(liquidity::Liquidity {
             id: liquidity::Id(edge.id.clone()),
-            address: edge.vault,
+            address: edge.address,
             gas: eth::Gas(edge.gas_estimate),
             state: liquidity::State::Erc4626(liquidity::erc4626::Edge {
                 asset: eth::TokenAddress(edge.asset),

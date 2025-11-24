@@ -705,6 +705,7 @@ pub fn new(
                         solvers_dto::auction::Liquidity::Erc4626(
                             solvers_dto::auction::Erc4626Edge {
                                 id: liquidity.id.0.to_string(),
+                                address: edge.tokens.1.0.into(), // vault address
                                 gas_estimate: liquidity.gas.into(),
                                 vault: edge.tokens.1.0.into(),
                                 asset: edge.tokens.0.0.into(),
