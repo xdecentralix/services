@@ -76,11 +76,21 @@ pub async fn solve(
         };
         let verifier = state.verifier().cloned();
         let swap_log_verifier = if logging.swap_log_verification {
+            if verifier.is_some() {
+                tracing::debug!("🔍 Swap log verification enabled with verifier");
+            } else {
+                tracing::warn!("⚠️  Swap log verification enabled but NO VERIFIER configured");
+            }
             verifier.clone()
         } else {
             None
         };
         let solution_verifier = if logging.solution_verification {
+            if verifier.is_some() {
+                tracing::debug!("🔍 Solution verification enabled with verifier");
+            } else {
+                tracing::warn!("⚠️  Solution verification enabled but NO VERIFIER configured");
+            }
             verifier
         } else {
             None

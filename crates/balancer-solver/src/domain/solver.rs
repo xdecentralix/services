@@ -155,11 +155,17 @@ impl Solver {
 
         // Create solution verifier if vault and batch router addresses are provided
         let verifier = match (
-            config.vault_address,
-            config.batch_router_address,
-            config.node_url,
+            &config.vault_address,
+            &config.batch_router_address,
+            &config.node_url,
         ) {
-            (Some(vault_addr), Some(batch_router_addr), Some(ref node_url)) => {
+            (Some(vault_addr), Some(batch_router_addr), Some(node_url)) => {
+                tracing::info!(
+                    vault = ?vault_addr,
+                    batch_router = ?batch_router_addr,
+                    node_url = %node_url,
+                    "✅ Creating solution verifier with on-chain verification"
+                );
                 let web3 =
                     ethrpc::web3(Default::default(), Default::default(), node_url, "verifier");
                 let vault = contracts::alloy::BalancerV2Vault::Instance::new(
@@ -176,7 +182,15 @@ impl Solver {
                     web3,
                 ))
             }
-            _ => None,
+            _ => {
+                tracing::warn!(
+                    vault_address = ?config.vault_address,
+                    batch_router_address = ?config.batch_router_address,
+                    node_url = ?config.node_url,
+                    "⚠️  Solution verifier NOT created - missing configuration"
+                );
+                None
+            }
         };
 
         Self(Arc::new(Inner {
