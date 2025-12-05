@@ -310,14 +310,31 @@ impl SolutionVerifier {
 
         // Check if this is an ERC4626 vault swap - verify with preview functions
         if kind == "erc4626" {
-            let quote_result = self
-                .quote_erc4626_swap(
-                    &pool_address,
-                    H160::from(input_token.0),
-                    H160::from(output_token.0),
-                    input_amount,
-                )
-                .await;
+            let input_h160 = H160::from(input_token.0);
+            let output_h160 = H160::from(output_token.0);
+
+            // For ERC4626, the vault address is one of the tokens (not pool_address which
+            // is 0x0). Determine vault address by trying both tokens:
+            // - For unwrap (vault → asset): input is vault
+            // - For wrap (asset → vault): output is vault
+            let quote_result = if pool_address != "0x0000000000000000000000000000000000000000" {
+                self.quote_erc4626_swap(&pool_address, input_h160, output_h160, input_amount)
+                    .await
+            } else {
+                // Try input first (unwrap case), then output (wrap case)
+                let input_addr = format!("{:#x}", input_h160);
+                match self
+                    .quote_erc4626_swap(&input_addr, input_h160, output_h160, input_amount)
+                    .await
+                {
+                    Ok(result) => Ok(result),
+                    Err(_) => {
+                        let output_addr = format!("{:#x}", output_h160);
+                        self.quote_erc4626_swap(&output_addr, input_h160, output_h160, input_amount)
+                            .await
+                    }
+                }
+            };
 
             match quote_result {
                 Ok((quoted_amount, _call_details)) => {
@@ -617,7 +634,7 @@ impl SolutionVerifier {
         input_token: H160,
         output_token: H160,
         input_amount: U256,
-    ) -> Result<(String, ContractCallDetails), Box<dyn std::error::Error>> {
+    ) -> Result<(String, ContractCallDetails), Box<dyn std::error::Error + Send + Sync>> {
         // Parse pool ID (it's a hex string starting with 0x)
         let pool_id_bytes = if balancer_pool_id.starts_with("0x") {
             const_hex::decode(&balancer_pool_id[2..])?
@@ -736,7 +753,7 @@ impl SolutionVerifier {
         input_token: H160,
         output_token: H160,
         input_amount: U256,
-    ) -> Result<(String, ContractCallDetails), Box<dyn std::error::Error>> {
+    ) -> Result<(String, ContractCallDetails), Box<dyn std::error::Error + Send + Sync>> {
         // Parse pool address from string
         let pool_address: H160 = pool_address_str.parse()?;
 
@@ -811,7 +828,7 @@ impl SolutionVerifier {
         input_token: H160,
         output_token: H160,
         input_amount: U256,
-    ) -> Result<(String, ContractCallDetails), Box<dyn std::error::Error>> {
+    ) -> Result<(String, ContractCallDetails), Box<dyn std::error::Error + Send + Sync>> {
         // Parse vault address
         let vault_address: H160 = vault_address_str.parse()?;
 
