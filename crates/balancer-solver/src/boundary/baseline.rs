@@ -456,29 +456,19 @@ fn to_boundary_liquidity(
                 }
                 liquidity::State::Erc4626(edge) => {
                     if let Some(web3) = erc4626_web3 {
+                        // Create boundary edge with explicit vault and asset addresses
                         let edge_boundary =
                             boundary_erc4626::Edge::new(web3, edge.vault.0, edge.asset.0);
-                        if let Some(pair_fw) =
+                        // Create a single TokenPair for both directions (TokenPair is symmetric)
+                        if let Some(pair) =
                             TokenPair::new(edge.asset.0.into_alloy(), edge.vault.0.into_alloy())
                         {
                             onchain_liquidity
-                                .entry(pair_fw)
+                                .entry(pair)
                                 .or_default()
                                 .push(OnchainLiquidity {
                                     id: liquidity.id.clone(),
-                                    token_pair: pair_fw,
-                                    source: LiquiditySource::Erc4626(edge_boundary.clone()),
-                                });
-                        }
-                        if let Some(pair_bw) =
-                            TokenPair::new(edge.vault.0.into_alloy(), edge.asset.0.into_alloy())
-                        {
-                            onchain_liquidity
-                                .entry(pair_bw)
-                                .or_default()
-                                .push(OnchainLiquidity {
-                                    id: liquidity.id.clone(),
-                                    token_pair: pair_bw,
+                                    token_pair: pair,
                                     source: LiquiditySource::Erc4626(edge_boundary),
                                 });
                         }
