@@ -150,24 +150,14 @@ pub async fn load(path: &Path) -> solver::Config {
         ),
     };
 
-    // Build base tokens, including ERC4626 vault addresses if configured.
-    // This enables routing through ERC4626 vaults as intermediate hops.
-    let mut base_tokens: Vec<eth::TokenAddress> = config
-        .base_tokens
-        .into_iter()
-        .map(eth::TokenAddress)
-        .collect();
-
-    // Add ERC4626 vault addresses to base tokens for routing
-    if let Some(chain_id) = config.chain_id {
-        let erc4626_vaults = get_erc4626_vault_addresses(chain_id);
-        base_tokens.extend(erc4626_vaults.into_iter().map(eth::TokenAddress));
-    }
-
     solver::Config {
         chain_id: config.chain_id.map(|c| c as u64).unwrap_or(1),
         weth,
-        base_tokens,
+        base_tokens: config
+            .base_tokens
+            .into_iter()
+            .map(eth::TokenAddress)
+            .collect(),
         max_hops: config.max_hops,
         max_partial_attempts: config.max_partial_attempts,
         solution_gas_offset: config.solution_gas_offset.into(),
@@ -187,53 +177,6 @@ pub async fn load(path: &Path) -> solver::Config {
             solution_verification: config.logging.solution_verification,
             enhanced_solutions: config.logging.enhanced_solutions,
         },
-    }
-}
-
-/// Returns the ERC4626 vault addresses from the config file if enabled.
-/// These are added to base tokens to enable routing through vaults.
-fn get_erc4626_vault_addresses(chain: Chain) -> Vec<eth::H160> {
-    let config_dir = match chain {
-        Chain::ArbitrumOne => "arbitrum",
-        Chain::Mainnet => "mainnet",
-        Chain::Goerli => "goerli",
-        Chain::Sepolia => "sepolia",
-        Chain::Gnosis => "gnosis",
-        Chain::Base => "base",
-        Chain::Bnb => "bnb",
-        Chain::Avalanche => "avalanche",
-        Chain::Optimism => "optimism",
-        Chain::Polygon => "polygon",
-        Chain::Hardhat => "hardhat",
-        Chain::Lens => "lens",
-        Chain::Linea => "linea",
-        Chain::Plasma => "plasma",
-    };
-
-    let primary_path = format!("configs/{}/erc4626.toml", config_dir);
-    let fallback_path = format!("../{}", primary_path);
-
-    let config = shared::sources::erc4626::registry::load_config_from_file(std::path::Path::new(
-        &primary_path,
-    ))
-    .or_else(|_| {
-        shared::sources::erc4626::registry::load_config_from_file(std::path::Path::new(
-            &fallback_path,
-        ))
-    });
-
-    match config {
-        Ok(cfg) if cfg.enabled => {
-            tracing::debug!(
-                vault_count = cfg.vaults.len(),
-                "Adding ERC4626 vault tokens to base tokens"
-            );
-            cfg.vaults.into_iter().map(eth::H160::from).collect()
-        }
-        _ => {
-            tracing::debug!("ERC4626 not enabled; no vault tokens added to base tokens");
-            vec![]
-        }
     }
 }
 

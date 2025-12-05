@@ -111,26 +111,18 @@ impl Fetcher {
         )
         .await?;
 
-        // Optionally include ERC4626 liquidity source if configured
-        let erc4626_sources = erc4626::maybe_collector(eth).await?;
-
-        // Build base tokens, including ERC4626 vault addresses if configured.
-        // This enables routing through ERC4626 vaults as intermediate hops.
-        let mut base_token_list: Vec<eth::H160> = config
-            .base_tokens
-            .iter()
-            .copied()
-            .map(eth::H160::from)
-            .collect();
-
-        // Add ERC4626 vault addresses to base tokens for routing
-        let erc4626_vaults = erc4626::get_vault_addresses(&eth.chain());
-        base_token_list.extend(erc4626_vaults);
-
         let base_tokens = BaseTokens::new(
             eth.contracts().weth().address().into_legacy(),
-            &base_token_list,
+            &config
+                .base_tokens
+                .iter()
+                .copied()
+                .map(eth::H160::from)
+                .collect::<Vec<_>>(),
         );
+
+        // Optionally include ERC4626 liquidity source if configured
+        let erc4626_sources = erc4626::maybe_collector(eth).await?;
 
         Ok(Self {
             blocks: block_stream.clone(),
