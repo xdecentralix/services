@@ -40,11 +40,21 @@ impl LiquidityCollecting for LiquidityCollector {
         let mut pairs = self.base_tokens.relevant_pairs(pairs.into_iter());
 
         // Expand with ERC4626 vault pairs when underlying asset is relevant.
-        // This enables routing through vault token pools (e.g., wstETH-USDC).
+        // This enables routing through vault token pools (e.g., wstETH-USDC)
+        // and boosted pools (pools containing multiple vault tokens).
         if !self.erc4626_vault_pairs.is_empty() {
             // Collect tokens as owned values to avoid borrow conflicts when mutating pairs
             let relevant_tokens: HashSet<_> =
                 pairs.iter().flat_map(|p| p.into_iter()).copied().collect();
+
+            // First pass: collect all "relevant vaults" - vaults whose underlying
+            // asset appears in the relevant tokens
+            let relevant_vaults: Vec<_> = self
+                .erc4626_vault_pairs
+                .iter()
+                .filter(|(_, asset)| relevant_tokens.contains(&asset.into_alloy()))
+                .map(|(vault, _)| vault.into_alloy())
+                .collect();
 
             for (vault, asset) in &self.erc4626_vault_pairs {
                 let asset_alloy = asset.into_alloy();
@@ -66,10 +76,21 @@ impl LiquidityCollecting for LiquidityCollector {
                 }
             }
 
+            // Second pass: add vault-to-vault pairs to enable fetching boosted pools
+            // (pools where all tokens are ERC4626 vaults, e.g., steakUSDC-steakUSDT)
+            for i in 0..relevant_vaults.len() {
+                for j in (i + 1)..relevant_vaults.len() {
+                    if let Some(pair) = TokenPair::new(relevant_vaults[i], relevant_vaults[j]) {
+                        pairs.insert(pair);
+                    }
+                }
+            }
+
             tracing::debug!(
                 vault_count = self.erc4626_vault_pairs.len(),
+                relevant_vault_count = relevant_vaults.len(),
                 expanded_pair_count = pairs.len(),
-                "Expanded pairs with ERC4626 vault tokens"
+                "Expanded pairs with ERC4626 vault tokens (including vault-to-vault)"
             );
         }
 
