@@ -73,7 +73,7 @@ pub fn new(
                     limit_order.order.taker_token.into(),
                 ]
             }
-            liquidity::Kind::Erc4626(edge) => vec![edge.tokens.0, edge.tokens.1],
+            liquidity::Kind::Erc4626(edge) => vec![edge.asset, edge.vault],
         })
     {
         tokens.entry(token.into()).or_insert_with(Default::default);
@@ -705,10 +705,10 @@ pub fn new(
                         solvers_dto::auction::Liquidity::Erc4626(
                             solvers_dto::auction::Erc4626Edge {
                                 id: liquidity.id.0.to_string(),
-                                address: edge.tokens.1.0.into(), // vault address
+                                address: edge.vault.0.into(), // vault address
                                 gas_estimate: liquidity.gas.into(),
-                                vault: edge.tokens.1.0.into(),
-                                asset: edge.tokens.0.0.into(),
+                                vault: edge.vault.0.into(),
+                                asset: edge.asset.0.into(),
                             },
                         )
                     }

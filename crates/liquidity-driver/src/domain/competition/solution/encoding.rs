@@ -404,9 +404,10 @@ pub fn liquidity_interaction(
         }
         liquidity::Kind::ZeroEx(limit_order) => limit_order.to_interaction(&input).ok(),
         liquidity::Kind::Erc4626(edge) => {
-            // Decide direction by tokens: input.0.token -> output.0.token
+            // Decide direction by explicit asset/vault: asset -> vault wraps, vault ->
+            // asset unwraps.
             let (sell, buy) = (input.0.token, output.0.token);
-            if edge.tokens.0 == sell && edge.tokens.1 == buy {
+            if edge.asset == sell && edge.vault == buy {
                 // Wrap: mint shares_out to settlement, with bounded approve emitted separately
                 crate::boundary::liquidity::erc4626::to_wrap_interaction(
                     &input,
@@ -414,7 +415,7 @@ pub fn liquidity_interaction(
                     &settlement_contract.into(),
                 )
                 .ok()
-            } else if edge.tokens.0 == buy && edge.tokens.1 == sell {
+            } else if edge.vault == sell && edge.asset == buy {
                 // Unwrap: withdraw assets_out to settlement
                 crate::boundary::liquidity::erc4626::to_unwrap_interaction(
                     &input,
@@ -609,7 +610,8 @@ mod test {
             id: dl::Id(0),
             gas: eth::Gas(90_000.into()),
             kind: dl::Kind::Erc4626(dl::erc4626::Edge {
-                tokens: (asset.into(), vault.into()),
+                asset: asset.into(),
+                vault: vault.into(),
             }),
         };
         // Note: we validate via direct allowances() and interaction selector; no need
