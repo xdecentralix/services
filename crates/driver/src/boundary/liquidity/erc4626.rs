@@ -35,6 +35,37 @@ fn chain_to_config_dir(chain: &Chain) -> &'static str {
     }
 }
 
+/// Returns the ERC4626 vault addresses from the config file if enabled.
+/// These should be added to base tokens to enable routing through vaults.
+pub fn get_vault_addresses(chain: &Chain) -> Vec<eth::H160> {
+    let config_dir = chain_to_config_dir(chain);
+    let primary_path = format!("configs/{}/erc4626.toml", config_dir);
+    let fallback_path = format!("../{}", primary_path);
+
+    let config = shared::sources::erc4626::registry::load_config_from_file(std::path::Path::new(
+        &primary_path,
+    ))
+    .or_else(|_| {
+        shared::sources::erc4626::registry::load_config_from_file(std::path::Path::new(
+            &fallback_path,
+        ))
+    });
+
+    match config {
+        Ok(cfg) if cfg.enabled => {
+            tracing::debug!(
+                vault_count = cfg.vaults.len(),
+                "Adding ERC4626 vault tokens to base tokens"
+            );
+            cfg.vaults.into_iter().map(eth::H160::from).collect()
+        }
+        _ => {
+            tracing::debug!("ERC4626 not enabled; no vault tokens added to base tokens");
+            vec![]
+        }
+    }
+}
+
 /// Builds the ERC4626 liquidity collector if enabled via
 /// configs/<chain>/erc4626.toml.
 pub async fn maybe_collector(eth: &Ethereum) -> AnyResult<Vec<Box<dyn LiquidityCollecting>>> {
