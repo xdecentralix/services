@@ -1,6 +1,8 @@
 use {
     crate::liquidity::Liquidity,
     anyhow::Result,
+    ethcontract::H160,
+    ethrpc::alloy::conversions::IntoAlloy,
     model::TokenPair,
     shared::{baseline_solver::BaseTokens, recent_block_cache::Block},
     std::{collections::HashSet, future::Future, sync::Arc, time::Duration},
@@ -20,6 +22,11 @@ pub trait LiquidityCollecting: Send + Sync {
 pub struct LiquidityCollector {
     pub liquidity_sources: Vec<Box<dyn LiquidityCollecting>>,
     pub base_tokens: Arc<BaseTokens>,
+    /// ERC4626 vault pairs (vault, asset) used for pair expansion.
+    /// When the underlying asset appears in any requested pair, we expand
+    /// to include (vault, asset) and (vault, other_token) pairs to enable
+    /// routing through vault token pools.
+    pub erc4626_vault_pairs: Vec<(H160, H160)>,
 }
 
 #[async_trait::async_trait]
@@ -30,7 +37,42 @@ impl LiquidityCollecting for LiquidityCollector {
         pairs: HashSet<TokenPair>,
         at_block: Block,
     ) -> Result<Vec<Liquidity>> {
-        let pairs = self.base_tokens.relevant_pairs(pairs.into_iter());
+        let mut pairs = self.base_tokens.relevant_pairs(pairs.into_iter());
+
+        // Expand with ERC4626 vault pairs when underlying asset is relevant.
+        // This enables routing through vault token pools (e.g., wstETH-USDC).
+        if !self.erc4626_vault_pairs.is_empty() {
+            // Collect tokens as owned values to avoid borrow conflicts when mutating pairs
+            let relevant_tokens: HashSet<_> =
+                pairs.iter().flat_map(|p| p.into_iter()).copied().collect();
+
+            for (vault, asset) in &self.erc4626_vault_pairs {
+                let asset_alloy = asset.into_alloy();
+                if relevant_tokens.contains(&asset_alloy) {
+                    let vault_alloy = vault.into_alloy();
+
+                    // Add the (vault, asset) pair for wrap/unwrap
+                    if let Some(pair) = TokenPair::new(vault_alloy, asset_alloy) {
+                        pairs.insert(pair);
+                    }
+
+                    // Add vault pairs with other relevant tokens for routing
+                    // through pools like vault-USDC, vault-DAI, etc.
+                    for token in &relevant_tokens {
+                        if let Some(pair) = TokenPair::new(vault_alloy, *token) {
+                            pairs.insert(pair);
+                        }
+                    }
+                }
+            }
+
+            tracing::debug!(
+                vault_count = self.erc4626_vault_pairs.len(),
+                expanded_pair_count = pairs.len(),
+                "Expanded pairs with ERC4626 vault tokens"
+            );
+        }
+
         let futures = self
             .liquidity_sources
             .iter()

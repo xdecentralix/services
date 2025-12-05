@@ -122,7 +122,7 @@ impl Fetcher {
         );
 
         // Optionally include ERC4626 liquidity source if configured
-        let erc4626_sources = erc4626::maybe_collector(eth).await?;
+        let (erc4626_sources, erc4626_vault_pairs) = erc4626::maybe_collector(eth).await?;
 
         Ok(Self {
             blocks: block_stream.clone(),
@@ -140,6 +140,7 @@ impl Fetcher {
                 .flatten()
                 .collect(),
                 base_tokens: Arc::new(base_tokens),
+                erc4626_vault_pairs,
             },
             swapr_routers,
         })

@@ -6,6 +6,7 @@ use {
     },
     anyhow::Result as AnyResult,
     chain::Chain,
+    ethcontract::H160,
     ethrpc::alloy::conversions::IntoLegacy,
     shared::sources::erc4626::registry::Erc4626Registry,
     solver::{
@@ -37,7 +38,11 @@ fn chain_to_config_dir(chain: &Chain) -> &'static str {
 
 /// Builds the ERC4626 liquidity collector if enabled via
 /// configs/<chain>/erc4626.toml.
-pub async fn maybe_collector(eth: &Ethereum) -> AnyResult<Vec<Box<dyn LiquidityCollecting>>> {
+/// Returns a tuple of (collectors, vault_pairs) where vault_pairs are (vault,
+/// asset) tuples used for pair expansion in the liquidity collector.
+pub async fn maybe_collector(
+    eth: &Ethereum,
+) -> AnyResult<(Vec<Box<dyn LiquidityCollecting>>, Vec<(H160, H160)>)> {
     // Try to load per-chain config file; if missing or disabled, return empty.
     let chain = eth.chain();
     let config_dir = chain_to_config_dir(&chain);
@@ -69,11 +74,23 @@ pub async fn maybe_collector(eth: &Ethereum) -> AnyResult<Vec<Box<dyn LiquidityC
                         fallback = %fallback_path,
                         "ERC4626 registry disabled or config file not found; skipping source"
                     );
-                    return Ok(vec![]);
+                    return Ok((vec![], vec![]));
                 }
             }
         }
     };
+
+    // Resolve all vault metadata to get (vault, asset) pairs for pair expansion
+    let vault_metas = registry.all().await;
+    let vault_pairs: Vec<(H160, H160)> = vault_metas
+        .iter()
+        .map(|meta| (meta.vault, meta.asset))
+        .collect();
+
+    tracing::debug!(
+        vault_count = vault_pairs.len(),
+        "Resolved ERC4626 vault pairs for pair expansion"
+    );
 
     let source = Erc4626LiquiditySource {
         web3,
@@ -89,7 +106,7 @@ pub async fn maybe_collector(eth: &Ethereum) -> AnyResult<Vec<Box<dyn LiquidityC
     };
     let collector =
         BackgroundInitLiquiditySource::new("erc4626", init, Duration::from_secs(5), None);
-    Ok(vec![Box::new(collector)])
+    Ok((vec![Box::new(collector)], vault_pairs))
 }
 
 pub fn to_domain(id: liquidity::Id, order: Erc4626Order) -> Result<liquidity::Liquidity> {
