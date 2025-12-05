@@ -56,15 +56,15 @@ impl Interaction {
                     liquidity::Kind::BalancerV3QuantAmm(pool) => pool.batch_router.into(),
                     liquidity::Kind::Swapr(pool) => pool.base.router.into(),
                     liquidity::Kind::ZeroEx(pool) => pool.zeroex.address().into_legacy(),
-                    liquidity::Kind::Erc4626(edge) => edge.vault.0.into(),
+                    liquidity::Kind::Erc4626(edge) => edge.tokens.1.0.into(),
                 };
                 match &interaction.liquidity.kind {
                     liquidity::Kind::Erc4626(edge) => {
                         // For ERC4626, only require bounded approval on wrap (asset->vault)
                         // direction. Wrap if input token equals asset and
                         // output token equals vault.
-                        if interaction.input.token == edge.asset
-                            && interaction.output.token == edge.vault
+                        if interaction.input.token == edge.tokens.0
+                            && interaction.output.token == edge.tokens.1
                         {
                             vec![
                                 eth::Allowance {

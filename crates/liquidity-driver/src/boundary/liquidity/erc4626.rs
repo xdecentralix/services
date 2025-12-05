@@ -94,40 +94,17 @@ pub async fn maybe_collector(eth: &Ethereum) -> AnyResult<Vec<Box<dyn LiquidityC
 
 pub fn to_domain(id: liquidity::Id, order: Erc4626Order) -> Result<liquidity::Liquidity> {
     // At this stage, amounts are populated during route realization; here we only
-    // carry tokens and handler wiring. Preserve explicit asset/vault direction.
-    let (t0, t1) = order.tokens.get();
-
-    // Prefer explicit data from wrap/unwrap; fall back to pair ordering with vault
-    // known.
-    let (asset, vault) = if let Some(wrap) = &order.wrap {
-        let asset_addr = wrap.underlying.address();
-        let vault_addr = wrap.vault.address();
-        (
-            eth::TokenAddress(asset_addr.into()),
-            eth::TokenAddress(vault_addr.into()),
-        )
-    } else if let Some(unwrap) = &order.unwrap {
-        let vault_addr = unwrap.vault.address();
-        let maybe_asset = if t0.into_legacy() == vault_addr {
-            t1
-        } else {
-            t0
-        };
-        (
-            eth::TokenAddress(maybe_asset.into_legacy().into()),
-            eth::TokenAddress(vault_addr.into()),
-        )
-    } else {
-        (
-            eth::TokenAddress(t0.into_legacy().into()),
-            eth::TokenAddress(t1.into_legacy().into()),
-        )
-    };
-
+    // carry tokens and handler wiring
+    let (a, b) = order.tokens.get();
     Ok(liquidity::Liquidity {
         id,
         gas: 90_000u64.into(),
-        kind: liquidity::Kind::Erc4626(liquidity::erc4626::Edge { asset, vault }),
+        kind: liquidity::Kind::Erc4626(liquidity::erc4626::Edge {
+            tokens: (
+                eth::TokenAddress(a.into_legacy().into()),
+                eth::TokenAddress(b.into_legacy().into()),
+            ),
+        }),
     })
 }
 
