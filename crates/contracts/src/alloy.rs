@@ -556,7 +556,6 @@ crate::bindings!(
         // Not available on Lens, Polygon, BNB
     }
 );
-// Note: BalancerV3ReClammPool cannot be generated with alloy due to ABI complexities
 crate::bindings!(
     BalancerV3ReClammPoolFactoryV2,
     crate::deployments! {

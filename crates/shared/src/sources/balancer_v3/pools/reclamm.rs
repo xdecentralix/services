@@ -7,41 +7,12 @@ use {
         swap::fixed_point::Bfp,
     },
     anyhow::{Result, anyhow},
-    contracts::alloy::BalancerV3ReClammPoolFactoryV2,
+    contracts::alloy::{BalancerV3ReClammPool, BalancerV3ReClammPoolFactoryV2},
     ethcontract::{BlockId, H160, U256},
     ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
 };
-
-// Minimal alloy interface for ReCLAMM pool dynamic data.
-// The full BalancerV3ReClammPool contract cannot be generated with alloy due to
-// ABI complexities, so we define only the function we need here.
-alloy::sol! {
-    #[sol(rpc)]
-    interface IReClammPoolDynamicData {
-        function getReClammPoolDynamicData() external view returns (
-            uint256[] memory balancesLiveScaled18,
-            uint256[] memory tokenRates,
-            uint256 staticSwapFeePercentage,
-            uint256 totalSupply,
-            uint256 lastTimestamp,
-            uint256[] memory lastVirtualBalances,
-            int256 dailyPriceShiftExponent,
-            uint256 dailyPriceShiftBase,
-            uint256 centerednessMargin,
-            uint256 currentPriceRatio,
-            uint256 currentFourthRootPriceRatio,
-            uint256 startFourthRootPriceRatio,
-            uint256 endFourthRootPriceRatio,
-            uint32 priceRatioUpdateStartTime,
-            uint32 priceRatioUpdateEndTime,
-            bool isPoolInitialized,
-            bool isPoolPaused,
-            bool isPoolInRecoveryMode
-        );
-    }
-}
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PoolInfo {
@@ -106,10 +77,7 @@ impl FactoryIndexing for BalancerV3ReClammPoolFactoryV2::Instance {
         common_pool_state: BoxFuture<'static, common::PoolState>,
         block: BlockId,
     ) -> BoxFuture<'static, Result<Option<Self::PoolState>>> {
-        // Use minimal alloy interface for the pool contract since full
-        // BalancerV3ReClammPool cannot be generated with alloy due to ABI
-        // complexities
-        let pool_contract = IReClammPoolDynamicData::IReClammPoolDynamicDataInstance::new(
+        let pool_contract = BalancerV3ReClammPool::Instance::new(
             pool_info.common.address.into_alloy(),
             self.provider().clone(),
         );
@@ -126,10 +94,10 @@ impl FactoryIndexing for BalancerV3ReClammPoolFactoryV2::Instance {
 
         async move {
             // Join the shared common state and pool-specific dynamic data
-            let (common, dynamic) = futures::try_join!(fetch_common, fetch_dynamic)?;
+            let (common, data) = futures::try_join!(fetch_common, fetch_dynamic)?;
 
             // Convert alloy types to legacy types
-            let last_virtual_balances: Vec<U256> = dynamic
+            let last_virtual_balances: Vec<U256> = data
                 .lastVirtualBalances
                 .into_iter()
                 .map(|v| v.into_legacy())
@@ -140,17 +108,17 @@ impl FactoryIndexing for BalancerV3ReClammPoolFactoryV2::Instance {
                 swap_fee: common.swap_fee,
                 version: Version::V2,
                 last_virtual_balances,
-                daily_price_shift_base: Bfp::from_wei(dynamic.dailyPriceShiftBase.into_legacy()),
-                last_timestamp: dynamic.lastTimestamp.into_legacy().low_u64(),
-                centeredness_margin: Bfp::from_wei(dynamic.centerednessMargin.into_legacy()),
+                daily_price_shift_base: Bfp::from_wei(data.dailyPriceShiftBase.into_legacy()),
+                last_timestamp: data.lastTimestamp.into_legacy().low_u64(),
+                centeredness_margin: Bfp::from_wei(data.centerednessMargin.into_legacy()),
                 start_fourth_root_price_ratio: Bfp::from_wei(
-                    dynamic.startFourthRootPriceRatio.into_legacy(),
+                    data.startFourthRootPriceRatio.into_legacy(),
                 ),
                 end_fourth_root_price_ratio: Bfp::from_wei(
-                    dynamic.endFourthRootPriceRatio.into_legacy(),
+                    data.endFourthRootPriceRatio.into_legacy(),
                 ),
-                price_ratio_update_start_time: dynamic.priceRatioUpdateStartTime as u64,
-                price_ratio_update_end_time: dynamic.priceRatioUpdateEndTime as u64,
+                price_ratio_update_start_time: data.priceRatioUpdateStartTime as u64,
+                price_ratio_update_end_time: data.priceRatioUpdateEndTime as u64,
             };
 
             Ok(Some(pool_state))
