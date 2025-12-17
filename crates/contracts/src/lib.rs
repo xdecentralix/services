@@ -68,7 +68,6 @@ include_contracts! {
     BalancerV3QuantAMMWeightedPoolFactory;
     BalancerV3QuantAMMWeightedPool;
     ERC20;
-    IRateProvider;
 }
 
 #[cfg(test)]

@@ -43,6 +43,7 @@ crate::bindings!(
 
 crate::bindings!(ERC20Mintable);
 crate::bindings!(IERC4626);
+crate::bindings!(IRateProvider);
 
 crate::bindings!(GnosisSafe);
 crate::bindings!(GnosisSafeCompatibilityFallbackHandler);

@@ -571,7 +571,6 @@ fn main() {
     generate_contract("BalancerV3Gyro2CLPPool");
     generate_contract("BalancerV3ReClammPool");
     generate_contract("BalancerV3QuantAMMWeightedPool");
-    generate_contract("IRateProvider");
 
     generate_contract_with_config("BaoswapRouter", |builder| {
         builder.add_network_str(GNOSIS, "0x6093AeBAC87d62b1A5a4cEec91204e35020E38bE")
