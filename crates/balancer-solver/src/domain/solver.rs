@@ -58,6 +58,7 @@ pub struct LoggingConfig {
     pub swap_log_verification: bool,
     pub solution_verification: bool,
     pub enhanced_solutions: bool,
+    pub notifications: bool,
 }
 
 struct Inner {

@@ -88,6 +88,7 @@ struct LoggingSection {
     swap_log_verification: bool,
     solution_verification: bool,
     enhanced_solutions: bool,
+    notifications: bool,
 }
 
 impl Default for LoggingSection {
@@ -99,6 +100,7 @@ impl Default for LoggingSection {
             swap_log_verification: true,
             solution_verification: true,
             enhanced_solutions: true,
+            notifications: true,
         }
     }
 }
@@ -176,6 +178,7 @@ pub async fn load(path: &Path) -> solver::Config {
             swap_log_verification: config.logging.swap_log_verification,
             solution_verification: config.logging.solution_verification,
             enhanced_solutions: config.logging.enhanced_solutions,
+            notifications: config.logging.notifications,
         },
     }
 }
