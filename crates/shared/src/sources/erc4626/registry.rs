@@ -1,5 +1,6 @@
 use {
     ethcontract::H160,
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     serde::Deserialize,
     std::{
         collections::HashMap,
@@ -52,8 +53,9 @@ impl Erc4626Registry {
             return Some(m);
         }
 
-        let ierc4626 = contracts::IERC4626::at(&self.web3, vault);
-        let asset = ierc4626.asset().call().await.ok()?;
+        let ierc4626 =
+            contracts::alloy::IERC4626::Instance::new(vault.into_alloy(), self.web3.alloy.clone());
+        let asset = ierc4626.asset().call().await.ok()?.into_legacy();
         let meta = VaultMeta {
             vault,
             asset,

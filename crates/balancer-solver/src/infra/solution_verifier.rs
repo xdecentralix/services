@@ -6,6 +6,7 @@ use {
             self,
             IBatchRouter::{SwapPathExactAmountIn, SwapPathStep},
         },
+        IERC4626,
     },
     ethcontract::{Address, H160, U256},
     ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
@@ -833,20 +834,28 @@ impl SolutionVerifier {
         let vault_address: H160 = vault_address_str.parse()?;
 
         // Create ERC4626 contract instance
-        let erc4626 = contracts::IERC4626::at(&self.web3, vault_address);
+        let erc4626 = IERC4626::Instance::new(vault_address.into_alloy(), self.web3.alloy.clone());
 
         // Get asset address to determine direction
-        let asset_address = erc4626.asset().call().await?;
+        let asset_address: H160 = erc4626.asset().call().await?.into_legacy();
 
         // Determine if this is a wrap (asset -> vault) or unwrap (vault -> asset)
         let (quoted_amount, function_name) =
             if input_token == asset_address && output_token == vault_address {
                 // Wrap: asset -> vault shares (call previewDeposit)
-                let shares = erc4626.preview_deposit(input_amount).call().await?;
+                let shares: U256 = erc4626
+                    .previewDeposit(input_amount.into_alloy())
+                    .call()
+                    .await?
+                    .into_legacy();
                 (shares, "previewDeposit")
             } else if input_token == vault_address && output_token == asset_address {
                 // Unwrap: vault shares -> asset (call previewRedeem)
-                let assets = erc4626.preview_redeem(input_amount).call().await?;
+                let assets: U256 = erc4626
+                    .previewRedeem(input_amount.into_alloy())
+                    .call()
+                    .await?
+                    .into_legacy();
                 (assets, "previewRedeem")
             } else {
                 return Err(format!(

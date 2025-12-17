@@ -115,13 +115,13 @@ pub fn to_domain(id: liquidity::Id, order: Erc4626Order) -> Result<liquidity::Li
     // semantics.
     let (vault, asset) = if let Some(ref wrap) = order.wrap {
         // Wrap order: asset -> vault
-        let vault_addr: eth::H160 = wrap.vault.address().into();
-        let asset_addr: eth::H160 = wrap.underlying.address().into();
+        let vault_addr: eth::H160 = (*wrap.vault.address()).into_legacy();
+        let asset_addr: eth::H160 = (*wrap.underlying.address()).into_legacy();
         (vault_addr, asset_addr)
     } else if let Some(ref unwrap) = order.unwrap {
         // Unwrap order: vault -> asset
         // The vault address is known, derive asset from TokenPair
-        let vault_addr: eth::H160 = unwrap.vault.address().into();
+        let vault_addr: eth::H160 = (*unwrap.vault.address()).into_legacy();
         let (a, b) = order.tokens.get();
         let a_h160: eth::H160 = a.into_legacy();
         let b_h160: eth::H160 = b.into_legacy();
