@@ -198,6 +198,7 @@ impl BalancerV3Liquidity {
                 end_fourth_root_price_ratio: pool.end_fourth_root_price_ratio,
                 price_ratio_update_start_time: pool.price_ratio_update_start_time,
                 price_ratio_update_end_time: pool.price_ratio_update_end_time,
+                current_timestamp: pool.current_timestamp,
                 settlement_handling: Arc::new(SettlementHandler {
                     pool_id: pool.common.id,
                     inner: inner.clone(),
@@ -664,6 +665,7 @@ mod tests {
             end_fourth_root_price_ratio: "1".parse().unwrap(),
             price_ratio_update_start_time: 0,
             price_ratio_update_end_time: 0,
+            current_timestamp: 2,
         }];
 
         pool_fetcher

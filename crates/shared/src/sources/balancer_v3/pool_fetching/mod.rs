@@ -213,6 +213,7 @@ pub struct ReClammPool {
     pub end_fourth_root_price_ratio: Bfp,
     pub price_ratio_update_start_time: u64,
     pub price_ratio_update_end_time: u64,
+    pub current_timestamp: u64,
 }
 
 impl ReClammPool {
@@ -234,6 +235,7 @@ impl ReClammPool {
             end_fourth_root_price_ratio: reclamm_state.end_fourth_root_price_ratio,
             price_ratio_update_start_time: reclamm_state.price_ratio_update_start_time,
             price_ratio_update_end_time: reclamm_state.price_ratio_update_end_time,
+            current_timestamp: reclamm_state.current_timestamp,
         }
     }
 }

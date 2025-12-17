@@ -1305,6 +1305,7 @@ pub struct ReClammPoolRef<'a> {
     pub end_fourth_root_price_ratio: Bfp,
     pub price_ratio_update_start_time: u64,
     pub price_ratio_update_end_time: u64,
+    pub current_timestamp: u64,
 }
 
 impl ReClammPoolRef<'_> {
@@ -1324,7 +1325,7 @@ impl ReClammPoolRef<'_> {
             end_fourth_root_price_ratio: self.end_fourth_root_price_ratio,
         };
         let (va, vb, changed) = reclamm_math::compute_current_virtual_balances(
-            self.last_timestamp,
+            self.current_timestamp,
             &balances_scaled18,
             self.last_virtual_balances[0],
             self.last_virtual_balances[1],
@@ -1431,6 +1432,7 @@ impl ReClammPool {
             end_fourth_root_price_ratio: self.end_fourth_root_price_ratio,
             price_ratio_update_start_time: self.price_ratio_update_start_time,
             price_ratio_update_end_time: self.price_ratio_update_end_time,
+            current_timestamp: self.current_timestamp,
         }
     }
 }

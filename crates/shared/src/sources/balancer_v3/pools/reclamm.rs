@@ -51,6 +51,8 @@ pub struct PoolState {
     pub end_fourth_root_price_ratio: Bfp,
     pub price_ratio_update_start_time: u64,
     pub price_ratio_update_end_time: u64,
+    // Current block timestamp (fetched each time pool state is retrieved)
+    pub current_timestamp: u64,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -96,6 +98,13 @@ impl FactoryIndexing for BalancerV3ReClammPoolFactoryV2::Instance {
             // Join the shared common state and pool-specific dynamic data
             let (common, data) = futures::try_join!(fetch_common, fetch_dynamic)?;
 
+            // Use current system time as approximation for block timestamp
+            // This is reasonable since pool fetching happens near real-time
+            let current_timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+
             // Convert alloy types to legacy types
             let last_virtual_balances: Vec<U256> = data
                 .lastVirtualBalances
@@ -119,6 +128,7 @@ impl FactoryIndexing for BalancerV3ReClammPoolFactoryV2::Instance {
                 ),
                 price_ratio_update_start_time: data.priceRatioUpdateStartTime as u64,
                 price_ratio_update_end_time: data.priceRatioUpdateEndTime as u64,
+                current_timestamp,
             };
 
             Ok(Some(pool_state))

@@ -459,6 +459,7 @@ pub struct ReClammPool {
     pub end_fourth_root_price_ratio: BigDecimal,
     pub price_ratio_update_start_time: u64,
     pub price_ratio_update_end_time: u64,
+    pub current_timestamp: u64,
 }
 
 #[serde_as]
