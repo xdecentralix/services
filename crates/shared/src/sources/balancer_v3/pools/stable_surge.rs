@@ -9,13 +9,14 @@ use {
         swap::fixed_point::Bfp,
     },
     anyhow::Result,
-    contracts::{
+    contracts::alloy::{
         BalancerV3StablePool,
         BalancerV3StableSurgeHook,
         BalancerV3StableSurgePoolFactory,
         BalancerV3StableSurgePoolFactoryV2,
     },
-    ethcontract::{BlockId, H160},
+    ethcontract::{BlockId, H160, U256},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
 };
@@ -87,27 +88,31 @@ pub use stable::{AmplificationParameter, Version};
 
 // FactoryIndexing implementation for BalancerV3StableSurgePoolFactory (V1)
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV3StableSurgePoolFactory {
+impl FactoryIndexing for BalancerV3StableSurgePoolFactory::Instance {
     type PoolInfo = PoolInfo;
     type PoolState = PoolState;
 
     async fn specialize_pool_info(&self, pool: common::PoolInfo) -> Result<Self::PoolInfo> {
         // Get hook address from factory
-        let hook_address = self.get_stable_surge_hook().call().await?;
+        let hook_address: H160 = self.getStableSurgeHook().call().await?.into_legacy();
 
         // Create hook contract instance
-        let hook_contract =
-            BalancerV3StableSurgeHook::at(&self.raw_instance().web3(), hook_address);
+        let hook_contract = BalancerV3StableSurgeHook::Instance::new(
+            hook_address.into_alloy(),
+            self.provider().clone(),
+        );
 
         // Fetch surge parameters from hook contract
-        let surge_threshold_percentage = hook_contract
-            .get_surge_threshold_percentage(pool.address)
+        let surge_threshold_percentage: U256 = hook_contract
+            .getSurgeThresholdPercentage(pool.address.into_alloy())
             .call()
-            .await?;
-        let max_surge_fee_percentage = hook_contract
-            .get_max_surge_fee_percentage(pool.address)
+            .await?
+            .into_legacy();
+        let max_surge_fee_percentage: U256 = hook_contract
+            .getMaxSurgeFeePercentage(pool.address.into_alloy())
             .call()
-            .await?;
+            .await?
+            .into_legacy();
 
         Ok(PoolInfo {
             common: pool,
@@ -122,26 +127,32 @@ impl FactoryIndexing for BalancerV3StableSurgePoolFactory {
         common_pool_state: BoxFuture<'static, common::PoolState>,
         block: BlockId,
     ) -> BoxFuture<'static, Result<Option<Self::PoolState>>> {
-        let pool_contract =
-            BalancerV3StablePool::at(&self.raw_instance().web3(), pool_info.common.address);
+        let block = block.into_alloy();
+        let pool_contract = BalancerV3StablePool::Instance::new(
+            pool_info.common.address.into_alloy(),
+            self.provider().clone(),
+        );
 
         // Extract hook parameters from pool info
         let surge_threshold_percentage = pool_info.surge_threshold_percentage;
         let max_surge_fee_percentage = pool_info.max_surge_fee_percentage;
 
         let fetch_common = common_pool_state.map(Result::Ok);
-        let fetch_amplification_parameter = pool_contract
-            .get_amplification_parameter()
-            .block(block)
-            .call();
+        let fetch_amplification_parameter = async move {
+            pool_contract
+                .getAmplificationParameter()
+                .block(block)
+                .call()
+                .await
+        };
 
         async move {
             let (common, amplification_parameter) =
                 futures::try_join!(fetch_common, fetch_amplification_parameter)?;
-            let amplification_parameter = {
-                let (factor, _, precision) = amplification_parameter;
-                stable::AmplificationParameter::try_new(factor, precision)?
-            };
+            let amplification_parameter = stable::AmplificationParameter::try_new(
+                amplification_parameter.value.into_legacy(),
+                amplification_parameter.precision.into_legacy(),
+            )?;
 
             Ok(Some(PoolState {
                 tokens: common.tokens,
@@ -158,27 +169,31 @@ impl FactoryIndexing for BalancerV3StableSurgePoolFactory {
 
 // FactoryIndexing implementation for BalancerV3StableSurgePoolFactoryV2 (V2)
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV3StableSurgePoolFactoryV2 {
+impl FactoryIndexing for BalancerV3StableSurgePoolFactoryV2::Instance {
     type PoolInfo = PoolInfo;
     type PoolState = PoolState;
 
     async fn specialize_pool_info(&self, pool: common::PoolInfo) -> Result<Self::PoolInfo> {
         // Get hook address from factory
-        let hook_address = self.get_stable_surge_hook().call().await?;
+        let hook_address: H160 = self.getStableSurgeHook().call().await?.into_legacy();
 
         // Create hook contract instance
-        let hook_contract =
-            BalancerV3StableSurgeHook::at(&self.raw_instance().web3(), hook_address);
+        let hook_contract = BalancerV3StableSurgeHook::Instance::new(
+            hook_address.into_alloy(),
+            self.provider().clone(),
+        );
 
         // Fetch surge parameters from hook contract
-        let surge_threshold_percentage = hook_contract
-            .get_surge_threshold_percentage(pool.address)
+        let surge_threshold_percentage: U256 = hook_contract
+            .getSurgeThresholdPercentage(pool.address.into_alloy())
             .call()
-            .await?;
-        let max_surge_fee_percentage = hook_contract
-            .get_max_surge_fee_percentage(pool.address)
+            .await?
+            .into_legacy();
+        let max_surge_fee_percentage: U256 = hook_contract
+            .getMaxSurgeFeePercentage(pool.address.into_alloy())
             .call()
-            .await?;
+            .await?
+            .into_legacy();
 
         Ok(PoolInfo {
             common: pool,
@@ -193,26 +208,32 @@ impl FactoryIndexing for BalancerV3StableSurgePoolFactoryV2 {
         common_pool_state: BoxFuture<'static, common::PoolState>,
         block: BlockId,
     ) -> BoxFuture<'static, Result<Option<Self::PoolState>>> {
-        let pool_contract =
-            BalancerV3StablePool::at(&self.raw_instance().web3(), pool_info.common.address);
+        let block = block.into_alloy();
+        let pool_contract = BalancerV3StablePool::Instance::new(
+            pool_info.common.address.into_alloy(),
+            self.provider().clone(),
+        );
 
         // Extract hook parameters from pool info
         let surge_threshold_percentage = pool_info.surge_threshold_percentage;
         let max_surge_fee_percentage = pool_info.max_surge_fee_percentage;
 
         let fetch_common = common_pool_state.map(Result::Ok);
-        let fetch_amplification_parameter = pool_contract
-            .get_amplification_parameter()
-            .block(block)
-            .call();
+        let fetch_amplification_parameter = async move {
+            pool_contract
+                .getAmplificationParameter()
+                .block(block)
+                .call()
+                .await
+        };
 
         async move {
             let (common, amplification_parameter) =
                 futures::try_join!(fetch_common, fetch_amplification_parameter)?;
-            let amplification_parameter = {
-                let (factor, _, precision) = amplification_parameter;
-                stable::AmplificationParameter::try_new(factor, precision)?
-            };
+            let amplification_parameter = stable::AmplificationParameter::try_new(
+                amplification_parameter.value.into_legacy(),
+                amplification_parameter.precision.into_legacy(),
+            )?;
 
             Ok(Some(PoolState {
                 tokens: common.tokens,

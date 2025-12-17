@@ -49,24 +49,6 @@ macro_rules! include_contracts {
 }
 
 include_contracts! {
-    BalancerV3Vault;
-    BalancerV3WeightedPool;
-    BalancerV3WeightedPoolFactory;
-    BalancerV3StablePool;
-    BalancerV3StablePoolFactory;
-    BalancerV3StablePoolFactoryV2;
-    BalancerV3StableSurgeHook;
-    BalancerV3StableSurgePool;
-    BalancerV3StableSurgePoolFactory;
-    BalancerV3StableSurgePoolFactoryV2;
-    BalancerV3GyroECLPPool;
-    BalancerV3GyroECLPPoolFactory;
-    BalancerV3Gyro2CLPPool;
-    BalancerV3Gyro2CLPPoolFactory;
-    BalancerV3ReClammPool;
-    BalancerV3ReClammPoolFactoryV2;
-    BalancerV3QuantAMMWeightedPoolFactory;
-    BalancerV3QuantAMMWeightedPool;
     ERC20;
 }
 

@@ -31,13 +31,15 @@ use {
         swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     },
     crate::{
-        ethrpc::{Web3, Web3Transport},
+        ethrpc::Web3,
         recent_block_cache::{Block, CacheConfig},
         token_info::TokenInfoFetching,
     },
+    alloy::providers::DynProvider,
     anyhow::{Context, Result},
     clap::ValueEnum,
-    contracts::{
+    contracts::alloy::{
+        BalancerV3BatchRouter,
         BalancerV3Gyro2CLPPoolFactory,
         BalancerV3GyroECLPPoolFactory,
         BalancerV3QuantAMMWeightedPoolFactory,
@@ -48,9 +50,9 @@ use {
         BalancerV3StableSurgePoolFactoryV2,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
-        alloy::{BalancerV3BatchRouter, InstanceExt},
+        InstanceExt,
     },
-    ethcontract::{BlockId, H160, H256, I256, Instance, U256, dyns::DynInstance},
+    ethcontract::{BlockId, H160, H256, I256, U256},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
     model::TokenPair,
     reqwest::{Client, Url},
@@ -495,17 +497,60 @@ impl BalancerFactoryKind {
     }
 }
 
+/// Enum wrapping alloy-based factory instances.
+pub enum BalancerFactoryInstance {
+    Weighted(BalancerV3WeightedPoolFactory::Instance),
+    Stable(BalancerV3StablePoolFactory::Instance),
+    StableV2(BalancerV3StablePoolFactoryV2::Instance),
+    StableSurge(BalancerV3StableSurgePoolFactory::Instance),
+    StableSurgeV2(BalancerV3StableSurgePoolFactoryV2::Instance),
+    Gyro2CLP(BalancerV3Gyro2CLPPoolFactory::Instance),
+    GyroE(BalancerV3GyroECLPPoolFactory::Instance),
+    ReClamm(BalancerV3ReClammPoolFactoryV2::Instance),
+    QuantAmm(BalancerV3QuantAMMWeightedPoolFactory::Instance),
+}
+
+impl BalancerFactoryInstance {
+    pub fn address(&self) -> &alloy::primitives::Address {
+        match self {
+            BalancerFactoryInstance::Weighted(instance) => instance.address(),
+            BalancerFactoryInstance::Stable(instance) => instance.address(),
+            BalancerFactoryInstance::StableV2(instance) => instance.address(),
+            BalancerFactoryInstance::StableSurge(instance) => instance.address(),
+            BalancerFactoryInstance::StableSurgeV2(instance) => instance.address(),
+            BalancerFactoryInstance::Gyro2CLP(instance) => instance.address(),
+            BalancerFactoryInstance::GyroE(instance) => instance.address(),
+            BalancerFactoryInstance::ReClamm(instance) => instance.address(),
+            BalancerFactoryInstance::QuantAmm(instance) => instance.address(),
+        }
+    }
+
+    pub fn provider(&self) -> &DynProvider {
+        match self {
+            BalancerFactoryInstance::Weighted(instance) => instance.provider(),
+            BalancerFactoryInstance::Stable(instance) => instance.provider(),
+            BalancerFactoryInstance::StableV2(instance) => instance.provider(),
+            BalancerFactoryInstance::StableSurge(instance) => instance.provider(),
+            BalancerFactoryInstance::StableSurgeV2(instance) => instance.provider(),
+            BalancerFactoryInstance::Gyro2CLP(instance) => instance.provider(),
+            BalancerFactoryInstance::GyroE(instance) => instance.provider(),
+            BalancerFactoryInstance::ReClamm(instance) => instance.provider(),
+            BalancerFactoryInstance::QuantAmm(instance) => instance.provider(),
+        }
+    }
+}
+
 /// All balancer V3 related contracts that we expect to exist.
 pub struct BalancerContracts {
-    pub vault: BalancerV3Vault,
+    pub vault: BalancerV3Vault::Instance,
     pub batch_router: BalancerV3BatchRouter::Instance,
-    pub factories: Vec<(BalancerFactoryKind, DynInstance)>,
+    pub factories: Vec<(BalancerFactoryKind, BalancerFactoryInstance)>,
 }
 
 impl BalancerContracts {
     pub async fn try_new(web3: &Web3, factory_kinds: Vec<BalancerFactoryKind>) -> Result<Self> {
         let web3 = ethrpc::instrumented::instrument_with_label(web3, "balancerV3".into());
-        let vault = BalancerV3Vault::deployed(&web3)
+        let vault = BalancerV3Vault::Instance::deployed(&web3.alloy)
             .await
             .context("Cannot retrieve balancer V3 vault")?;
         let batch_router = BalancerV3BatchRouter::Instance::deployed(&web3.alloy)
@@ -514,31 +559,79 @@ impl BalancerContracts {
 
         macro_rules! instance {
             ($factory:ident) => {{
-                $factory::deployed(&web3)
+                $factory::Instance::deployed(&web3.alloy)
                     .await
                     .context(format!(
                         "Cannot retrieve Balancer V3 factory {}",
                         stringify!($factory)
                     ))?
-                    .raw_instance()
-                    .clone()
             }};
         }
 
         let mut factories = Vec::new();
         for factory_kind in factory_kinds {
-            let factory_instance = match factory_kind {
-                BalancerFactoryKind::Weighted => instance!(BalancerV3WeightedPoolFactory),
-                BalancerFactoryKind::Stable => instance!(BalancerV3StablePoolFactory),
-                BalancerFactoryKind::StableV2 => instance!(BalancerV3StablePoolFactoryV2),
-                BalancerFactoryKind::StableSurge => instance!(BalancerV3StableSurgePoolFactory),
-                BalancerFactoryKind::StableSurgeV2 => instance!(BalancerV3StableSurgePoolFactoryV2),
-                BalancerFactoryKind::Gyro2CLP => instance!(BalancerV3Gyro2CLPPoolFactory),
-                BalancerFactoryKind::GyroE => instance!(BalancerV3GyroECLPPoolFactory),
-                BalancerFactoryKind::ReClamm => instance!(BalancerV3ReClammPoolFactoryV2),
-                BalancerFactoryKind::QuantAmm => instance!(BalancerV3QuantAMMWeightedPoolFactory),
+            match factory_kind {
+                BalancerFactoryKind::Weighted => {
+                    factories.push((
+                        factory_kind,
+                        BalancerFactoryInstance::Weighted(instance!(BalancerV3WeightedPoolFactory)),
+                    ));
+                }
+                BalancerFactoryKind::Stable => {
+                    factories.push((
+                        factory_kind,
+                        BalancerFactoryInstance::Stable(instance!(BalancerV3StablePoolFactory)),
+                    ));
+                }
+                BalancerFactoryKind::StableV2 => {
+                    factories.push((
+                        factory_kind,
+                        BalancerFactoryInstance::StableV2(instance!(BalancerV3StablePoolFactoryV2)),
+                    ));
+                }
+                BalancerFactoryKind::StableSurge => {
+                    factories.push((
+                        factory_kind,
+                        BalancerFactoryInstance::StableSurge(instance!(
+                            BalancerV3StableSurgePoolFactory
+                        )),
+                    ));
+                }
+                BalancerFactoryKind::StableSurgeV2 => {
+                    factories.push((
+                        factory_kind,
+                        BalancerFactoryInstance::StableSurgeV2(instance!(
+                            BalancerV3StableSurgePoolFactoryV2
+                        )),
+                    ));
+                }
+                BalancerFactoryKind::Gyro2CLP => {
+                    factories.push((
+                        factory_kind,
+                        BalancerFactoryInstance::Gyro2CLP(instance!(BalancerV3Gyro2CLPPoolFactory)),
+                    ));
+                }
+                BalancerFactoryKind::GyroE => {
+                    factories.push((
+                        factory_kind,
+                        BalancerFactoryInstance::GyroE(instance!(BalancerV3GyroECLPPoolFactory)),
+                    ));
+                }
+                BalancerFactoryKind::ReClamm => {
+                    factories.push((
+                        factory_kind,
+                        BalancerFactoryInstance::ReClamm(instance!(BalancerV3ReClammPoolFactoryV2)),
+                    ));
+                }
+                BalancerFactoryKind::QuantAmm => {
+                    factories.push((
+                        factory_kind,
+                        BalancerFactoryInstance::QuantAmm(instance!(
+                            BalancerV3QuantAMMWeightedPoolFactory
+                        )),
+                    ));
+                }
             };
-            factories.push((factory_kind, factory_instance));
         }
 
         Ok(BalancerContracts {
@@ -653,6 +746,8 @@ async fn create_aggregate_pool_fetcher(
     token_infos: Arc<dyn TokenInfoFetching>,
     contracts: &BalancerContracts,
 ) -> Result<Aggregate> {
+    use ethrpc::alloy::conversions::IntoLegacy;
+
     let registered_pools = pool_initializer.initialize_pools().await?;
     let fetched_block_number = registered_pools.fetched_block_number;
     let fetched_block_hash = web3
@@ -668,16 +763,12 @@ async fn create_aggregate_pool_fetcher(
         ($factory:ident, $instance:expr_2021) => {{
             create_internal_pool_fetcher(
                 contracts.vault.clone(),
-                $factory::with_deployment_info(
-                    &$instance.web3(),
-                    $instance.address(),
-                    $instance.deployment_information(),
-                ),
+                $factory::Instance::new(*$instance.address(), $instance.provider().clone()),
                 block_retriever.clone(),
                 token_infos.clone(),
                 $instance,
                 registered_pools_by_factory
-                    .remove(&$instance.address())
+                    .remove(&(*$instance.address()).into_legacy())
                     .unwrap_or_else(|| RegisteredPools::empty(fetched_block_number)),
                 fetched_block_hash,
             )?
@@ -739,11 +830,11 @@ async fn create_aggregate_pool_fetcher(
 }
 
 fn create_internal_pool_fetcher<Factory>(
-    vault: BalancerV3Vault,
+    vault: BalancerV3Vault::Instance,
     factory: Factory,
     block_retriever: Arc<dyn BlockRetrieving>,
     token_infos: Arc<dyn TokenInfoFetching>,
-    factory_instance: &Instance<Web3Transport>,
+    factory_instance: &BalancerFactoryInstance,
     registered_pools: RegisteredPools,
     fetched_block_hash: H256,
 ) -> Result<Box<dyn InternalPoolFetching>>

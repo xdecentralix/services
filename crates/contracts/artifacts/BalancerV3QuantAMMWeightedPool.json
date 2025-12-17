@@ -4,216 +4,6 @@
   "sourceName": "contracts/BalancerV3QuantAMMWeightedPool.sol",
   "abi": [
     {
-      "inputs": [
-        {
-          "components": [
-            {
-              "internalType": "string",
-              "name": "name",
-              "type": "string"
-            },
-            {
-              "internalType": "string",
-              "name": "symbol",
-              "type": "string"
-            },
-            {
-              "internalType": "uint256",
-              "name": "numTokens",
-              "type": "uint256"
-            },
-            {
-              "internalType": "string",
-              "name": "version",
-              "type": "string"
-            },
-            {
-              "internalType": "address",
-              "name": "updateWeightRunner",
-              "type": "address"
-            },
-            {
-              "internalType": "uint256",
-              "name": "poolRegistry",
-              "type": "uint256"
-            },
-            {
-              "internalType": "string[][]",
-              "name": "poolDetails",
-              "type": "string[][]"
-            }
-          ],
-          "internalType": "struct QuantAMMWeightedPool.NewPoolParams",
-          "name": "params",
-          "type": "tuple"
-        },
-        {
-          "internalType": "contract IVault",
-          "name": "vault",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "inputs": [],
-      "name": "BaseOutOfBounds",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "ECDSAInvalidSignature",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "length",
-          "type": "uint256"
-        }
-      ],
-      "name": "ECDSAInvalidSignatureLength",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "s",
-          "type": "bytes32"
-        }
-      ],
-      "name": "ECDSAInvalidSignatureS",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "deadline",
-          "type": "uint256"
-        }
-      ],
-      "name": "ERC2612ExpiredSignature",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "signer",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        }
-      ],
-      "name": "ERC2612InvalidSigner",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "ExponentOutOfBounds",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "currentNonce",
-          "type": "uint256"
-        }
-      ],
-      "name": "InvalidAccountNonce",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "InvalidExponent",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "InvalidInitialization",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "InvalidShortString",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "MaxInRatio",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "MaxOutRatio",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "NotInitializing",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "ProductOutOfBounds",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "sender",
-          "type": "address"
-        }
-      ],
-      "name": "SenderIsNotVault",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "string",
-          "name": "str",
-          "type": "string"
-        }
-      ],
-      "name": "StringTooLong",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "WeightedPoolBptRateUnsupported",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "ZeroDivision",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "ZeroInvariant",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "maxTradeSizeRatioExceeded",
-      "type": "error"
-    },
-    {
       "anonymous": false,
       "inputs": [
         {
@@ -536,7 +326,7 @@
           "type": "uint256[]"
         },
         {
-          "internalType": "enum Rounding",
+          "internalType": "uint8",
           "name": "rounding",
           "type": "uint8"
         }
@@ -890,7 +680,7 @@
         {
           "components": [
             {
-              "internalType": "contract IERC20[]",
+              "internalType": "address[]",
               "name": "tokens",
               "type": "address[]"
             },
@@ -971,55 +761,10 @@
     },
     {
       "inputs": [],
-      "name": "getTokenInfo",
-      "outputs": [
-        {
-          "internalType": "contract IERC20[]",
-          "name": "tokens",
-          "type": "address[]"
-        },
-        {
-          "components": [
-            {
-              "internalType": "enum TokenType",
-              "name": "tokenType",
-              "type": "uint8"
-            },
-            {
-              "internalType": "contract IRateProvider",
-              "name": "rateProvider",
-              "type": "address"
-            },
-            {
-              "internalType": "bool",
-              "name": "paysYieldFees",
-              "type": "bool"
-            }
-          ],
-          "internalType": "struct TokenInfo[]",
-          "name": "tokenInfo",
-          "type": "tuple[]"
-        },
-        {
-          "internalType": "uint256[]",
-          "name": "balancesRaw",
-          "type": "uint256[]"
-        },
-        {
-          "internalType": "uint256[]",
-          "name": "lastBalancesLiveScaled18",
-          "type": "uint256[]"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
       "name": "getTokens",
       "outputs": [
         {
-          "internalType": "contract IERC20[]",
+          "internalType": "address[]",
           "name": "tokens",
           "type": "address[]"
         }
@@ -1032,7 +777,7 @@
       "name": "getVault",
       "outputs": [
         {
-          "internalType": "contract IVault",
+          "internalType": "address",
           "name": "",
           "type": "address"
         }
@@ -1056,197 +801,6 @@
     {
       "inputs": [],
       "name": "incrementNonce",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "components": [
-            {
-              "internalType": "string",
-              "name": "name",
-              "type": "string"
-            },
-            {
-              "internalType": "string",
-              "name": "symbol",
-              "type": "string"
-            },
-            {
-              "components": [
-                {
-                  "internalType": "contract IERC20",
-                  "name": "token",
-                  "type": "address"
-                },
-                {
-                  "internalType": "enum TokenType",
-                  "name": "tokenType",
-                  "type": "uint8"
-                },
-                {
-                  "internalType": "contract IRateProvider",
-                  "name": "rateProvider",
-                  "type": "address"
-                },
-                {
-                  "internalType": "bool",
-                  "name": "paysYieldFees",
-                  "type": "bool"
-                }
-              ],
-              "internalType": "struct TokenConfig[]",
-              "name": "tokens",
-              "type": "tuple[]"
-            },
-            {
-              "internalType": "uint256[]",
-              "name": "normalizedWeights",
-              "type": "uint256[]"
-            },
-            {
-              "components": [
-                {
-                  "internalType": "address",
-                  "name": "pauseManager",
-                  "type": "address"
-                },
-                {
-                  "internalType": "address",
-                  "name": "swapFeeManager",
-                  "type": "address"
-                },
-                {
-                  "internalType": "address",
-                  "name": "poolCreator",
-                  "type": "address"
-                }
-              ],
-              "internalType": "struct PoolRoleAccounts",
-              "name": "roleAccounts",
-              "type": "tuple"
-            },
-            {
-              "internalType": "uint256",
-              "name": "swapFeePercentage",
-              "type": "uint256"
-            },
-            {
-              "internalType": "address",
-              "name": "poolHooksContract",
-              "type": "address"
-            },
-            {
-              "internalType": "bool",
-              "name": "enableDonation",
-              "type": "bool"
-            },
-            {
-              "internalType": "bool",
-              "name": "disableUnbalancedLiquidity",
-              "type": "bool"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "salt",
-              "type": "bytes32"
-            },
-            {
-              "internalType": "int256[]",
-              "name": "_initialWeights",
-              "type": "int256[]"
-            },
-            {
-              "components": [
-                {
-                  "internalType": "contract IERC20[]",
-                  "name": "assets",
-                  "type": "address[]"
-                },
-                {
-                  "internalType": "contract IUpdateRule",
-                  "name": "rule",
-                  "type": "address"
-                },
-                {
-                  "internalType": "address[][]",
-                  "name": "oracles",
-                  "type": "address[][]"
-                },
-                {
-                  "internalType": "uint40",
-                  "name": "updateInterval",
-                  "type": "uint40"
-                },
-                {
-                  "internalType": "uint64[]",
-                  "name": "lambda",
-                  "type": "uint64[]"
-                },
-                {
-                  "internalType": "uint64",
-                  "name": "epsilonMax",
-                  "type": "uint64"
-                },
-                {
-                  "internalType": "uint64",
-                  "name": "absoluteWeightGuardRail",
-                  "type": "uint64"
-                },
-                {
-                  "internalType": "uint64",
-                  "name": "maxTradeSizeRatio",
-                  "type": "uint64"
-                },
-                {
-                  "internalType": "int256[][]",
-                  "name": "ruleParameters",
-                  "type": "int256[][]"
-                },
-                {
-                  "internalType": "address",
-                  "name": "poolManager",
-                  "type": "address"
-                }
-              ],
-              "internalType": "struct IQuantAMMWeightedPool.PoolSettings",
-              "name": "_poolSettings",
-              "type": "tuple"
-            },
-            {
-              "internalType": "int256[]",
-              "name": "_initialMovingAverages",
-              "type": "int256[]"
-            },
-            {
-              "internalType": "int256[]",
-              "name": "_initialIntermediateValues",
-              "type": "int256[]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "_oracleStalenessThreshold",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "poolRegistry",
-              "type": "uint256"
-            },
-            {
-              "internalType": "string[][]",
-              "name": "poolDetails",
-              "type": "string[][]"
-            }
-          ],
-          "internalType": "struct QuantAMMWeightedPoolFactory.CreationNewPoolParams",
-          "name": "params",
-          "type": "tuple"
-        }
-      ],
-      "name": "initialize",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1292,62 +846,6 @@
         }
       ],
       "name": "nonces",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "components": [
-            {
-              "internalType": "enum SwapKind",
-              "name": "kind",
-              "type": "uint8"
-            },
-            {
-              "internalType": "uint256",
-              "name": "amountGivenScaled18",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256[]",
-              "name": "balancesScaled18",
-              "type": "uint256[]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "indexIn",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "indexOut",
-              "type": "uint256"
-            },
-            {
-              "internalType": "address",
-              "name": "router",
-              "type": "address"
-            },
-            {
-              "internalType": "bytes",
-              "name": "userData",
-              "type": "bytes"
-            }
-          ],
-          "internalType": "struct PoolSwapParams",
-          "name": "request",
-          "type": "tuple"
-        }
-      ],
-      "name": "onSwap",
       "outputs": [
         {
           "internalType": "uint256",
@@ -1590,7 +1088,7 @@
       "name": "updateWeightRunner",
       "outputs": [
         {
-          "internalType": "contract UpdateWeightRunner",
+          "internalType": "address",
           "name": "",
           "type": "address"
         }

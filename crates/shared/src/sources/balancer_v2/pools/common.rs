@@ -12,9 +12,7 @@ use {
     anyhow::{Context, Result, anyhow, ensure},
     contracts::alloy::{BalancerV2BasePool, BalancerV2Vault, IRateProvider},
     ethcontract::{BlockId, H160, H256, U256},
-    ethrpc::{
-        alloy::conversions::{IntoAlloy, IntoLegacy},
-    },
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::{collections::BTreeMap, future::Future, sync::Arc},
     tokio::sync::oneshot,

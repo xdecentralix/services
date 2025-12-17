@@ -7,8 +7,9 @@ use {
         swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     },
     anyhow::{Result, anyhow},
-    contracts::{BalancerV3Gyro2CLPPool, BalancerV3Gyro2CLPPoolFactory},
+    contracts::alloy::{BalancerV3Gyro2CLPPool, BalancerV3Gyro2CLPPoolFactory},
     ethcontract::{BlockId, H160},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
 };
@@ -58,22 +59,22 @@ impl PoolIndexing for PoolInfo {
 }
 
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV3Gyro2CLPPoolFactory {
+impl FactoryIndexing for BalancerV3Gyro2CLPPoolFactory::Instance {
     type PoolInfo = PoolInfo;
     type PoolState = PoolState;
 
     async fn specialize_pool_info(&self, pool: common::PoolInfo) -> Result<Self::PoolInfo> {
         // For Gyroscope 2-CLP, we need to fetch the immutable parameters from the pool
         // contract
-        let pool_contract = BalancerV3Gyro2CLPPool::at(&self.raw_instance().web3(), pool.address);
+        let pool_contract = BalancerV3Gyro2CLPPool::Instance::new(
+            pool.address.into_alloy(),
+            self.provider().clone(),
+        );
 
-        let immutable_data = pool_contract
-            .get_gyro_2clp_pool_immutable_data()
-            .call()
-            .await?;
+        let immutable_data = pool_contract.getGyro2CLPPoolImmutableData().call().await?;
         // The structure is: (tokens, decimals, sqrt_alpha, sqrt_beta)
-        let sqrt_alpha = immutable_data.2;
-        let sqrt_beta = immutable_data.3;
+        let sqrt_alpha: ethcontract::U256 = immutable_data.sqrtAlpha.into_legacy();
+        let sqrt_beta: ethcontract::U256 = immutable_data.sqrtBeta.into_legacy();
 
         Ok(PoolInfo {
             common: pool,

@@ -213,6 +213,17 @@ impl IntoLegacy for alloy::primitives::U256 {
     }
 }
 
+impl IntoLegacy for alloy::primitives::I256 {
+    type To = ethcontract::I256;
+
+    fn into_legacy(self) -> Self::To {
+        // Convert alloy I256 to ethcontract I256 by reinterpreting the bits
+        // Both use two's complement representation
+        let underlying_u256: alloy::primitives::U256 = self.into_raw();
+        ethcontract::I256::from_raw(underlying_u256.into_legacy())
+    }
+}
+
 impl IntoLegacy for alloy::primitives::U512 {
     type To = primitive_types::U512;
 

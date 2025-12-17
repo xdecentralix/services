@@ -7,11 +7,41 @@ use {
         swap::fixed_point::Bfp,
     },
     anyhow::{Result, anyhow},
-    contracts::{BalancerV3ReClammPool, BalancerV3ReClammPoolFactoryV2},
+    contracts::alloy::BalancerV3ReClammPoolFactoryV2,
     ethcontract::{BlockId, H160, U256},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
 };
+
+// Minimal alloy interface for ReCLAMM pool dynamic data.
+// The full BalancerV3ReClammPool contract cannot be generated with alloy due to
+// ABI complexities, so we define only the function we need here.
+alloy::sol! {
+    #[sol(rpc)]
+    interface IReClammPoolDynamicData {
+        function getReClammPoolDynamicData() external view returns (
+            uint256[] memory balancesLiveScaled18,
+            uint256[] memory tokenRates,
+            uint256 staticSwapFeePercentage,
+            uint256 totalSupply,
+            uint256 lastTimestamp,
+            uint256[] memory lastVirtualBalances,
+            int256 dailyPriceShiftExponent,
+            uint256 dailyPriceShiftBase,
+            uint256 centerednessMargin,
+            uint256 currentPriceRatio,
+            uint256 currentFourthRootPriceRatio,
+            uint256 startFourthRootPriceRatio,
+            uint256 endFourthRootPriceRatio,
+            uint32 priceRatioUpdateStartTime,
+            uint32 priceRatioUpdateEndTime,
+            bool isPoolInitialized,
+            bool isPoolPaused,
+            bool isPoolInRecoveryMode
+        );
+    }
+}
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PoolInfo {
@@ -62,7 +92,7 @@ pub enum Version {
 pub type TokenState = common::TokenState;
 
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV3ReClammPoolFactoryV2 {
+impl FactoryIndexing for BalancerV3ReClammPoolFactoryV2::Instance {
     type PoolInfo = PoolInfo;
     type PoolState = PoolState;
 
@@ -76,53 +106,51 @@ impl FactoryIndexing for BalancerV3ReClammPoolFactoryV2 {
         common_pool_state: BoxFuture<'static, common::PoolState>,
         block: BlockId,
     ) -> BoxFuture<'static, Result<Option<Self::PoolState>>> {
-        let pool_contract =
-            BalancerV3ReClammPool::at(&self.raw_instance().web3(), pool_info.common.address);
+        // Use minimal alloy interface for the pool contract since full
+        // BalancerV3ReClammPool cannot be generated with alloy due to ABI
+        // complexities
+        let pool_contract = IReClammPoolDynamicData::IReClammPoolDynamicDataInstance::new(
+            pool_info.common.address.into_alloy(),
+            self.provider().clone(),
+        );
+        let block = block.into_alloy();
 
         let fetch_common = common_pool_state.map(Result::Ok);
-        let fetch_dynamic = pool_contract
-            .get_re_clamm_pool_dynamic_data()
-            .block(block)
-            .call();
+        let fetch_dynamic = async move {
+            pool_contract
+                .getReClammPoolDynamicData()
+                .block(block)
+                .call()
+                .await
+        };
 
         async move {
             // Join the shared common state and pool-specific dynamic data
             let (common, dynamic) = futures::try_join!(fetch_common, fetch_dynamic)?;
 
-            // dynamic is a tuple following ReClammPoolDynamicData ABI
-            let (
-                _balances_live_scaled18,
-                _token_rates,
-                _static_swap_fee_percentage,
-                _total_supply,
-                last_timestamp_u256,
-                last_virtual_balances,
-                _daily_price_shift_exponent,
-                daily_price_shift_base_u256,
-                centeredness_margin_u256,
-                _current_price_ratio,
-                _current_fourth_root_price_ratio,
-                start_fourth_root_price_ratio_u256,
-                end_fourth_root_price_ratio_u256,
-                price_ratio_update_start_time_u32,
-                price_ratio_update_end_time_u32,
-                _is_pool_initialized,
-                _is_pool_paused,
-                _is_pool_in_recovery_mode,
-            ) = dynamic;
+            // Convert alloy types to legacy types
+            let last_virtual_balances: Vec<U256> = dynamic
+                .lastVirtualBalances
+                .into_iter()
+                .map(|v| v.into_legacy())
+                .collect();
 
             let pool_state = PoolState {
                 tokens: common.tokens,
                 swap_fee: common.swap_fee,
                 version: Version::V2,
                 last_virtual_balances,
-                daily_price_shift_base: Bfp::from_wei(daily_price_shift_base_u256),
-                last_timestamp: last_timestamp_u256.low_u64(),
-                centeredness_margin: Bfp::from_wei(centeredness_margin_u256),
-                start_fourth_root_price_ratio: Bfp::from_wei(start_fourth_root_price_ratio_u256),
-                end_fourth_root_price_ratio: Bfp::from_wei(end_fourth_root_price_ratio_u256),
-                price_ratio_update_start_time: price_ratio_update_start_time_u32 as u64,
-                price_ratio_update_end_time: price_ratio_update_end_time_u32 as u64,
+                daily_price_shift_base: Bfp::from_wei(dynamic.dailyPriceShiftBase.into_legacy()),
+                last_timestamp: dynamic.lastTimestamp.into_legacy().low_u64(),
+                centeredness_margin: Bfp::from_wei(dynamic.centerednessMargin.into_legacy()),
+                start_fourth_root_price_ratio: Bfp::from_wei(
+                    dynamic.startFourthRootPriceRatio.into_legacy(),
+                ),
+                end_fourth_root_price_ratio: Bfp::from_wei(
+                    dynamic.endFourthRootPriceRatio.into_legacy(),
+                ),
+                price_ratio_update_start_time: dynamic.priceRatioUpdateStartTime as u64,
+                price_ratio_update_end_time: dynamic.priceRatioUpdateEndTime as u64,
             };
 
             Ok(Some(pool_state))
