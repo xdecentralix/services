@@ -50,7 +50,6 @@ use {
         BalancerV3StableSurgePoolFactoryV2,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
-        InstanceExt,
     },
     ethcontract::{BlockId, H160, H256, I256, U256},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},

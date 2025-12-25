@@ -33,6 +33,7 @@ use {
         recent_block_cache::{Block, CacheConfig},
         token_info::TokenInfoFetching,
     },
+    alloy::providers::DynProvider,
     anyhow::{Context, Result},
     clap::ValueEnum,
     contracts::alloy::{
@@ -52,8 +53,6 @@ use {
         BalancerV2WeightedPoolFactory,
         BalancerV2WeightedPoolFactoryV3,
         BalancerV2WeightedPoolFactoryV4,
-        InstanceExt,
-        Provider as DynProvider,
     },
     ethcontract::{BlockId, H160, H256},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},

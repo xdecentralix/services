@@ -18,7 +18,6 @@ use {
         },
         infra::metrics,
     },
-    contracts::alloy::InstanceExt,
     ethereum_types::U256,
     ethrpc::alloy::conversions::IntoAlloy,
     reqwest::Url,
