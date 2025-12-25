@@ -6,8 +6,6 @@ use {
 #[path = "src/paths.rs"]
 mod paths;
 
-const GNOSIS: &str = "100";
-
 fn main() {
     // NOTE: This is a workaround for `rerun-if-changed` directives for
     // non-existent files cause the crate's build unit to get flagged for a
@@ -18,9 +16,6 @@ fn main() {
     // - https://doc.rust-lang.org/cargo/reference/build-scripts.html#cargorerun-if-changedpath
     println!("cargo:rerun-if-changed=build.rs");
 
-    generate_contract_with_config("BaoswapRouter", |builder| {
-        builder.add_network_str(GNOSIS, "0x6093AeBAC87d62b1A5a4cEec91204e35020E38bE")
-    });
     generate_contract("ERC20");
 }
 
