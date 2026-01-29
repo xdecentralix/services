@@ -4,9 +4,10 @@ use {
         domain::{auction, eth, liquidity, order},
         util::conv,
     },
-    bigdecimal::{FromPrimitive, ToPrimitive},
+    bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive},
     itertools::Itertools,
     solvers_dto::auction::*,
+    std::str::FromStr,
 };
 
 /// Converts a data transfer object into its domain object representation.
@@ -496,6 +497,7 @@ mod reclamm_pool {
                 .ok_or("invalid end_fourth_root_price_ratio")?,
                 price_ratio_update_start_time: pool.price_ratio_update_start_time,
                 price_ratio_update_end_time: pool.price_ratio_update_end_time,
+                current_timestamp: pool.current_timestamp,
             }),
         })
     }
@@ -581,8 +583,13 @@ mod quant_amm_pool {
                 version: match pool.version {
                     QuantAmmVersion::V1 => liquidity::quantamm::Version::V1,
                 },
-                max_trade_size_ratio: conv::decimal_to_rational(&pool.max_trade_size_ratio)
-                    .ok_or("invalid max_trade_size_ratio")?,
+                max_trade_size_ratio: {
+                    let ratio_wei = &pool.max_trade_size_ratio;
+                    let scale =
+                        BigDecimal::from_str("1000000000000000000").map_err(|_| "invalid scale")?;
+                    let ratio = ratio_wei / scale;
+                    conv::decimal_to_rational(&ratio).ok_or("invalid max_trade_size_ratio")?
+                },
                 first_four_weights_and_multipliers: pool
                     .first_four_weights_and_multipliers
                     .iter()

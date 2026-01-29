@@ -67,6 +67,34 @@ pub async fn solve(
             );
         }
         let liquidity_client = state.liquidity_client();
+        let logging = state.logging().clone();
+        let save_dir = state.auction_save_directory().map(|p| p.to_path_buf());
+        let swap_logger = if logging.swap_logs && save_dir.is_some() {
+            Some(crate::boundary::swap_logger::SwapLogger::new())
+        } else {
+            None
+        };
+        let verifier = state.verifier().cloned();
+        let swap_log_verifier = if logging.swap_log_verification {
+            if verifier.is_some() {
+                tracing::debug!("🔍 Swap log verification enabled with verifier");
+            } else {
+                tracing::warn!("⚠️  Swap log verification enabled but NO VERIFIER configured");
+            }
+            verifier.clone()
+        } else {
+            None
+        };
+        let solution_verifier = if logging.solution_verification {
+            if verifier.is_some() {
+                tracing::debug!("🔍 Solution verification enabled with verifier");
+            } else {
+                tracing::warn!("⚠️  Solution verification enabled but NO VERIFIER configured");
+            }
+            verifier
+        } else {
+            None
+        };
 
         // Get base tokens and protocols from solver configuration if available
         let base_tokens = {
@@ -87,7 +115,7 @@ pub async fn solve(
             liquidity_client,
             base_tokens.as_deref(),
             protocols.as_deref(),
-            state.auction_save_directory(),
+            save_dir.as_deref(),
         )
         .await
         {
@@ -102,8 +130,9 @@ pub async fn solve(
         };
 
         let auction_id = auction.id;
+
         let solutions = state
-            .solve(auction)
+            .solve_with_logger(auction, swap_logger.clone())
             .instrument(tracing::info_span!("auction", id = %auction_id))
             .await;
 
@@ -133,82 +162,137 @@ pub async fn solve(
         );
 
         // Save auction and solutions to JSON if configured (non-blocking)
-        if let (Some(save_dir), Some(auction_json)) = (state.auction_save_directory(), auction_json)
-        {
+        if let (Some(save_dir), Some(auction_json)) = (save_dir.clone(), auction_json) {
             let solutions_json = serde_json::to_value(&solutions_dto).ok();
-            let save_dir = save_dir.to_path_buf();
             let save_dir_for_competition = save_dir.clone();
             let save_dir_for_enhanced = save_dir.clone();
-            let save_dir_for_verify = save_dir.clone();
+            let save_dir_for_enhanced_verify = save_dir.clone();
+            let save_dir_for_base_verify = save_dir.clone();
+            let save_dir_for_swap_log = save_dir.clone();
+            let save_dir_for_swap_log_verify = save_dir.clone();
+            let save_dir_for_auction_files = save_dir.clone();
 
-            tokio::spawn(async move {
-                if let Some(solutions) = solutions_json {
-                    save_auction_and_solutions(auction_json, solutions, &save_dir).await;
-                }
-            });
-
-            // Spawn background task to fetch competition data
-            let cow_api_url = state.cow_api_base_url();
-            tokio::spawn(async move {
-                fetch_and_save_competition_data(auction_id, cow_api_url, &save_dir_for_competition)
-                    .await;
-            });
-
-            // Spawn background task to create enhanced solutions if liquidity was fetched
-            // If verifier is also configured, verify using the enhanced solutions
-            if let Some(liq_response) = fetched_liquidity {
-                let verifier_opt = state.verifier().cloned();
-                let solutions_json_for_enhanced = serde_json::to_value(&solutions_dto).ok();
-
+            if logging.auction_files {
                 tokio::spawn(async move {
-                    if let Some(solutions_json) = solutions_json_for_enhanced {
-                        // Deserialize back to Solutions for the function
-                        if let Ok(solutions_for_enhance) =
-                            serde_json::from_value::<dto::Solutions>(solutions_json)
-                        {
-                            // Create enhanced solutions with liquidityDetails
-                            let enhanced = dto::auction::create_enhanced_solutions(
-                                &solutions_for_enhance,
-                                &liq_response,
-                            );
-
-                            // Save enhanced solutions file
-                            save_enhanced_solutions_json(
-                                enhanced.clone(),
-                                auction_id,
-                                &save_dir_for_enhanced,
-                            )
-                            .await;
-
-                            // Verify using enhanced solutions if verifier is configured
-                            if let Some(verifier) = verifier_opt {
-                                verify_and_save_solutions(
-                                    enhanced,
-                                    verifier,
-                                    auction_id,
-                                    &save_dir_for_verify,
-                                )
-                                .await;
-                            }
-                        }
-                    }
-                });
-            } else if let Some(verifier) = state.verifier() {
-                // No liquidity fetched, but verifier configured - use basic solutions
-                let solutions_json_for_verify = serde_json::to_value(&solutions_dto).ok();
-                let verifier = verifier.clone();
-
-                tokio::spawn(async move {
-                    if let Some(solutions_json) = solutions_json_for_verify {
-                        verify_and_save_solutions(
-                            solutions_json,
-                            verifier,
-                            auction_id,
-                            &save_dir_for_verify,
+                    if let Some(solutions) = solutions_json {
+                        save_auction_and_solutions(
+                            auction_json,
+                            solutions,
+                            &save_dir_for_auction_files,
                         )
                         .await;
                     }
                 });
+            }
+
+            // Save swap log if logger was used, and optionally verify it
+            if logging.swap_logs {
+                if let Some(logger) = swap_logger.clone() {
+                    let swap_records = logger.get_records();
+                    if !swap_records.is_empty() {
+                        let auction_id_num = match auction_id {
+                            crate::domain::auction::Id::Solve(id) => Some(id),
+                            crate::domain::auction::Id::Quote => None,
+                        };
+                        let verifier_for_swap_log = swap_log_verifier.clone();
+
+                        tokio::spawn(async move {
+                            save_swap_log(
+                                swap_records.clone(),
+                                auction_id_num,
+                                &save_dir_for_swap_log,
+                            )
+                            .await;
+
+                            // Verify swap log if verifier is configured
+                            if let Some(verifier) = verifier_for_swap_log {
+                                verify_and_save_swap_log(
+                                    swap_records,
+                                    auction_id_num,
+                                    verifier,
+                                    &save_dir_for_swap_log_verify,
+                                )
+                                .await;
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Spawn background task to fetch competition data
+            if logging.competition {
+                let cow_api_url = state.cow_api_base_url();
+                tokio::spawn(async move {
+                    fetch_and_save_competition_data(
+                        auction_id,
+                        cow_api_url,
+                        &save_dir_for_competition,
+                    )
+                    .await;
+                });
+            }
+
+            // Spawn background task to create enhanced solutions if liquidity was fetched
+            // If verifier is also configured, verify using the enhanced solutions
+            let had_liquidity = fetched_liquidity.is_some();
+            if logging.enhanced_solutions {
+                if let Some(liq_response) = fetched_liquidity {
+                    let verifier_opt = solution_verifier.clone();
+                    let solutions_json_for_enhanced = serde_json::to_value(&solutions_dto).ok();
+
+                    tokio::spawn(async move {
+                        if let Some(solutions_json) = solutions_json_for_enhanced {
+                            // Deserialize back to Solutions for the function
+                            if let Ok(solutions_for_enhance) =
+                                serde_json::from_value::<dto::Solutions>(solutions_json)
+                            {
+                                // Create enhanced solutions with liquidityDetails
+                                let enhanced = dto::auction::create_enhanced_solutions(
+                                    &solutions_for_enhance,
+                                    &liq_response,
+                                );
+
+                                // Save enhanced solutions file
+                                save_enhanced_solutions_json(
+                                    enhanced.clone(),
+                                    auction_id,
+                                    &save_dir_for_enhanced,
+                                )
+                                .await;
+
+                                // Verify using enhanced solutions if verifier is configured
+                                if let Some(verifier) = verifier_opt {
+                                    verify_and_save_solutions(
+                                        enhanced,
+                                        verifier,
+                                        auction_id,
+                                        &save_dir_for_enhanced_verify,
+                                    )
+                                    .await;
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            if let Some(verifier) = solution_verifier {
+                // No liquidity fetched or enhanced solutions disabled - verify basic solutions
+                let should_skip_base = logging.enhanced_solutions && had_liquidity;
+                let solutions_json_for_verify = serde_json::to_value(&solutions_dto).ok();
+                if !should_skip_base {
+                    tokio::spawn(async move {
+                        if let Some(solutions_json) = solutions_json_for_verify {
+                            verify_and_save_solutions(
+                                solutions_json,
+                                verifier,
+                                auction_id,
+                                &save_dir_for_base_verify,
+                            )
+                            .await;
+                        }
+                    });
+                }
             }
         }
 
@@ -221,6 +305,71 @@ pub async fn solve(
     handle_request
         .instrument(tracing::info_span!("/solve"))
         .await
+}
+
+/// Saves swap log data to JSON file in the configured directory.
+/// This function runs in a background task and logs errors without failing the
+/// request.
+async fn save_swap_log(
+    swap_records: Vec<crate::boundary::swap_logger::SwapRecord>,
+    auction_id: Option<i64>,
+    save_dir: &std::path::Path,
+) {
+    use tokio::fs;
+
+    // Determine filename based on auction ID
+    let base_filename = match auction_id {
+        Some(id) => id.to_string(),
+        None => {
+            // Use timestamp for quote auctions
+            let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S_%3f");
+            format!("quote_{}", timestamp)
+        }
+    };
+
+    let swap_log_file_path = save_dir.join(format!("{}_swap_log.json", base_filename));
+
+    // Create directory if it doesn't exist
+    if let Err(err) = fs::create_dir_all(save_dir).await {
+        tracing::warn!(
+            ?err,
+            directory = ?save_dir,
+            "Failed to create swap log save directory"
+        );
+        return;
+    }
+
+    // Serialize swap log to pretty JSON
+    let swap_log_json = match serde_json::to_string_pretty(&serde_json::json!({
+        "auction_id": auction_id,
+        "swaps_count": swap_records.len(),
+        "swaps": swap_records,
+    })) {
+        Ok(content) => content,
+        Err(err) => {
+            tracing::warn!(?err, "Failed to serialize swap log to JSON");
+            return;
+        }
+    };
+
+    // Write swap log file
+    match fs::write(&swap_log_file_path, swap_log_json).await {
+        Ok(_) => {
+            tracing::info!(
+                swap_log_file = ?swap_log_file_path,
+                auction_id = ?auction_id,
+                swaps_count = swap_records.len(),
+                "💾 Saved swap log to JSON file"
+            );
+        }
+        Err(err) => {
+            tracing::warn!(
+                ?err,
+                file_path = ?swap_log_file_path,
+                "Failed to write swap log JSON file"
+            );
+        }
+    }
 }
 
 /// Saves auction and solutions to separate JSON files in the configured
@@ -536,6 +685,181 @@ async fn verify_and_save_solutions(
         }
         Err(err) => {
             tracing::warn!(?err, "Failed to write verification file");
+        }
+    }
+}
+
+/// Verifies swap logs against on-chain contract calls and saves the results.
+async fn verify_and_save_swap_log(
+    swap_records: Vec<crate::boundary::swap_logger::SwapRecord>,
+    auction_id: Option<i64>,
+    verifier: crate::infra::solution_verifier::SolutionVerifier,
+    save_dir: &std::path::Path,
+) {
+    use tokio::fs;
+
+    // Load liquidity file to get pool data including rates
+    let liquidity_map = if let Some(id) = auction_id {
+        let liquidity_file = save_dir.join(format!("{}_liquidity.json", id));
+        match fs::read_to_string(&liquidity_file).await {
+            Ok(contents) => match serde_json::from_str::<serde_json::Value>(&contents) {
+                Ok(liq_json) => {
+                    let mut map = std::collections::HashMap::new();
+                    if let Some(liquidity_array) = liq_json["liquidity"].as_array() {
+                        for pool in liquidity_array {
+                            if let Some(pool_id) = pool["id"].as_str() {
+                                map.insert(pool_id.to_string(), pool.clone());
+                            }
+                        }
+                    }
+                    map
+                }
+                Err(err) => {
+                    tracing::warn!(?err, "Failed to parse liquidity JSON");
+                    std::collections::HashMap::new()
+                }
+            },
+            Err(err) => {
+                tracing::debug!(
+                    ?err,
+                    "Could not read liquidity file for swap log verification"
+                );
+                std::collections::HashMap::new()
+            }
+        }
+    } else {
+        std::collections::HashMap::new()
+    };
+
+    // Enrich swap records with pool data from liquidity file
+    let enriched_swaps: Vec<serde_json::Value> = swap_records
+        .into_iter()
+        .map(|swap| {
+            let mut swap_json = serde_json::to_value(&swap).unwrap_or_default();
+
+            if let Some(pool_data) = liquidity_map.get(&swap.liquidity_id) {
+                // Add balancerPoolId to pool_params if present
+                if let Some(balancer_pool_id) = pool_data["balancerPoolId"].as_str() {
+                    if let Some(params) = swap_json["pool_params"].as_object_mut() {
+                        params.insert(
+                            "balancerPoolId".to_string(),
+                            serde_json::Value::String(balancer_pool_id.to_string()),
+                        );
+                    }
+                }
+
+                // Determine pool version based on balancerPoolId presence
+                let pool_version = if pool_data["balancerPoolId"].is_null() {
+                    "V3"
+                } else {
+                    let pool_id = pool_data["balancerPoolId"].as_str().unwrap_or("");
+                    if pool_id.len() > 42 { "V2" } else { "V3" }
+                };
+                swap_json["pool_version"] = serde_json::Value::String(pool_version.to_string());
+
+                // Extract rate information for input and output tokens
+                // Tokens can be either an object (dict) or array depending on format
+                if let Some(tokens_obj) = pool_data["tokens"].as_object() {
+                    let input_token = swap.input_token.to_lowercase();
+                    let output_token = swap.output_token.to_lowercase();
+
+                    // Tokens stored as {address: {rate, scalingFactor, ...}}
+                    let token_in_data = tokens_obj.get(&input_token)
+                        .or_else(|| tokens_obj.get(&swap.input_token));
+                    let token_out_data = tokens_obj.get(&output_token)
+                        .or_else(|| tokens_obj.get(&swap.output_token));
+
+                    let token_in_rate = token_in_data.and_then(|t| t["rate"].as_str()).map(|s| s.to_string());
+                    let token_in_rate_provider = token_in_data.and_then(|t| t["rateProvider"].as_str()).map(|s| s.to_string());
+                    let token_in_scaling_factor = token_in_data.and_then(|t| t["scalingFactor"].as_str()).map(|s| s.to_string());
+
+                    let token_out_rate = token_out_data.and_then(|t| t["rate"].as_str()).map(|s| s.to_string());
+                    let token_out_rate_provider = token_out_data.and_then(|t| t["rateProvider"].as_str()).map(|s| s.to_string());
+                    let token_out_scaling_factor = token_out_data.and_then(|t| t["scalingFactor"].as_str()).map(|s| s.to_string());
+
+                    // Add rate info if we found any rate data
+                    if token_in_rate.is_some() || token_out_rate.is_some() {
+                        swap_json["rate_info"] = serde_json::json!({
+                            "token_in_rate": token_in_rate.unwrap_or_else(|| "".to_string()),
+                            "token_out_rate": token_out_rate.unwrap_or_else(|| "".to_string()),
+                            "token_in_rate_provider": token_in_rate_provider.unwrap_or_else(|| "".to_string()),
+                            "token_out_rate_provider": token_out_rate_provider.unwrap_or_else(|| "".to_string()),
+                            "token_in_scaling_factor": token_in_scaling_factor.unwrap_or_else(|| "".to_string()),
+                            "token_out_scaling_factor": token_out_scaling_factor.unwrap_or_else(|| "".to_string()),
+                        });
+                    }
+                }
+            }
+
+            swap_json
+        })
+        .collect();
+
+    // Add debug summary statistics
+    let debug_stats = {
+        let mut stats = std::collections::HashMap::new();
+        for swap in &enriched_swaps {
+            if swap["input_amount"].as_str() == Some("0") {
+                let kind = swap["kind"].as_str().unwrap_or("unknown").to_string();
+                let counter = stats.entry(kind).or_insert(0);
+                *counter += 1;
+            }
+        }
+        stats
+    };
+
+    // Convert swap records to JSON format expected by verifier
+    let swap_log_json = serde_json::json!({
+        "auction_id": auction_id,
+        "swaps_count": enriched_swaps.len(),
+        "debug_summary": {
+            "zero_input_swaps_by_kind": debug_stats,
+        },
+        "swaps": enriched_swaps,
+    });
+
+    // Verify swap logs
+    let verification_result = verifier.verify_swap_logs(&swap_log_json).await;
+
+    // Determine filename
+    let filename = match auction_id {
+        Some(id) => format!("{}_swap_log_verification.json", id),
+        None => {
+            let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S_%3f");
+            format!("quote_{}_swap_log_verification.json", timestamp)
+        }
+    };
+    let file_path = save_dir.join(filename);
+
+    // Create directory if needed
+    if let Err(err) = fs::create_dir_all(save_dir).await {
+        tracing::warn!(?err, directory = ?save_dir, "Failed to create directory");
+        return;
+    }
+
+    // Serialize to pretty JSON
+    let json_string = match serde_json::to_string_pretty(&verification_result) {
+        Ok(s) => s,
+        Err(err) => {
+            tracing::warn!(?err, "Failed to serialize swap log verification");
+            return;
+        }
+    };
+
+    // Write to file
+    match fs::write(&file_path, json_string).await {
+        Ok(_) => {
+            tracing::info!(
+                auction_id = ?auction_id,
+                file_path = ?file_path,
+                swaps_verified = verification_result.verified,
+                swaps_failed = verification_result.failed,
+                total_swaps = verification_result.total_swaps,
+                "✅ Saved swap log verification results"
+            );
+        }
+        Err(err) => {
+            tracing::warn!(?err, "Failed to write swap log verification file");
         }
     }
 }

@@ -7,8 +7,9 @@ use {
         swap::fixed_point::Bfp,
     },
     anyhow::{Result, anyhow},
-    contracts::{BalancerV3WeightedPool, BalancerV3WeightedPoolFactory},
+    contracts::alloy::{BalancerV3WeightedPool, BalancerV3WeightedPoolFactory},
     ethcontract::{BlockId, H160},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
 };
@@ -66,19 +67,21 @@ impl PoolIndexing for PoolInfo {
 }
 
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV3WeightedPoolFactory {
+impl FactoryIndexing for BalancerV3WeightedPoolFactory::Instance {
     type PoolInfo = PoolInfo;
     type PoolState = PoolState;
 
     async fn specialize_pool_info(&self, pool: common::PoolInfo) -> Result<Self::PoolInfo> {
-        let pool_contract = BalancerV3WeightedPool::at(&self.raw_instance().web3(), pool.address);
+        let pool_contract = BalancerV3WeightedPool::Instance::new(
+            pool.address.into_alloy(),
+            self.provider().clone(),
+        );
         let weights = pool_contract
-            .methods()
-            .get_normalized_weights()
+            .getNormalizedWeights()
             .call()
             .await?
             .into_iter()
-            .map(Bfp::from_wei)
+            .map(|w| Bfp::from_wei(w.into_legacy()))
             .collect();
 
         Ok(PoolInfo {
@@ -126,8 +129,7 @@ mod tests {
     use {
         super::*,
         crate::sources::balancer_v3::graph_api::{DynamicData, GqlChain, PoolData, Token},
-        ethcontract::{BlockNumber, H160, U256},
-        ethcontract_mock::Mock,
+        ethcontract::{H160, U256},
         futures::future,
         maplit::btreemap,
     };
@@ -245,37 +247,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fetch_weighted_pool() {
-        let weights = [bfp_v3!("0.5"), bfp_v3!("0.25"), bfp_v3!("0.25")];
-
-        let mock = Mock::new(42);
-        let web3 = mock.web3();
-
-        let pool = mock.deploy(BalancerV3WeightedPool::raw_contract().interface.abi.clone());
-        pool.expect_call(BalancerV3WeightedPool::signatures().get_normalized_weights())
-            .returns(weights.iter().copied().map(Bfp::as_uint256).collect());
-
-        let factory = BalancerV3WeightedPoolFactory::at(&web3, H160([0xfa; 20]));
-        let pool = factory
-            .specialize_pool_info(common::PoolInfo {
-                id: H160([1; 20]),
-                address: pool.address(),
-                tokens: vec![H160([0x11; 20]), H160([0x22; 20]), H160([0x33; 20])],
-                scaling_factors: vec![Bfp::exp10(0), Bfp::exp10(0), Bfp::exp10(0)],
-                rate_providers: vec![H160::zero(), H160::zero(), H160::zero()],
-                block_created: 42,
-            })
-            .await
-            .unwrap();
-
-        assert_eq!(pool.weights, weights);
-    }
-
-    #[tokio::test]
     async fn fetch_pool_state() {
-        let mock = Mock::new(42);
-        let web3 = mock.web3();
-
         let pool_info = PoolInfo {
             common: common::PoolInfo {
                 id: H160([1; 20]),
@@ -308,16 +280,14 @@ mod tests {
             },
         };
 
-        let factory = BalancerV3WeightedPoolFactory::at(&web3, H160([0xfa; 20]));
-        let pool_state = factory
-            .fetch_pool_state(
-                &pool_info,
-                future::ready(common_pool_state).boxed(),
-                BlockId::Number(BlockNumber::Latest),
-            )
-            .await
-            .unwrap()
-            .unwrap();
+        let pool_state = pool_state(
+            Version::V1,
+            pool_info.clone(),
+            future::ready(common_pool_state).boxed(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
 
         assert_eq!(pool_state.tokens.len(), 2);
         assert_eq!(pool_state.swap_fee, Bfp::from_wei(3000u64.into()));

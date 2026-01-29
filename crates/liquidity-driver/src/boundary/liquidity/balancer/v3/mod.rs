@@ -9,17 +9,18 @@ use {
     },
     anyhow::{Context, Result},
     chain::Chain,
-    contracts::{
+    contracts::alloy::{
         BalancerV3Gyro2CLPPoolFactory,
         BalancerV3GyroECLPPoolFactory,
         BalancerV3QuantAMMWeightedPoolFactory,
+        BalancerV3ReClammPoolFactoryV2,
         BalancerV3StablePoolFactory,
         BalancerV3StablePoolFactoryV2,
         BalancerV3StableSurgePoolFactory,
         BalancerV3StableSurgePoolFactoryV2,
         BalancerV3Vault,
         BalancerV3WeightedPoolFactory,
-        alloy::GPv2Settlement,
+        GPv2Settlement,
     },
     ethrpc::{
         alloy::conversions::{IntoAlloy, IntoLegacy},
@@ -31,7 +32,7 @@ use {
             BalancerFactoryKind,
             BalancerPoolFetcher,
             GqlChain,
-            pool_fetching::BalancerContracts,
+            pool_fetching::{BalancerContracts, BalancerFactoryInstance},
         },
         token_info::{CachedTokenInfoFetcher, TokenInfoFetcher},
     },
@@ -87,10 +88,10 @@ fn to_interaction(
         // Note that this code assumes `receiver == sender`. This assumption is
         // also baked into the Balancer V3 logic in the `shared` crate, so to
         // change this assumption, we would need to change it there as well.
-        GPv2Settlement::Instance::new(receiver.0.into_alloy(), ethrpc::mock::web3().alloy.clone()),
+        GPv2Settlement::Instance::new(receiver.0.into_alloy(), ethrpc::noop_provider()),
         contracts::alloy::BalancerV3BatchRouter::Instance::new(
             pool.batch_router.0.into_alloy(),
-            ethrpc::mock::web3().alloy,
+            ethrpc::noop_provider(),
         ),
         Allowances::empty(receiver.0),
     );
@@ -144,7 +145,7 @@ async fn init_liquidity(
 
     // Create Balancer V3 contracts configuration
     let contracts = BalancerContracts {
-        vault: BalancerV3Vault::at(&web3, config.vault.into()),
+        vault: BalancerV3Vault::Instance::new(config.vault.0.into_alloy(), web3.alloy.clone()),
         batch_router: contracts::alloy::BalancerV3BatchRouter::Instance::new(
             config.batch_router.0.into_alloy(),
             web3.alloy.clone(),
@@ -156,9 +157,12 @@ async fn init_liquidity(
                 .map(|&factory| {
                     (
                         BalancerFactoryKind::Weighted,
-                        BalancerV3WeightedPoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                        BalancerFactoryInstance::Weighted(
+                            BalancerV3WeightedPoolFactory::Instance::new(
+                                factory.0.into_alloy(),
+                                web3.alloy.clone(),
+                            ),
+                        ),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -168,9 +172,12 @@ async fn init_liquidity(
                 .map(|&factory| {
                     (
                         BalancerFactoryKind::Stable,
-                        BalancerV3StablePoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                        BalancerFactoryInstance::Stable(
+                            BalancerV3StablePoolFactory::Instance::new(
+                                factory.0.into_alloy(),
+                                web3.alloy.clone(),
+                            ),
+                        ),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -180,9 +187,12 @@ async fn init_liquidity(
                 .map(|&factory| {
                     (
                         BalancerFactoryKind::StableV2,
-                        BalancerV3StablePoolFactoryV2::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                        BalancerFactoryInstance::StableV2(
+                            BalancerV3StablePoolFactoryV2::Instance::new(
+                                factory.0.into_alloy(),
+                                web3.alloy.clone(),
+                            ),
+                        ),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -192,9 +202,12 @@ async fn init_liquidity(
                 .map(|&factory| {
                     (
                         BalancerFactoryKind::StableSurge,
-                        BalancerV3StableSurgePoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                        BalancerFactoryInstance::StableSurge(
+                            BalancerV3StableSurgePoolFactory::Instance::new(
+                                factory.0.into_alloy(),
+                                web3.alloy.clone(),
+                            ),
+                        ),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -204,9 +217,12 @@ async fn init_liquidity(
                 .map(|&factory| {
                     (
                         BalancerFactoryKind::StableSurgeV2,
-                        BalancerV3StableSurgePoolFactoryV2::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                        BalancerFactoryInstance::StableSurgeV2(
+                            BalancerV3StableSurgePoolFactoryV2::Instance::new(
+                                factory.0.into_alloy(),
+                                web3.alloy.clone(),
+                            ),
+                        ),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -216,9 +232,12 @@ async fn init_liquidity(
                 .map(|&factory| {
                     (
                         BalancerFactoryKind::GyroE,
-                        BalancerV3GyroECLPPoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                        BalancerFactoryInstance::GyroE(
+                            BalancerV3GyroECLPPoolFactory::Instance::new(
+                                factory.0.into_alloy(),
+                                web3.alloy.clone(),
+                            ),
+                        ),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -228,9 +247,12 @@ async fn init_liquidity(
                 .map(|&factory| {
                     (
                         BalancerFactoryKind::Gyro2CLP,
-                        BalancerV3Gyro2CLPPoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                        BalancerFactoryInstance::Gyro2CLP(
+                            BalancerV3Gyro2CLPPoolFactory::Instance::new(
+                                factory.0.into_alloy(),
+                                web3.alloy.clone(),
+                            ),
+                        ),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -240,9 +262,12 @@ async fn init_liquidity(
                 .map(|&factory| {
                     (
                         BalancerFactoryKind::ReClamm,
-                        contracts::BalancerV3ReClammPoolFactoryV2::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                        BalancerFactoryInstance::ReClamm(
+                            BalancerV3ReClammPoolFactoryV2::Instance::new(
+                                factory.0.into_alloy(),
+                                web3.alloy.clone(),
+                            ),
+                        ),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -252,9 +277,12 @@ async fn init_liquidity(
                 .map(|&factory| {
                     (
                         BalancerFactoryKind::QuantAmm,
-                        BalancerV3QuantAMMWeightedPoolFactory::at(&web3, factory.into())
-                            .raw_instance()
-                            .clone(),
+                        BalancerFactoryInstance::QuantAmm(
+                            BalancerV3QuantAMMWeightedPoolFactory::Instance::new(
+                                factory.0.into_alloy(),
+                                web3.alloy.clone(),
+                            ),
+                        ),
                     )
                 })
                 .collect::<Vec<_>>(),

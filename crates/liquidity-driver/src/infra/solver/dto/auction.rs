@@ -73,7 +73,7 @@ pub fn new(
                     limit_order.order.taker_token.into(),
                 ]
             }
-            liquidity::Kind::Erc4626(edge) => vec![edge.tokens.0, edge.tokens.1],
+            liquidity::Kind::Erc4626(edge) => vec![edge.vault, edge.asset],
         })
     {
         tokens.entry(token.into()).or_insert_with(Default::default);
@@ -606,6 +606,7 @@ pub fn new(
                                 ),
                                 price_ratio_update_start_time: pool.price_ratio_update_start_time,
                                 price_ratio_update_end_time: pool.price_ratio_update_end_time,
+                                current_timestamp: pool.current_timestamp,
                             },
                         )
                     }
@@ -638,9 +639,7 @@ pub fn new(
                                         solvers_dto::auction::QuantAmmVersion::V1
                                     }
                                 },
-                                max_trade_size_ratio: scaling_factor_to_decimal_v3(
-                                    pool.max_trade_size_ratio,
-                                ),
+                                max_trade_size_ratio: fee_to_decimal_v3(pool.max_trade_size_ratio),
                                 first_four_weights_and_multipliers: pool
                                     .first_four_weights_and_multipliers
                                     .iter()
@@ -701,13 +700,13 @@ pub fn new(
                     }
                     liquidity::Kind::Erc4626(edge) => {
                         // Expose a minimal ERC4626 edge to external solvers.
-                        // Add a new DTO variant and map it here.
                         solvers_dto::auction::Liquidity::Erc4626(
                             solvers_dto::auction::Erc4626Edge {
                                 id: liquidity.id.0.to_string(),
+                                address: edge.vault.0.into(), // vault address
                                 gas_estimate: liquidity.gas.into(),
-                                vault: edge.tokens.1.0.into(),
-                                asset: edge.tokens.0.0.into(),
+                                vault: edge.vault.0.into(),
+                                asset: edge.asset.0.into(),
                             },
                         )
                     }

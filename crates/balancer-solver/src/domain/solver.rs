@@ -18,7 +18,6 @@ use {
         },
         infra::metrics,
     },
-    contracts::alloy::InstanceExt,
     ethereum_types::U256,
     ethrpc::alloy::conversions::IntoAlloy,
     reqwest::Url,
@@ -47,6 +46,18 @@ pub struct Config {
     pub vault_address: Option<eth::Address>,
     pub batch_router_address: Option<eth::Address>,
     pub node_url: Option<Url>,
+    pub logging: LoggingConfig,
+}
+
+#[derive(Clone)]
+pub struct LoggingConfig {
+    pub auction_files: bool,
+    pub competition: bool,
+    pub swap_logs: bool,
+    pub swap_log_verification: bool,
+    pub solution_verification: bool,
+    pub enhanced_solutions: bool,
+    pub notifications: bool,
 }
 
 struct Inner {
@@ -94,6 +105,9 @@ struct Inner {
 
     /// Optional solution verifier for on-chain quote verification
     verifier: Option<crate::infra::solution_verifier::SolutionVerifier>,
+
+    /// Logging and verification feature toggles
+    logging: LoggingConfig,
 }
 
 impl Solver {
@@ -141,11 +155,17 @@ impl Solver {
 
         // Create solution verifier if vault and batch router addresses are provided
         let verifier = match (
-            config.vault_address,
-            config.batch_router_address,
-            config.node_url,
+            &config.vault_address,
+            &config.batch_router_address,
+            &config.node_url,
         ) {
-            (Some(vault_addr), Some(batch_router_addr), Some(ref node_url)) => {
+            (Some(vault_addr), Some(batch_router_addr), Some(node_url)) => {
+                tracing::info!(
+                    vault = ?vault_addr,
+                    batch_router = ?batch_router_addr,
+                    node_url = %node_url,
+                    "✅ Creating solution verifier with on-chain verification"
+                );
                 let web3 =
                     ethrpc::web3(Default::default(), Default::default(), node_url, "verifier");
                 let vault = contracts::alloy::BalancerV2Vault::Instance::new(
@@ -154,14 +174,23 @@ impl Solver {
                 );
                 let batch_router = contracts::alloy::BalancerV3BatchRouter::Instance::new(
                     batch_router_addr.0.into_alloy(),
-                    web3.alloy,
+                    web3.alloy.clone(),
                 );
                 Some(crate::infra::solution_verifier::SolutionVerifier::new(
                     vault,
                     batch_router,
+                    web3,
                 ))
             }
-            _ => None,
+            _ => {
+                tracing::warn!(
+                    vault_address = ?config.vault_address,
+                    batch_router_address = ?config.batch_router_address,
+                    node_url = ?config.node_url,
+                    "⚠️  Solution verifier NOT created - missing configuration"
+                );
+                None
+            }
         };
 
         Self(Arc::new(Inner {
@@ -177,6 +206,7 @@ impl Solver {
             liquidity_client,
             auction_save_directory: config.auction_save_directory,
             verifier,
+            logging: config.logging,
         }))
     }
 
@@ -229,9 +259,23 @@ impl Solver {
         self.0.verifier.as_ref()
     }
 
+    /// Returns logging configuration
+    pub fn logging(&self) -> &LoggingConfig {
+        &self.0.logging
+    }
+
     /// Solves the specified auction, returning a vector of all possible
     /// solutions.
     pub async fn solve(&self, auction: auction::Auction) -> Vec<solution::Solution> {
+        self.solve_with_logger(auction, None).await
+    }
+
+    /// Solve an auction with optional swap logging for debugging
+    pub async fn solve_with_logger(
+        &self,
+        auction: auction::Auction,
+        swap_logger: Option<crate::boundary::swap_logger::SwapLogger>,
+    ) -> Vec<solution::Solution> {
         metrics::solve(&auction);
         let deadline = auction.deadline.clone();
         // Make sure to push the CPU-heavy code to a separate thread in order to
@@ -249,7 +293,10 @@ impl Solver {
         let inner = self.0.clone();
         let span = tracing::Span::current();
         let background_work = async move {
-            inner.solve(auction, sender).instrument(span).await;
+            inner
+                .solve(auction, sender, swap_logger)
+                .instrument(span)
+                .await;
         };
 
         let mut handle = tokio::spawn(background_work);
@@ -274,14 +321,20 @@ impl Inner {
         &self,
         auction: auction::Auction,
         sender: tokio::sync::mpsc::UnboundedSender<solution::Solution>,
+        swap_logger: Option<crate::boundary::swap_logger::SwapLogger>,
     ) {
-        let boundary_solver = boundary::baseline::Solver::new(
+        let mut boundary_solver = boundary::baseline::Solver::new(
             &self.weth,
             &self.base_tokens,
             &auction.liquidity,
             self.uni_v3_quoter_v2.clone(),
             self.erc4626_web3.as_ref(),
         );
+
+        // Attach swap logger if provided
+        if let Some(logger) = swap_logger {
+            boundary_solver = boundary_solver.with_swap_logger(logger);
+        }
 
         for (i, order) in auction.orders.into_iter().enumerate() {
             let sell_token = order.sell.token;

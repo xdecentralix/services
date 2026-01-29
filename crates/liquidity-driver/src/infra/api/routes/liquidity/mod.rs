@@ -499,6 +499,7 @@ fn convert_domain_to_dto(
                 ),
                 price_ratio_update_start_time: pool.price_ratio_update_start_time,
                 price_ratio_update_end_time: pool.price_ratio_update_end_time,
+                current_timestamp: pool.current_timestamp,
             },
         )),
 
@@ -528,7 +529,7 @@ fn convert_domain_to_dto(
                         solvers_dto::auction::QuantAmmVersion::V1
                     }
                 },
-                max_trade_size_ratio: scaling_factor_to_decimal_v3(pool.max_trade_size_ratio),
+                max_trade_size_ratio: fee_to_decimal_v3(pool.max_trade_size_ratio),
                 first_four_weights_and_multipliers: pool
                     .first_four_weights_and_multipliers
                     .iter()
@@ -585,9 +586,10 @@ fn convert_domain_to_dto(
         liquidity::Kind::Erc4626(edge) => Ok(solvers_dto::auction::Liquidity::Erc4626(
             solvers_dto::auction::Erc4626Edge {
                 id: liquidity.id.0.to_string(),
+                address: edge.vault.0.into(), // vault address
                 gas_estimate: liquidity.gas.0.into(),
-                vault: edge.tokens.1.0.into(),
-                asset: edge.tokens.0.0.into(),
+                vault: edge.vault.0.into(),
+                asset: edge.asset.0.into(),
             },
         )),
 

@@ -20,7 +20,7 @@ pub struct Pool {
     pub fee: Fee,
     pub version: Version,
     // QuantAMM-specific parameters for weight interpolation
-    pub max_trade_size_ratio: ScalingFactor,
+    pub max_trade_size_ratio: Fee, // Ratio in 18-decimal fixed point format (like pool fee)
     pub first_four_weights_and_multipliers: Vec<ethcontract::I256>,
     pub second_four_weights_and_multipliers: Vec<ethcontract::I256>,
     pub last_update_time: u64,

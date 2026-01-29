@@ -3,12 +3,12 @@ use {
         app_data,
         arguments::{FeeFactor, VolumeFeeConfig},
     },
+    alloy::primitives::{U256, U512, Uint, ruint::UintTryFrom},
     chrono::{TimeZone, Utc},
     model::{
         order::OrderCreationAppData,
         quote::{OrderQuote, OrderQuoteRequest, OrderQuoteResponse, OrderQuoteSide, PriceQuality},
     },
-    primitive_types::U256,
     shared::{
         order_quoting::{CalculateQuoteError, OrderQuoting, Quote, QuoteParameters},
         order_validation::{
@@ -183,13 +183,14 @@ fn get_adjusted_quote_data(
     let (adjusted_sell_amount, adjusted_buy_amount) = match side {
         OrderQuoteSide::Sell { .. } => {
             // For SELL orders, fee is calculated on buy amount
-            let protocol_fee = quote
-                .buy_amount
-                .full_mul(U256::from(factor.to_bps()))
-                .checked_div(U256::from(FeeFactor::MAX_BPS).into())
-                .ok_or_else(|| anyhow::anyhow!("volume fee calculation division by zero"))?
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("volume fee calculation overflow"))?;
+            let protocol_fee = U256::uint_try_from(
+                quote
+                    .buy_amount
+                    .widening_mul(U256::from(factor.to_bps()))
+                    .checked_div(U512::from(FeeFactor::MAX_BPS))
+                    .ok_or_else(|| anyhow::anyhow!("volume fee calculation division by zero"))?,
+            )
+            .map_err(|_| anyhow::anyhow!("volume fee calculation overflow"))?;
 
             // Reduce buy amount by protocol fee
             let adjusted_buy = quote.buy_amount.saturating_sub(protocol_fee);
@@ -200,12 +201,14 @@ fn get_adjusted_quote_data(
             // For BUY orders, fee is calculated on sell amount + network fee.
             // Network fee is already in sell token, so it is added to get the total volume.
             let total_sell_volume = quote.sell_amount.saturating_add(quote.fee_amount);
-            let protocol_fee = total_sell_volume
-                .full_mul(U256::from(factor.to_bps()))
-                .checked_div(U256::from(FeeFactor::MAX_BPS).into())
-                .ok_or_else(|| anyhow::anyhow!("volume fee calculation division by zero"))?
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("volume fee calculation overflow"))?;
+            let factor = U256::from(factor.to_bps());
+            let volume_bps: Uint<512, 8> = total_sell_volume.widening_mul(factor);
+            let protocol_fee = U256::uint_try_from(
+                volume_bps
+                    .checked_div(U512::from(FeeFactor::MAX_BPS))
+                    .ok_or_else(|| anyhow::anyhow!("volume fee calculation division by zero"))?,
+            )
+            .map_err(|_| anyhow::anyhow!("volume fee calculation overflow"))?;
 
             // Increase sell amount by protocol fee
             let adjusted_sell = quote.sell_amount.saturating_add(protocol_fee);
@@ -251,8 +254,9 @@ mod tests {
     use {
         super::*,
         crate::arguments::FeeFactor,
+        alloy::primitives::U256,
+        ethrpc::alloy::conversions::IntoLegacy,
         model::quote::OrderQuoteSide,
-        primitive_types::U256,
         shared::order_quoting::{Quote, QuoteData},
     };
 
@@ -278,7 +282,7 @@ mod tests {
             },
             sell_amount,
             buy_amount,
-            fee_amount: U256::zero(),
+            fee_amount: U256::ZERO,
         }
     }
 
@@ -294,7 +298,7 @@ mod tests {
         let quote = create_test_quote(to_wei(100), to_wei(100));
         let side = OrderQuoteSide::Sell {
             sell_amount: model::quote::SellAmount::BeforeFee {
-                value: number::nonzero::U256::try_from(to_wei(100)).unwrap(),
+                value: number::nonzero::U256::try_from(to_wei(100).into_legacy()).unwrap(),
             },
         };
 
@@ -326,7 +330,8 @@ mod tests {
         // Buying 100 tokens, expecting to sell 100 tokens, with no network fee
         let quote = create_test_quote(to_wei(100), to_wei(100));
         let side = OrderQuoteSide::Buy {
-            buy_amount_after_fee: number::nonzero::U256::try_from(to_wei(100)).unwrap(),
+            buy_amount_after_fee: number::nonzero::U256::try_from(to_wei(100).into_legacy())
+                .unwrap(),
         };
 
         let result = get_adjusted_quote_data(&quote, Some(&volume_fee_config), &side).unwrap();
@@ -356,7 +361,8 @@ mod tests {
         let mut quote = create_test_quote(to_wei(100), to_wei(100));
         quote.fee_amount = to_wei(5); // Network fee in sell token
         let side = OrderQuoteSide::Buy {
-            buy_amount_after_fee: number::nonzero::U256::try_from(to_wei(100)).unwrap(),
+            buy_amount_after_fee: number::nonzero::U256::try_from(to_wei(100).into_legacy())
+                .unwrap(),
         };
 
         let result = get_adjusted_quote_data(&quote, Some(&volume_fee_config), &side).unwrap();
@@ -390,7 +396,7 @@ mod tests {
         let quote = create_test_quote(to_wei(100), to_wei(200));
         let side = OrderQuoteSide::Sell {
             sell_amount: model::quote::SellAmount::BeforeFee {
-                value: number::nonzero::U256::try_from(to_wei(100)).unwrap(),
+                value: number::nonzero::U256::try_from(to_wei(100).into_legacy()).unwrap(),
             },
         };
 
@@ -424,7 +430,7 @@ mod tests {
             let quote = create_test_quote(to_wei(100), to_wei(100));
             let side = OrderQuoteSide::Sell {
                 sell_amount: model::quote::SellAmount::BeforeFee {
-                    value: number::nonzero::U256::try_from(to_wei(100)).unwrap(),
+                    value: number::nonzero::U256::try_from(to_wei(100).into_legacy()).unwrap(),
                 },
             };
 
@@ -447,7 +453,7 @@ mod tests {
         let quote = create_test_quote(to_wei(100), to_wei(100));
         let side = OrderQuoteSide::Sell {
             sell_amount: model::quote::SellAmount::BeforeFee {
-                value: number::nonzero::U256::try_from(to_wei(100)).unwrap(),
+                value: number::nonzero::U256::try_from(to_wei(100).into_legacy()).unwrap(),
             },
         };
 

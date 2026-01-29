@@ -1,8 +1,5 @@
 use {
-    crate::{
-        domain::eth::{self, ContractAddress},
-        infra::blockchain::contracts::deployment_address,
-    },
+    crate::domain::eth::{self, ContractAddress},
     alloy::primitives::Address,
     chain::Chain,
     contracts::alloy::BalancerV2Vault,
@@ -381,44 +378,45 @@ impl BalancerV3 {
         chain: Chain,
         _graph_api_key: Option<String>,
     ) -> Option<Self> {
-        let factory_addresses =
-            |contracts: &[&ethcontract::Contract]| -> Vec<eth::ContractAddress> {
-                contracts
-                    .iter()
-                    .copied()
-                    .filter_map(|c| deployment_address(c, chain))
-                    .collect()
-            };
+        // Helper macro for collecting alloy deployment addresses as ContractAddress
+        macro_rules! alloy_addresses {
+            ( $chain:expr, [ $( $($p:ident)::+ ),* $(,)? ] ) => {{
+                let arr = [ $({
+                    $($p)::+::deployment_address(&$chain.id())
+                        .map(|addr| eth::ContractAddress::from(addr.into_legacy()))
+                }),* ];
+                arr.into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>()
+            }};
+        }
 
         Some(Self {
-            vault: deployment_address(contracts::BalancerV3Vault::raw_contract(), chain)?,
+            vault: ContractAddress::from(
+                contracts::alloy::BalancerV3Vault::deployment_address(&chain.id())?.into_legacy(),
+            ),
             batch_router: ContractAddress::from(
                 contracts::alloy::BalancerV3BatchRouter::deployment_address(&chain.id())?
                     .into_legacy(),
             ),
-            weighted: factory_addresses(
-                &[contracts::BalancerV3WeightedPoolFactory::raw_contract()],
+            weighted: alloy_addresses!(chain, [contracts::alloy::BalancerV3WeightedPoolFactory]),
+            stable: alloy_addresses!(chain, [contracts::alloy::BalancerV3StablePoolFactory]),
+            stable_v2: alloy_addresses!(chain, [contracts::alloy::BalancerV3StablePoolFactoryV2]),
+            stable_surge: alloy_addresses!(
+                chain,
+                [contracts::alloy::BalancerV3StableSurgePoolFactory]
             ),
-            stable: factory_addresses(&[contracts::BalancerV3StablePoolFactory::raw_contract()]),
-            stable_v2: factory_addresses(&[
-                contracts::BalancerV3StablePoolFactoryV2::raw_contract(),
-            ]),
-            stable_surge: factory_addresses(&[
-                contracts::BalancerV3StableSurgePoolFactory::raw_contract(),
-            ]),
-            stable_surge_v2: factory_addresses(&[
-                contracts::BalancerV3StableSurgePoolFactoryV2::raw_contract(),
-            ]),
-            gyro_e: factory_addresses(&[contracts::BalancerV3GyroECLPPoolFactory::raw_contract()]),
-            gyro_2clp: factory_addresses(&[
-                contracts::BalancerV3Gyro2CLPPoolFactory::raw_contract(),
-            ]),
-            reclamm: factory_addresses(
-                &[contracts::BalancerV3ReClammPoolFactoryV2::raw_contract()],
+            stable_surge_v2: alloy_addresses!(
+                chain,
+                [contracts::alloy::BalancerV3StableSurgePoolFactoryV2]
             ),
-            quantamm: factory_addresses(&[
-                contracts::BalancerV3QuantAMMWeightedPoolFactory::raw_contract(),
-            ]),
+            gyro_e: alloy_addresses!(chain, [contracts::alloy::BalancerV3GyroECLPPoolFactory]),
+            gyro_2clp: alloy_addresses!(chain, [contracts::alloy::BalancerV3Gyro2CLPPoolFactory]),
+            reclamm: alloy_addresses!(chain, [contracts::alloy::BalancerV3ReClammPoolFactoryV2]),
+            quantamm: alloy_addresses!(
+                chain,
+                [contracts::alloy::BalancerV3QuantAMMWeightedPoolFactory]
+            ),
             pool_deny_list: Vec::new(),
             graph_url: graph_url.clone(),
             reinit_interval: None,

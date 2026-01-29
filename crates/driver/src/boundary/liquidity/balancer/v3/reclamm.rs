@@ -60,6 +60,7 @@ pub fn to_domain(id: liquidity::Id, pool: BalancerV3ReClammOrder) -> Result<liqu
             )?,
             price_ratio_update_start_time: pool.price_ratio_update_start_time,
             price_ratio_update_end_time: pool.price_ratio_update_end_time,
+            current_timestamp: pool.current_timestamp,
         }),
     })
 }

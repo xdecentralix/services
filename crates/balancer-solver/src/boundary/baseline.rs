@@ -2,7 +2,7 @@
 
 use {
     crate::{
-        boundary::{self, liquidity::erc4626 as boundary_erc4626},
+        boundary::{self, liquidity::erc4626 as boundary_erc4626, swap_logger},
         domain::{eth, liquidity, order, solver},
     },
     contracts::alloy::UniswapV3QuoterV2,
@@ -23,6 +23,7 @@ pub struct Solver<'a> {
     base_tokens: BaseTokens,
     onchain_liquidity: HashMap<TokenPair, Vec<OnchainLiquidity>>,
     liquidity: HashMap<liquidity::Id, &'a liquidity::Liquidity>,
+    swap_logger: Option<swap_logger::SwapLogger>,
 }
 
 impl<'a> Solver<'a> {
@@ -40,7 +41,14 @@ impl<'a> Solver<'a> {
                 .iter()
                 .map(|liquidity| (liquidity.id.clone(), liquidity))
                 .collect(),
+            swap_logger: None,
         }
+    }
+
+    /// Enable swap logging for debugging and verification
+    pub fn with_swap_logger(mut self, logger: swap_logger::SwapLogger) -> Self {
+        self.swap_logger = Some(logger);
+        self
     }
 
     pub async fn route(
@@ -137,9 +145,89 @@ impl<'a> Solver<'a> {
                 .token_pair
                 .other(&sell_token.into_alloy())
                 .expect("Inconsistent path");
-            let buy_amount = liquidity
-                .get_amount_out(buy_token.into_legacy(), (sell_amount, sell_token))
-                .await?;
+
+            // Log the swap attempt if logging is enabled
+            let buy_amount = if let Some(ref logger) = self.swap_logger {
+                // Configure which pool types to log (set to log all by default)
+                let should_log = matches!(
+                    liquidity.kind_str(),
+                    "weightedProduct"
+                        | "stable"
+                        | "gyroE"
+                        | "gyro2CLP"
+                        | "gyro3CLP"
+                        | "reClamm"
+                        | "quantAmm"
+                        | "erc4626"
+                );
+
+                let result = liquidity
+                    .get_amount_out(buy_token.into_legacy(), (sell_amount, sell_token))
+                    .await;
+
+                // Only log if this is a pool type we're interested in
+                if should_log {
+                    // Build debug metadata for problematic swaps
+                    let debug = if sell_amount.is_zero()
+                        || result.is_none()
+                        || (result.is_some() && result.as_ref().unwrap().is_zero())
+                    {
+                        let mut note = Vec::new();
+                        if sell_amount.is_zero() {
+                            note.push(
+                                "Input amount is zero - likely from failed previous hop or \
+                                 pathfinding issue",
+                            );
+                        }
+                        if result.is_none() {
+                            note.push("get_amount_out returned None - swap calculation failed");
+                        } else if result.is_some() && result.as_ref().unwrap().is_zero() {
+                            note.push(
+                                "Output is zero despite calculation succeeding - check math \
+                                 implementation",
+                            );
+                        }
+
+                        Some(swap_logger::DebugMetadata {
+                            zero_input: if sell_amount.is_zero() {
+                                Some(true)
+                            } else {
+                                None
+                            },
+                            path_info: Some(format!(
+                                "Segment in path, sell_token: {:#x}, buy_token: {:#x}",
+                                sell_token,
+                                buy_token.into_legacy()
+                            )),
+                            note: if note.is_empty() {
+                                None
+                            } else {
+                                Some(note.join("; "))
+                            },
+                        })
+                    } else {
+                        None
+                    };
+
+                    logger.log_swap(swap_logger::SwapRecord {
+                        liquidity_id: liquidity.id.0.clone(),
+                        kind: liquidity.kind_str().to_string(),
+                        address: format!("{:#x}", liquidity.address()),
+                        input_token: format!("{:#x}", sell_token),
+                        input_amount: sell_amount.to_string(),
+                        output_token: format!("{:#x}", buy_token.into_legacy()),
+                        output_amount: result.as_ref().map(|amt| amt.to_string()),
+                        pool_params: extract_pool_params(reference_liquidity),
+                        debug,
+                    });
+                }
+
+                result?
+            } else {
+                liquidity
+                    .get_amount_out(buy_token.into_legacy(), (sell_amount, sell_token))
+                    .await?
+            };
 
             segments.push(solver::Segment {
                 liquidity: reference_liquidity,
@@ -210,6 +298,30 @@ fn to_boundary_liquidity(
                     if let Some(boundary_pool) =
                         boundary::liquidity::stable::to_boundary_pool(liquidity.address, pool)
                     {
+                        for pair in pool.reserves.token_pairs() {
+                            let token_pair = to_boundary_token_pair(&pair);
+                            onchain_liquidity.entry(token_pair).or_default().push(
+                                OnchainLiquidity {
+                                    id: liquidity.id.clone(),
+                                    token_pair,
+                                    source: LiquiditySource::Stable(boundary_pool.clone()),
+                                },
+                            );
+                        }
+                    }
+                }
+                liquidity::State::StableSurge(pool) => {
+                    // StableSurge pools use the same math as stable pools but with dynamic fees
+                    // For quoting purposes, we treat them as stable pools with the current fee
+                    let stable_pool = liquidity::stable::Pool {
+                        reserves: pool.reserves.clone(),
+                        amplification_parameter: pool.amplification_parameter,
+                        fee: pool.fee,
+                    };
+                    if let Some(boundary_pool) = boundary::liquidity::stable::to_boundary_pool(
+                        liquidity.address,
+                        &stable_pool,
+                    ) {
                         for pair in pool.reserves.token_pairs() {
                             let token_pair = to_boundary_token_pair(&pair);
                             onchain_liquidity.entry(token_pair).or_default().push(
@@ -344,29 +456,19 @@ fn to_boundary_liquidity(
                 }
                 liquidity::State::Erc4626(edge) => {
                     if let Some(web3) = erc4626_web3 {
+                        // Create boundary edge with explicit vault and asset addresses
                         let edge_boundary =
                             boundary_erc4626::Edge::new(web3, edge.vault.0, edge.asset.0);
-                        if let Some(pair_fw) =
+                        // Create a single TokenPair for both directions (TokenPair is symmetric)
+                        if let Some(pair) =
                             TokenPair::new(edge.asset.0.into_alloy(), edge.vault.0.into_alloy())
                         {
                             onchain_liquidity
-                                .entry(pair_fw)
+                                .entry(pair)
                                 .or_default()
                                 .push(OnchainLiquidity {
                                     id: liquidity.id.clone(),
-                                    token_pair: pair_fw,
-                                    source: LiquiditySource::Erc4626(edge_boundary.clone()),
-                                });
-                        }
-                        if let Some(pair_bw) =
-                            TokenPair::new(edge.vault.0.into_alloy(), edge.asset.0.into_alloy())
-                        {
-                            onchain_liquidity
-                                .entry(pair_bw)
-                                .or_default()
-                                .push(OnchainLiquidity {
-                                    id: liquidity.id.clone(),
-                                    token_pair: pair_bw,
+                                    token_pair: pair,
                                     source: LiquiditySource::Erc4626(edge_boundary),
                                 });
                         }
@@ -388,6 +490,42 @@ struct OnchainLiquidity {
     id: liquidity::Id,
     token_pair: TokenPair,
     source: LiquiditySource,
+}
+
+impl OnchainLiquidity {
+    /// Get the pool kind as a string
+    fn kind_str(&self) -> &str {
+        match &self.source {
+            LiquiditySource::ConstantProduct(_) => "constantProduct",
+            LiquiditySource::WeightedProduct(_) => "weightedProduct",
+            LiquiditySource::Stable(_) => "stable",
+            LiquiditySource::GyroE(_) => "gyroE",
+            LiquiditySource::Gyro2CLP(_) => "gyro2CLP",
+            LiquiditySource::Gyro3CLP(_) => "gyro3CLP",
+            LiquiditySource::ReClamm(_) => "reClamm",
+            LiquiditySource::QuantAmm(_) => "quantAmm",
+            LiquiditySource::LimitOrder(_) => "limitOrder",
+            LiquiditySource::Concentrated(_) => "concentrated",
+            LiquiditySource::Erc4626(_) => "erc4626",
+        }
+    }
+
+    /// Get the pool address
+    fn address(&self) -> H160 {
+        match &self.source {
+            LiquiditySource::ConstantProduct(pool) => pool.address,
+            LiquiditySource::WeightedProduct(pool) => pool.common.address,
+            LiquiditySource::Stable(pool) => pool.common.address,
+            LiquiditySource::GyroE(pool) => pool.common.address,
+            LiquiditySource::Gyro2CLP(pool) => pool.common.address,
+            LiquiditySource::Gyro3CLP(pool) => pool.common.address,
+            LiquiditySource::ReClamm(pool) => pool.common.address,
+            LiquiditySource::QuantAmm(pool) => pool.common.address,
+            LiquiditySource::LimitOrder(_) => H160::zero(),
+            LiquiditySource::Concentrated(pool) => pool.address,
+            LiquiditySource::Erc4626(_) => H160::zero(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -470,4 +608,142 @@ fn to_boundary_base_tokens(
 fn to_boundary_token_pair(pair: &liquidity::TokenPair) -> TokenPair {
     let (a, b) = pair.get();
     TokenPair::new(a.0.into_alloy(), b.0.into_alloy()).unwrap()
+}
+
+/// Extract pool parameters for logging purposes
+fn extract_pool_params(liquidity: &liquidity::Liquidity) -> serde_json::Value {
+    use serde_json::json;
+
+    match &liquidity.state {
+        liquidity::State::ConstantProduct(_pool) => {
+            json!({
+                "kind": "constantProduct",
+                // Simplified for constant product pools
+            })
+        }
+        liquidity::State::WeightedProduct(pool) => {
+            json!({
+                "kind": "weightedProduct",
+                "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
+                "reserves": pool.reserves.iter().map(|r| json!({
+                    "token": format!("{:#x}", r.asset.token.0),
+                    "balance": r.asset.amount.to_string(),
+                    "weight": format!("{}/{}", r.weight.numer(), r.weight.denom()),
+                    "scalingFactor": format!("{}/{}", r.scale.get().numer(), r.scale.get().denom()),
+                    "rate": format!("{}/{}", r.rate.numer(), r.rate.denom()),
+                })).collect::<Vec<_>>(),
+            })
+        }
+        liquidity::State::Stable(pool) => {
+            json!({
+                "kind": "stable",
+                "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
+                "amplificationParameter": format!("{}/{}", pool.amplification_parameter.numer(), pool.amplification_parameter.denom()),
+                "reserves": pool.reserves.iter().map(|r| json!({
+                    "token": format!("{:#x}", r.asset.token.0),
+                    "balance": r.asset.amount.to_string(),
+                    "scalingFactor": format!("{}/{}", r.scale.get().numer(), r.scale.get().denom()),
+                    "rate": format!("{}/{}", r.rate.numer(), r.rate.denom()),
+                })).collect::<Vec<_>>(),
+            })
+        }
+        liquidity::State::StableSurge(pool) => {
+            json!({
+                "kind": "stableSurge",
+                "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
+                "amplificationParameter": format!("{}/{}", pool.amplification_parameter.numer(), pool.amplification_parameter.denom()),
+                "surgeThresholdPercentage": format!("{}/{}", pool.surge_threshold_percentage.numer(), pool.surge_threshold_percentage.denom()),
+                "maxSurgeFeePercentage": format!("{}/{}", pool.max_surge_fee_percentage.numer(), pool.max_surge_fee_percentage.denom()),
+                "reserves": pool.reserves.iter().map(|r| json!({
+                    "token": format!("{:#x}", r.asset.token.0),
+                    "balance": r.asset.amount.to_string(),
+                    "scalingFactor": format!("{}/{}", r.scale.get().numer(), r.scale.get().denom()),
+                    "rate": format!("{}/{}", r.rate.numer(), r.rate.denom()),
+                })).collect::<Vec<_>>(),
+            })
+        }
+        liquidity::State::GyroE(pool) => {
+            json!({
+                "kind": "gyroE",
+                "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
+                "reserves": pool.reserves.iter().map(|r| json!({
+                    "token": format!("{:#x}", r.asset.token.0),
+                    "balance": r.asset.amount.to_string(),
+                    "scalingFactor": format!("{}/{}", r.scale.get().numer(), r.scale.get().denom()),
+                    "rate": format!("{}/{}", r.rate.numer(), r.rate.denom()),
+                })).collect::<Vec<_>>(),
+                "params": json!({
+                    "alpha": format!("{}/{}", pool.params_alpha.numer(), pool.params_alpha.denom()),
+                    "beta": format!("{}/{}", pool.params_beta.numer(), pool.params_beta.denom()),
+                    "c": format!("{}/{}", pool.params_c.numer(), pool.params_c.denom()),
+                    "s": format!("{}/{}", pool.params_s.numer(), pool.params_s.denom()),
+                    "lambda": format!("{}/{}", pool.params_lambda.numer(), pool.params_lambda.denom()),
+                }),
+            })
+        }
+        liquidity::State::Gyro2CLP(pool) => {
+            json!({
+                "kind": "gyro2CLP",
+                "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
+                "reserves": pool.reserves.iter().map(|r| json!({
+                    "token": format!("{:#x}", r.asset.token.0),
+                    "balance": r.asset.amount.to_string(),
+                })).collect::<Vec<_>>(),
+                "sqrtAlpha": format!("{}/{}", pool.sqrt_alpha.numer(), pool.sqrt_alpha.denom()),
+                "sqrtBeta": format!("{}/{}", pool.sqrt_beta.numer(), pool.sqrt_beta.denom()),
+            })
+        }
+        liquidity::State::Gyro3CLP(pool) => {
+            json!({
+                "kind": "gyro3CLP",
+                "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
+                "reserves": pool.reserves.iter().map(|r| json!({
+                    "token": format!("{:#x}", r.asset.token.0),
+                    "balance": r.asset.amount.to_string(),
+                })).collect::<Vec<_>>(),
+                "root3Alpha": format!("{}/{}", pool.root3_alpha.numer(), pool.root3_alpha.denom()),
+            })
+        }
+        liquidity::State::BalancerV3ReClamm(pool) => {
+            json!({
+                "kind": "reClamm",
+                "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
+                "reserves": pool.reserves.iter().map(|r| json!({
+                    "token": format!("{:#x}", r.asset.token.0),
+                    "balance": r.asset.amount.to_string(),
+                })).collect::<Vec<_>>(),
+            })
+        }
+        liquidity::State::QuantAmm(pool) => {
+            json!({
+                "kind": "quantAmm",
+                "fee": format!("{}/{}", pool.fee.numer(), pool.fee.denom()),
+                "reserves": pool.reserves.iter().map(|r| json!({
+                    "token": format!("{:#x}", r.asset.token.0),
+                    "balance": r.asset.amount.to_string(),
+                })).collect::<Vec<_>>(),
+            })
+        }
+        liquidity::State::Concentrated(_pool) => {
+            json!({
+                "kind": "concentrated",
+                // Concentrated liquidity pools are complex, just note the type
+            })
+        }
+        liquidity::State::Erc4626(_edge) => {
+            json!({
+                "kind": "erc4626",
+                // ERC4626 is a wrapper, minimal info needed
+            })
+        }
+        liquidity::State::LimitOrder(order) => {
+            json!({
+                "kind": "limitOrder",
+                "maker": format!("{:#x}", order.maker.token.0),
+                "taker": format!("{:#x}", order.taker.token.0),
+                "makerAmount": order.maker.amount.to_string(),
+                "takerAmount": order.taker.amount.to_string(),
+            })
+        }
+    }
 }

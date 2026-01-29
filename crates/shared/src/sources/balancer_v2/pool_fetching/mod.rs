@@ -33,6 +33,7 @@ use {
         recent_block_cache::{Block, CacheConfig},
         token_info::TokenInfoFetching,
     },
+    alloy::providers::DynProvider,
     anyhow::{Context, Result},
     clap::ValueEnum,
     contracts::alloy::{
@@ -52,8 +53,6 @@ use {
         BalancerV2WeightedPoolFactory,
         BalancerV2WeightedPoolFactoryV3,
         BalancerV2WeightedPoolFactoryV4,
-        InstanceExt,
-        Provider as DynProvider,
     },
     ethcontract::{BlockId, H160, H256},
     ethrpc::block_stream::{BlockRetrieving, CurrentBlockWatcher},
@@ -726,7 +725,6 @@ async fn create_aggregate_pool_fetcher(
             use ethrpc::alloy::conversions::IntoLegacy;
             create_internal_pool_fetcher(
                 contracts.vault.clone(),
-                web3.clone(),
                 $factory::Instance::new(*$instance.address(), $instance.provider().clone()),
                 block_retriever.clone(),
                 token_infos.clone(),
@@ -815,7 +813,6 @@ async fn create_aggregate_pool_fetcher(
 /// specified factory and parameters.
 fn create_internal_pool_fetcher<Factory>(
     vault: BalancerV2Vault::Instance,
-    web3: Web3,
     factory: Factory,
     block_retriever: Arc<dyn BlockRetrieving>,
     token_infos: Arc<dyn TokenInfoFetching>,
@@ -835,7 +832,7 @@ where
 
     Ok(Box::new(Registry::new(
         block_retriever,
-        Arc::new(PoolInfoFetcher::new(vault, web3, factory, token_infos)),
+        Arc::new(PoolInfoFetcher::new(vault, factory, token_infos)),
         factory_instance,
         initial_pools,
         start_sync_at_block,

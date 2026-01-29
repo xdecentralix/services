@@ -6,6 +6,7 @@ use {
     },
     anyhow::Result as AnyResult,
     chain::Chain,
+    ethcontract::H160,
     ethrpc::alloy::conversions::IntoLegacy,
     shared::sources::erc4626::registry::Erc4626Registry,
     solver::{
@@ -37,7 +38,11 @@ fn chain_to_config_dir(chain: &Chain) -> &'static str {
 
 /// Builds the ERC4626 liquidity collector if enabled via
 /// configs/<chain>/erc4626.toml.
-pub async fn maybe_collector(eth: &Ethereum) -> AnyResult<Vec<Box<dyn LiquidityCollecting>>> {
+/// Returns a tuple of (collectors, vault_pairs) where vault_pairs are (vault,
+/// asset) tuples used for pair expansion in the liquidity collector.
+pub async fn maybe_collector(
+    eth: &Ethereum,
+) -> AnyResult<(Vec<Box<dyn LiquidityCollecting>>, Vec<(H160, H160)>)> {
     // Try to load per-chain config file; if missing or disabled, return empty.
     let chain = eth.chain();
     let config_dir = chain_to_config_dir(&chain);
@@ -69,11 +74,23 @@ pub async fn maybe_collector(eth: &Ethereum) -> AnyResult<Vec<Box<dyn LiquidityC
                         fallback = %fallback_path,
                         "ERC4626 registry disabled or config file not found; skipping source"
                     );
-                    return Ok(vec![]);
+                    return Ok((vec![], vec![]));
                 }
             }
         }
     };
+
+    // Resolve all vault metadata to get (vault, asset) pairs for pair expansion
+    let vault_metas = registry.all().await;
+    let vault_pairs: Vec<(H160, H160)> = vault_metas
+        .iter()
+        .map(|meta| (meta.vault, meta.asset))
+        .collect();
+
+    tracing::debug!(
+        vault_count = vault_pairs.len(),
+        "Resolved ERC4626 vault pairs for pair expansion"
+    );
 
     let source = Erc4626LiquiditySource {
         web3,
@@ -89,21 +106,40 @@ pub async fn maybe_collector(eth: &Ethereum) -> AnyResult<Vec<Box<dyn LiquidityC
     };
     let collector =
         BackgroundInitLiquiditySource::new("erc4626", init, Duration::from_secs(5), None);
-    Ok(vec![Box::new(collector)])
+    Ok((vec![Box::new(collector)], vault_pairs))
 }
 
 pub fn to_domain(id: liquidity::Id, order: Erc4626Order) -> Result<liquidity::Liquidity> {
-    // At this stage, amounts are populated during route realization; here we only
-    // carry tokens and handler wiring
-    let (a, b) = order.tokens.get();
+    // Extract vault and asset addresses explicitly from the order.
+    // The wrap/unwrap variants contain the actual contract references with correct
+    // semantics.
+    let (vault, asset) = if let Some(ref wrap) = order.wrap {
+        // Wrap order: asset -> vault
+        let vault_addr: eth::H160 = (*wrap.vault.address()).into_legacy();
+        let asset_addr: eth::H160 = (*wrap.underlying.address()).into_legacy();
+        (vault_addr, asset_addr)
+    } else if let Some(ref unwrap) = order.unwrap {
+        // Unwrap order: vault -> asset
+        // The vault address is known, derive asset from TokenPair
+        let vault_addr: eth::H160 = (*unwrap.vault.address()).into_legacy();
+        let (a, b) = order.tokens.get();
+        let a_h160: eth::H160 = a.into_legacy();
+        let b_h160: eth::H160 = b.into_legacy();
+        // The asset is whichever token in the pair is NOT the vault
+        let asset_addr = if a_h160 == vault_addr { b_h160 } else { a_h160 };
+        (vault_addr, asset_addr)
+    } else {
+        // Fallback: shouldn't happen, but handle gracefully
+        let (a, b) = order.tokens.get();
+        (a.into_legacy(), b.into_legacy())
+    };
+
     Ok(liquidity::Liquidity {
         id,
         gas: 90_000u64.into(),
         kind: liquidity::Kind::Erc4626(liquidity::erc4626::Edge {
-            tokens: (
-                eth::TokenAddress(a.into_legacy().into()),
-                eth::TokenAddress(b.into_legacy().into()),
-            ),
+            vault: eth::TokenAddress(vault.into()),
+            asset: eth::TokenAddress(asset.into()),
         }),
     })
 }

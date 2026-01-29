@@ -1,5 +1,7 @@
 use {
+    contracts::alloy::IERC4626,
     ethereum_types::{H160, U256},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     shared::{baseline_solver::BaselineSolvable, ethrpc::Web3},
 };
 
@@ -8,12 +10,12 @@ use {
 pub struct Edge {
     pub vault: H160,
     pub asset: H160,
-    contract: contracts::IERC4626,
+    contract: IERC4626::Instance,
 }
 
 impl Edge {
     pub fn new(web3: &Web3, vault: H160, asset: H160) -> Self {
-        let contract = contracts::IERC4626::at(web3, vault);
+        let contract = IERC4626::Instance::new(vault.into_alloy(), web3.alloy.clone());
         Self {
             vault,
             asset,
@@ -35,10 +37,20 @@ impl BaselineSolvable for Edge {
             }
             if in_token == this.asset && out_token == this.vault {
                 // asset -> vault
-                this.contract.preview_deposit(in_amount).call().await.ok()
+                this.contract
+                    .previewDeposit(in_amount.into_alloy())
+                    .call()
+                    .await
+                    .ok()
+                    .map(|r| r.into_legacy())
             } else if in_token == this.vault && out_token == this.asset {
                 // vault -> asset
-                this.contract.preview_redeem(in_amount).call().await.ok()
+                this.contract
+                    .previewRedeem(in_amount.into_alloy())
+                    .call()
+                    .await
+                    .ok()
+                    .map(|r| r.into_legacy())
             } else {
                 None
             }
@@ -57,10 +69,20 @@ impl BaselineSolvable for Edge {
             }
             if in_token == this.asset && out_token == this.vault {
                 // asset -> vault (exact shares out)
-                this.contract.preview_mint(out_amount).call().await.ok()
+                this.contract
+                    .previewMint(out_amount.into_alloy())
+                    .call()
+                    .await
+                    .ok()
+                    .map(|r| r.into_legacy())
             } else if in_token == this.vault && out_token == this.asset {
                 // vault -> asset (exact assets out)
-                this.contract.preview_withdraw(out_amount).call().await.ok()
+                this.contract
+                    .previewWithdraw(out_amount.into_alloy())
+                    .call()
+                    .await
+                    .ok()
+                    .map(|r| r.into_legacy())
             } else {
                 None
             }

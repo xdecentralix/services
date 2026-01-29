@@ -9,7 +9,7 @@ use {
         settlement::SettlementEncoder,
     },
     anyhow::Result,
-    contracts::{ERC20, IERC4626, alloy::GPv2Settlement},
+    contracts::alloy::{ERC20, GPv2Settlement, IERC4626},
     ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     model::TokenPair,
     primitive_types::U256,
@@ -26,9 +26,9 @@ use {
 #[derive(Clone, Debug)]
 pub struct Erc4626WrapOrder {
     #[cfg_attr(test, derivative(PartialEq = "ignore"))]
-    pub vault: IERC4626,
+    pub vault: IERC4626::Instance,
     #[cfg_attr(test, derivative(PartialEq = "ignore"))]
-    pub underlying: ERC20,
+    pub underlying: ERC20::Instance,
     pub shares_out: U256,
     pub assets_in_max: U256,
     #[cfg_attr(test, derivative(PartialEq = "ignore"))]
@@ -40,7 +40,7 @@ pub struct Erc4626WrapOrder {
 #[derive(Clone, Debug)]
 pub struct Erc4626UnwrapOrder {
     #[cfg_attr(test, derivative(PartialEq = "ignore"))]
-    pub vault: IERC4626,
+    pub vault: IERC4626::Instance,
     pub assets_out: U256,
     #[cfg_attr(test, derivative(PartialEq = "ignore"))]
     pub settlement: GPv2Settlement::Instance,
@@ -89,8 +89,14 @@ impl LiquidityCollecting for Erc4626LiquiditySource {
                         out.push(Liquidity::Erc4626(Box::new(Erc4626Order {
                             tokens: pair,
                             wrap: Some(Erc4626WrapOrder {
-                                vault: contracts::IERC4626::at(&self.web3, edge.vault),
-                                underlying: contracts::ERC20::at(&self.web3, edge.asset),
+                                vault: IERC4626::Instance::new(
+                                    edge.vault.into_alloy(),
+                                    self.web3.alloy.clone(),
+                                ),
+                                underlying: ERC20::Instance::new(
+                                    edge.asset.into_alloy(),
+                                    self.web3.alloy.clone(),
+                                ),
                                 shares_out: U256::zero(),
                                 assets_in_max: U256::zero(),
                                 settlement: self.settlement.clone(),
@@ -102,7 +108,10 @@ impl LiquidityCollecting for Erc4626LiquiditySource {
                             tokens: pair,
                             wrap: None,
                             unwrap: Some(Erc4626UnwrapOrder {
-                                vault: contracts::IERC4626::at(&self.web3, edge.vault),
+                                vault: IERC4626::Instance::new(
+                                    edge.vault.into_alloy(),
+                                    self.web3.alloy.clone(),
+                                ),
                                 assets_out: U256::zero(),
                                 settlement: self.settlement.clone(),
                             }),
@@ -130,8 +139,8 @@ impl SettlementHandling<Erc4626WrapOrder> for Erc4626WrapOrder {
     fn encode(&self, execution: Self, encoder: &mut SettlementEncoder) -> Result<()> {
         // bounded approve underlying -> vault for assets_in_max
         let approve = Erc20ApproveInteraction {
-            token: execution.underlying.address().into_alloy(),
-            spender: execution.vault.address().into_alloy(),
+            token: *execution.underlying.address(),
+            spender: *execution.vault.address(),
             amount: execution.assets_in_max.into_alloy(),
         };
         encoder.append_to_execution_plan(Arc::new(approve));

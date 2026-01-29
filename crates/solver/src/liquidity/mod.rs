@@ -530,6 +530,7 @@ pub struct BalancerV3ReClammOrder {
     pub end_fourth_root_price_ratio: V3Bfp,
     pub price_ratio_update_start_time: u64,
     pub price_ratio_update_end_time: u64,
+    pub current_timestamp: u64,
     #[cfg_attr(test, derivative(PartialEq = "ignore"))]
     pub settlement_handling: Arc<dyn SettlementHandling<Self>>,
 }

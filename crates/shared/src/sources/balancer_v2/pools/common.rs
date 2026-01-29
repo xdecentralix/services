@@ -10,15 +10,9 @@ use {
         token_info::TokenInfoFetching,
     },
     anyhow::{Context, Result, anyhow, ensure},
-    contracts::{
-        IRateProvider,
-        alloy::{BalancerV2BasePool, BalancerV2Vault},
-    },
+    contracts::alloy::{BalancerV2BasePool, BalancerV2Vault, IRateProvider},
     ethcontract::{BlockId, H160, H256, U256},
-    ethrpc::{
-        Web3,
-        alloy::conversions::{IntoAlloy, IntoLegacy},
-    },
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::{collections::BTreeMap, future::Future, sync::Arc},
     tokio::sync::oneshot,
@@ -48,7 +42,6 @@ where
 /// on a pool factory type and its inner pool type.
 pub struct PoolInfoFetcher<Factory> {
     vault: BalancerV2Vault::Instance,
-    web3: Web3,
     factory: Factory,
     token_infos: Arc<dyn TokenInfoFetching>,
 }
@@ -56,13 +49,11 @@ pub struct PoolInfoFetcher<Factory> {
 impl<Factory> PoolInfoFetcher<Factory> {
     pub fn new(
         vault: BalancerV2Vault::Instance,
-        web3: Web3,
         factory: Factory,
         token_infos: Arc<dyn TokenInfoFetching>,
     ) -> Self {
         Self {
             vault,
-            web3,
             factory,
             token_infos,
         }
@@ -133,7 +124,6 @@ impl<Factory> PoolInfoFetcher<Factory> {
         pool: &PoolInfo,
         block: BlockId,
     ) -> BoxFuture<'static, Result<PoolState>> {
-        let legacy_block = block;
         let block = block.into_alloy();
         let pool_address = pool.address;
         let pool_id = pool.id;
@@ -167,21 +157,32 @@ impl<Factory> PoolInfoFetcher<Factory> {
         };
 
         let rate_providers = pool.rate_providers.clone();
-        let web3 = self.web3.clone();
+        let pool_address = pool.address;
+        let pool_tokens_for_logging = pool.tokens.clone();
+        let provider = self.vault.provider().clone();
         let fetch_rates = async move {
             let mut rates = Vec::new();
-            for rate_provider in rate_providers {
-                if rate_provider == H160::zero() {
+            for (token_index, (rate_provider, token)) in rate_providers
+                .iter()
+                .zip(pool_tokens_for_logging.iter())
+                .enumerate()
+            {
+                if *rate_provider == H160::zero() {
                     rates.push(U256::exp10(18)); // Default rate of 1.0 as rate provider is not set
                 } else {
-                    let rate_contract = IRateProvider::at(&web3, rate_provider);
-                    match rate_contract.get_rate().block(legacy_block).call().await {
-                        Ok(rate) => rates.push(rate),
+                    let rate_contract =
+                        IRateProvider::Instance::new(rate_provider.into_alloy(), provider.clone());
+                    match rate_contract.getRate().block(block).call().await {
+                        Ok(rate) => rates.push(rate.into_legacy()),
                         Err(error) => {
-                            tracing::debug!(
-                                %rate_provider,
+                            tracing::warn!(
                                 ?error,
-                                "rate provider call failed, using default rate of 1.0"
+                                "rate provider call failed, using default rate of 1.0 | \
+                                 rate_provider={:#x} pool={:#x} token={:#x} token_index={}",
+                                rate_provider,
+                                pool_address,
+                                token,
+                                token_index
                             );
                             rates.push(U256::exp10(18)); // Default on error
                         }
@@ -434,22 +435,12 @@ mod tests {
         },
         anyhow::bail,
         contracts::alloy::BalancerV2Vault,
-        ethcontract::{U256, transport::DynTransport},
-        ethrpc::{alloy::MutWallet, mock::MockTransport},
+        ethcontract::U256,
         maplit::{btreemap, hashmap},
         mockall::predicate,
         std::future,
         web3::types::BlockNumber,
     };
-
-    // Helper function to create a mock Web3<DynTransport> for tests
-    fn mock_web3_dyn_transport() -> ethrpc::Web3 {
-        ethrpc::Web3 {
-            legacy: web3::Web3::new(DynTransport::new(MockTransport::new())),
-            alloy: ethrpc::mock::web3().alloy,
-            wallet: MutWallet::default(),
-        }
-    }
 
     #[tokio::test]
     async fn fetch_common_pool_info() {
@@ -489,7 +480,6 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault,
-            web3: mock_web3_dyn_transport(),
             factory: MockFactoryIndexing::new(),
             token_infos: Arc::new(token_infos),
         };
@@ -558,7 +548,6 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault,
-            web3: mock_web3_dyn_transport(),
             factory: MockFactoryIndexing::new(),
             token_infos: Arc::new(token_infos),
         };
@@ -648,7 +637,6 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault,
-            web3: mock_web3_dyn_transport(),
             factory: MockFactoryIndexing::new(),
             token_infos: Arc::new(token_infos),
         };
@@ -778,7 +766,6 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault,
-            web3: mock_web3_dyn_transport(),
             factory,
             token_infos: Arc::new(MockTokenInfoFetching::new()),
         };
@@ -852,7 +839,6 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault,
-            web3: mock_web3_dyn_transport(),
             factory,
             token_infos: Arc::new(MockTokenInfoFetching::new()),
         };
@@ -926,7 +912,6 @@ mod tests {
 
         let pool_info_fetcher = PoolInfoFetcher {
             vault,
-            web3: mock_web3_dyn_transport(),
             factory,
             token_infos: Arc::new(MockTokenInfoFetching::new()),
         };
@@ -964,7 +949,6 @@ mod tests {
                 H160([0xba; 20]).into_alloy(),
                 ethrpc::mock::web3().alloy,
             ),
-            web3: mock_web3_dyn_transport(),
             factory: MockFactoryIndexing::new(),
             token_infos: Arc::new(token_infos),
         };
@@ -991,7 +975,6 @@ mod tests {
                 H160([0xba; 20]).into_alloy(),
                 ethrpc::mock::web3().alloy,
             ),
-            web3: mock_web3_dyn_transport(),
             factory: MockFactoryIndexing::new(),
             token_infos: Arc::new(token_infos),
         };

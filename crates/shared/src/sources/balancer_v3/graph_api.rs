@@ -8,7 +8,10 @@
 //! - ensure that we are using the latest up-to-date pool data by using events
 //!   from the node
 
-const QUERY_PAGE_SIZE: usize = 100;
+/// Page size for pagination when fetching pools from the V3 API.
+const QUERY_PAGE_SIZE: usize = 250;
+/// Maximum number of concurrent detail queries to avoid rate limiting
+const MAX_CONCURRENT_DETAIL_QUERIES: usize = 10;
 
 /// Custom deserializer that converts empty strings to None for optional SBfp
 /// fields. This ensures consistency with V2 and provides robust handling of any
@@ -51,16 +54,47 @@ where
     }
 }
 
+/// Custom deserializer for Bfp that treats the input string as a wei value (raw
+/// integer). This is needed because the API returns some fields (like
+/// maxTradeSizeRatio) as raw wei but formatted as a string (sometimes with
+/// ".000" decimals). E.g., "100000000000000000.000000000000000000" (10^17)
+/// should be parsed as 0.1 tokens (10^17 wei), not 10^17 tokens.
+fn deserialize_optional_bfp_from_wei<'de, D>(deserializer: D) -> Result<Option<Bfp>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt_s = Option::<String>::deserialize(deserializer)?;
+    match opt_s {
+        None => Ok(None),
+        Some(s) => {
+            if s.is_empty() {
+                return Ok(None);
+            }
+            // Handle potential decimal point (take integer part)
+            let integer_part = s.split('.').next().unwrap_or("0");
+            let wei = U256::from_dec_str(integer_part).map_err(serde::de::Error::custom)?;
+            Ok(Some(Bfp::from_wei(wei)))
+        }
+    }
+}
+
 use {
     super::swap::{fixed_point::Bfp, signed_fixed_point::SBfp},
     crate::subgraph::SubgraphClient,
     anyhow::{Context, Result},
-    ethcontract::H160,
+    ethcontract::{H160, U256},
+    futures::stream::{self, StreamExt},
     reqwest::{Client, Url},
     serde::{Deserialize, Deserializer, Serialize},
     serde_json::json,
     serde_with::{DisplayFromStr, serde_as},
-    std::collections::HashMap,
+    std::{
+        collections::HashMap,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+    },
 };
 
 /// Balancer V3 API client for fetching pool data.
@@ -99,13 +133,22 @@ impl BalancerApiClient {
     }
 
     /// Retrieves all registered pools for the configured chain.
+    /// Uses a two-step approach:
+    /// 1. Fetch all pool IDs with minimal data via poolGetPools
+    /// 2. Fetch detailed parameters for Gyro pools via poolGetPool (with rate
+    ///    limiting)
     pub async fn get_registered_pools(&self) -> Result<RegisteredPools> {
         use self::pools_query::*;
 
         let mut pools = Vec::new();
         let mut skip = 0;
 
-        // Use offset-based pagination with Balancer V3 API
+        // Step 1: Fetch all pools with minimal data (poolGetPools returns
+        // GqlPoolMinimal)
+        tracing::info!(
+            "Fetching pool list from Balancer V3 API for chain {:?}",
+            self.chain
+        );
         loop {
             let page = self
                 .client
@@ -117,15 +160,14 @@ impl BalancerApiClient {
                         "orderBy" => "totalLiquidity",
                         "orderDirection" => "desc",
                         "where" => json!({
-                            "includeHooks": "STABLE_SURGE",
                             "chainIn": [self.chain],
-                             "poolTypeIn": ["WEIGHTED", "STABLE", "GYROE", "RECLAMM", "QUANT_AMM_WEIGHTED", "GYRO"],
-                            "protocolVersionIn": [3] // V3 protocol
+                            "protocolVersionIn": [3], // V3 protocol
+                            "minTvl": 50.0
                         }),
                     }),
                 )
                 .await?
-                .aggregator_pools;
+                .pools;
 
             let no_more_pages = page.len() != QUERY_PAGE_SIZE;
             pools.extend(page);
@@ -137,10 +179,131 @@ impl BalancerApiClient {
             skip += QUERY_PAGE_SIZE;
         }
 
+        tracing::info!(
+            "Fetched {} pools, enriching pools with detailed parameters",
+            pools.len()
+        );
+
+        // Step 2: Enrich pools with detailed parameters
+        // Filter pools that need detailed parameters (GYROE, GYRO/2CLP,
+        // QUANT_AMM_WEIGHTED)
+        let pools_needing_details: Vec<_> = pools
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, p)| {
+                if matches!(
+                    p.pool_type.as_str(),
+                    "GYROE" | "GYRO" | "QUANT_AMM_WEIGHTED"
+                ) {
+                    Some((idx, p.id.clone(), p.pool_type.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if !pools_needing_details.is_empty() {
+            tracing::info!(
+                "Fetching detailed parameters for {} pools (rate-limited to {} concurrent \
+                 requests)",
+                pools_needing_details.len(),
+                MAX_CONCURRENT_DETAIL_QUERIES
+            );
+
+            // Fetch details with controlled concurrency to avoid rate limits
+            let total_to_fetch = pools_needing_details.len();
+            let processed = Arc::new(AtomicUsize::new(0));
+
+            let enriched_pools = stream::iter(pools_needing_details)
+                .map(|(idx, pool_id, pool_type)| async move {
+                    let detailed = self.get_pool_details(&pool_id, &pool_type).await;
+                    (idx, detailed)
+                })
+                .buffer_unordered(MAX_CONCURRENT_DETAIL_QUERIES)
+                .inspect({
+                    let processed = Arc::clone(&processed);
+                    move |_| {
+                        let count = processed.fetch_add(1, Ordering::Relaxed) + 1;
+                        if count % 10 == 0 || count == total_to_fetch {
+                            tracing::debug!(
+                                "Pool enrichment progress: {}/{} pools fetched",
+                                count,
+                                total_to_fetch
+                            );
+                        }
+                    }
+                })
+                .collect::<Vec<_>>()
+                .await;
+
+            // Merge detailed data back into pools
+            let mut successful = 0;
+            let mut failed = 0;
+            for (idx, detailed_result) in enriched_pools {
+                match detailed_result {
+                    Ok(detailed) => {
+                        pools[idx] = detailed;
+                        successful += 1;
+                    }
+                    Err(err) => {
+                        tracing::warn!(
+                            "Failed to fetch details for pool {}: {:?}",
+                            pools[idx].id,
+                            err
+                        );
+                        failed += 1;
+                        // Continue with minimal data for this pool
+                    }
+                }
+            }
+
+            tracing::info!(
+                "Completed pool enrichment: {}/{} successful, {} failed",
+                successful,
+                total_to_fetch,
+                failed
+            );
+        }
+
         Ok(RegisteredPools {
             fetched_block_number: 0, // Balancer V3 API doesn't support historical queries
             pools,
         })
+    }
+
+    /// Fetches detailed pool data for a specific pool using poolGetPool query
+    /// with inline fragments. This is necessary because poolGetPools
+    /// returns GqlPoolMinimal without type-specific parameters (Gyro, QuantAMM,
+    /// etc.).
+    async fn get_pool_details(&self, pool_id: &str, pool_type: &str) -> Result<PoolData> {
+        use self::pool_detail_query::*;
+
+        let query = match pool_type {
+            "GYROE" => QUERY_GYRO_E,
+            "GYRO" => QUERY_GYRO_2CLP,
+            "QUANT_AMM_WEIGHTED" => QUERY_QUANT_AMM,
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unsupported pool type for detail query: {}",
+                    pool_type
+                ));
+            }
+        };
+
+        let data = self
+            .client
+            .query::<DetailData>(
+                query,
+                Some(json_map! {
+                    "id" => pool_id,
+                    "chain" => serde_json::to_value(self.chain).context("Failed to serialize chain")?,
+                }),
+            )
+            .await
+            .context("Failed to fetch pool details")?;
+
+        data.pool
+            .ok_or_else(|| anyhow::anyhow!("Pool not found: {}", pool_id))
     }
 }
 
@@ -243,8 +406,7 @@ pub struct PoolData {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct QuantAmmWeightedParams {
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_bfp_from_wei")]
     pub max_trade_size_ratio: Option<Bfp>,
 }
 
@@ -352,15 +514,18 @@ impl PoolData {
 mod pools_query {
     use serde::Deserialize;
 
+    // Step 1 query: Fetch minimal pool data (poolGetPools returns GqlPoolMinimal)
+    // Note: We cannot request gyro parameters here as they're not available on
+    // GqlPoolMinimal
     pub const QUERY: &str = r#"
-        query aggregatorPools(
+        query poolGetPools(
             $first: Int,
             $skip: Int,
             $orderBy: GqlPoolOrderBy,
             $orderDirection: GqlPoolOrderDirection,
-            $where: GqlAggregatorPoolFilter
+            $where: GqlPoolFilter
         ) {
-            aggregatorPools(
+            poolGetPools(
                 first: $first
                 skip: $skip
                 orderBy: $orderBy
@@ -383,25 +548,6 @@ mod pools_query {
                     swapEnabled
                 }
                 createTime
-                alpha
-                beta
-                c
-                s
-                lambda
-                tauAlphaX
-                tauAlphaY
-                tauBetaX
-                tauBetaY
-                u
-                v
-                w
-                z
-                dSq
-                quantAmmWeightedParams {
-                    maxTradeSizeRatio
-                }
-                sqrtAlpha
-                sqrtBeta
                 hook {
                     address
                     params {
@@ -417,8 +563,143 @@ mod pools_query {
 
     #[derive(Debug, Deserialize)]
     pub struct Data {
-        #[serde(rename = "aggregatorPools")]
-        pub aggregator_pools: Vec<super::PoolData>,
+        #[serde(rename = "poolGetPools")]
+        pub pools: Vec<super::PoolData>,
+    }
+}
+
+mod pool_detail_query {
+    use serde::Deserialize;
+
+    // Step 2 query: Fetch detailed Gyro E-CLP pool data using poolGetPool with
+    // inline fragments
+    pub const QUERY_GYRO_E: &str = r#"
+        query poolGetPool($id: String!, $chain: GqlChain!) {
+            poolGetPool(id: $id, chain: $chain) {
+                id
+                address
+                type
+                protocolVersion
+                factory
+                chain
+                poolTokens {
+                    address
+                    decimals
+                    weight
+                    priceRateProvider
+                }
+                dynamicData {
+                    swapEnabled
+                }
+                createTime
+                hook {
+                    address
+                    params {
+                        ... on StableSurgeHookParams {
+                            maxSurgeFeePercentage
+                            surgeThresholdPercentage
+                        }
+                    }
+                }
+                ... on GqlPoolGyro {
+                    alpha
+                    beta
+                    c
+                    s
+                    lambda
+                    tauAlphaX
+                    tauAlphaY
+                    tauBetaX
+                    tauBetaY
+                    u
+                    v
+                    w
+                    z
+                    dSq
+                }
+            }
+        }
+    "#;
+
+    // Step 2 query: Fetch detailed Gyro 2-CLP pool data
+    pub const QUERY_GYRO_2CLP: &str = r#"
+        query poolGetPool($id: String!, $chain: GqlChain!) {
+            poolGetPool(id: $id, chain: $chain) {
+                id
+                address
+                type
+                protocolVersion
+                factory
+                chain
+                poolTokens {
+                    address
+                    decimals
+                    weight
+                    priceRateProvider
+                }
+                dynamicData {
+                    swapEnabled
+                }
+                createTime
+                hook {
+                    address
+                    params {
+                        ... on StableSurgeHookParams {
+                            maxSurgeFeePercentage
+                            surgeThresholdPercentage
+                        }
+                    }
+                }
+                ... on GqlPoolGyro {
+                    sqrtAlpha
+                    sqrtBeta
+                }
+            }
+        }
+    "#;
+
+    // Step 2 query: Fetch detailed QuantAMM Weighted pool data
+    pub const QUERY_QUANT_AMM: &str = r#"
+        query poolGetPool($id: String!, $chain: GqlChain!) {
+            poolGetPool(id: $id, chain: $chain) {
+                id
+                address
+                type
+                protocolVersion
+                factory
+                chain
+                poolTokens {
+                    address
+                    decimals
+                    weight
+                    priceRateProvider
+                }
+                dynamicData {
+                    swapEnabled
+                }
+                createTime
+                hook {
+                    address
+                    params {
+                        ... on StableSurgeHookParams {
+                            maxSurgeFeePercentage
+                            surgeThresholdPercentage
+                        }
+                    }
+                }
+                ... on GqlPoolQuantAmmWeighted {
+                    quantAmmWeightedParams {
+                        maxTradeSizeRatio
+                    }
+                }
+            }
+        }
+    "#;
+
+    #[derive(Debug, Deserialize)]
+    pub struct DetailData {
+        #[serde(rename = "poolGetPool")]
+        pub pool: Option<super::PoolData>,
     }
 }
 
@@ -429,7 +710,7 @@ mod tests {
     #[test]
     fn decode_pools_data() {
         let json = r#"{
-            "aggregatorPools": [
+            "poolGetPools": [
                 {
                     "id": "0x1111111111111111111111111111111111111111",
                     "address": "0x1111111111111111111111111111111111111111",
@@ -454,8 +735,8 @@ mod tests {
         }"#;
 
         let data: pools_query::Data = serde_json::from_str(json).unwrap();
-        assert_eq!(data.aggregator_pools.len(), 1);
-        let pool = &data.aggregator_pools[0];
+        assert_eq!(data.pools.len(), 1);
+        let pool = &data.pools[0];
         assert_eq!(pool.id, "0x1111111111111111111111111111111111111111");
         assert_eq!(pool.address, H160([0x11; 20]));
         assert_eq!(pool.pool_type_enum(), PoolType::Weighted);
@@ -470,7 +751,7 @@ mod tests {
 
         // Test that both null and empty strings are handled correctly in V3
         let mixed_json = json!({
-            "aggregatorPools": [
+            "poolGetPools": [
                 {
                     "id": "0x1111111111111111111111111111111111111111",
                     "address": "0x1111111111111111111111111111111111111111",
@@ -514,7 +795,7 @@ mod tests {
         });
 
         let data: Data = serde_json::from_value(mixed_json).unwrap();
-        let pool = &data.aggregator_pools[0];
+        let pool = &data.pools[0];
 
         // Verify E-CLP parameters parsed correctly
         assert!(pool.alpha.is_some());
@@ -548,7 +829,7 @@ mod tests {
     #[test]
     fn decode_stable_surge_hook_data() {
         let json = r#"{
-            "aggregatorPools": [
+            "poolGetPools": [
                 {
                     "id": "0x1111111111111111111111111111111111111111",
                     "address": "0x1111111111111111111111111111111111111111",
@@ -579,8 +860,8 @@ mod tests {
         }"#;
 
         let data: pools_query::Data = serde_json::from_str(json).unwrap();
-        assert_eq!(data.aggregator_pools.len(), 1);
-        let pool = &data.aggregator_pools[0];
+        assert_eq!(data.pools.len(), 1);
+        let pool = &data.pools[0];
 
         // Verify pool basic data
         assert_eq!(pool.pool_type_enum(), PoolType::Stable);

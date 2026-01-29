@@ -20,12 +20,13 @@ use {
         event_handling::EventStoring,
         sources::balancer_v3::pools::{FactoryIndexing, PoolIndexing, common},
     },
+    alloy::rpc::types::Log,
     anyhow::{Context, Result},
-    contracts::balancer_v3_weighted_pool_factory::{
-        Event as BasePoolFactoryEvent,
-        event_data::PoolCreated,
+    contracts::alloy::BalancerV3WeightedPoolFactory::BalancerV3WeightedPoolFactory::{
+        BalancerV3WeightedPoolFactoryEvents,
+        PoolCreated,
     },
-    ethcontract::{Event, H160},
+    ethcontract::H160,
     ethrpc::{alloy::conversions::IntoLegacy, block_stream::RangeInclusive},
     model::TokenPair,
     std::{
@@ -131,7 +132,7 @@ where
     ) -> Result<()> {
         let pool = self
             .pool_info_fetcher
-            .fetch_pool_info(pool_creation.pool, block_created)
+            .fetch_pool_info(pool_creation.pool.into_legacy(), block_created)
             .await?;
         self.insert_pool(pool);
 
@@ -177,13 +178,13 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Factory> EventStoring<Event<BasePoolFactoryEvent>> for PoolStorage<Factory>
+impl<Factory> EventStoring<(BalancerV3WeightedPoolFactoryEvents, Log)> for PoolStorage<Factory>
 where
     Factory: FactoryIndexing,
 {
     async fn replace_events(
         &mut self,
-        events: Vec<Event<BasePoolFactoryEvent>>,
+        events: Vec<(BalancerV3WeightedPoolFactoryEvents, Log)>,
         range: RangeInclusive<u64>,
     ) -> Result<()> {
         tracing::debug!("replacing {} events for block {:?}", events.len(), range);
@@ -192,17 +193,20 @@ where
         self.append_events(events).await
     }
 
-    async fn append_events(&mut self, events: Vec<Event<BasePoolFactoryEvent>>) -> Result<()> {
+    async fn append_events(
+        &mut self,
+        events: Vec<(BalancerV3WeightedPoolFactoryEvents, Log)>,
+    ) -> Result<()> {
         tracing::debug!("inserting {} events", events.len());
 
-        for event in events {
-            let block_created = event.meta.context("event missing metadata")?.block_number;
-            match event.data {
-                BasePoolFactoryEvent::PoolCreated(pool_created) => {
+        for (event, log) in events {
+            let block_created = log.block_number.context("event missing block number")?;
+            match event {
+                BalancerV3WeightedPoolFactoryEvents::PoolCreated(pool_created) => {
                     self.index_pool_creation(pool_created, block_created)
                         .await?;
                 }
-                BasePoolFactoryEvent::FactoryDisabled(_) => {
+                BalancerV3WeightedPoolFactoryEvents::FactoryDisabled(_) => {
                     // Ignore factory disabled events
                     tracing::debug!("ignoring factory disabled event");
                 }
@@ -258,7 +262,7 @@ mod tests {
             .map(|i| {
                 (
                     PoolCreated {
-                        pool: pool_addresses[i],
+                        pool: pool_addresses[i].into_alloy(),
                     },
                     i as u64,
                 )
@@ -444,7 +448,7 @@ mod tests {
             weights: vec![Bfp::from_wei(1337.into())],
         };
         let new_creation = PoolCreated {
-            pool: new_pool.common.address,
+            pool: new_pool.common.address.into_alloy(),
         };
 
         mock_pool_fetcher

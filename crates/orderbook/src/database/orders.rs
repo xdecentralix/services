@@ -12,8 +12,7 @@ use {
         order_events::{OrderEvent, OrderEventLabel, insert_order_event},
         orders::{self, FullOrder, OrderKind as DbOrderKind},
     },
-    ethcontract::H256,
-    ethrpc::alloy::conversions::IntoLegacy,
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt, StreamExt, stream::TryStreamExt},
     model::{
         order::{
@@ -40,7 +39,6 @@ use {
         big_decimal_to_u256,
         u256_to_big_decimal,
     },
-    primitive_types::{H160, U256},
     shared::{
         db_order_conversions::{
             buy_token_destination_from,
@@ -165,7 +163,7 @@ async fn insert_order(order: &Order, ex: &mut PgConnection) -> Result<(), Insert
 
     let db_order = database::orders::Order {
         uid: order_uid,
-        owner: ByteArray(order.metadata.owner.0),
+        owner: ByteArray(order.metadata.owner.0.0),
         creation_timestamp: order.metadata.creation_date,
         sell_token: ByteArray(order.data.sell_token.0.0),
         buy_token: ByteArray(order.data.buy_token.0.0),
@@ -180,7 +178,7 @@ async fn insert_order(order: &Order, ex: &mut PgConnection) -> Result<(), Insert
         partially_fillable: order.data.partially_fillable,
         signature: order.signature.to_bytes(),
         signing_scheme: signing_scheme_into(order.signature.scheme()),
-        settlement_contract: ByteArray(order.metadata.settlement_contract.0),
+        settlement_contract: ByteArray(order.metadata.settlement_contract.0.0),
         sell_token_balance: sell_token_source_into(order.data.sell_token_balance),
         buy_token_balance: buy_token_destination_into(order.data.buy_token_balance),
         cancellation_timestamp: None,
@@ -408,7 +406,7 @@ impl Postgres {
     }
 
     pub async fn token_metadata(&self, token: &Address) -> Result<TokenMetadata> {
-        let (first_trade_block, native_price): (Option<u32>, Option<U256>) = tokio::try_join!(
+        let (first_trade_block, native_price): (Option<u32>, Option<alloy::primitives::U256>) = tokio::try_join!(
             self.execute_instrumented("token_first_trade_block", async {
                 let mut ex = self.pool.acquire().await?;
                 database::trades::token_first_trade_block(&mut ex, ByteArray(token.0.0))
@@ -426,7 +424,7 @@ impl Postgres {
                 )
                 .await
                 .map_err(anyhow::Error::from)?
-                .and_then(|price| big_decimal_to_u256(&price)))
+                .and_then(|price| number::conversions::alloy::big_decimal_to_u256(&price)))
             })
         )?;
 
@@ -455,7 +453,7 @@ impl Postgres {
 
 #[async_trait]
 impl LimitOrderCounting for Postgres {
-    async fn count(&self, owner: H160) -> Result<u64> {
+    async fn count(&self, owner: Address) -> Result<u64> {
         let _timer = super::Metrics::get()
             .database_queries
             .with_label_values(&["count_limit_orders_by_owner"])
@@ -465,20 +463,28 @@ impl LimitOrderCounting for Postgres {
         Ok(database::orders::user_orders_with_quote(
             &mut ex,
             now_in_epoch_seconds().into(),
-            &ByteArray(owner.0),
+            &ByteArray(owner.0.0),
         )
         .await?
         .into_iter()
         .filter(|order_with_quote| {
             is_order_outside_market_price(
                 &Amounts {
-                    sell: big_decimal_to_u256(&order_with_quote.order_sell_amount).unwrap(),
-                    buy: big_decimal_to_u256(&order_with_quote.order_buy_amount).unwrap(),
-                    fee: 0.into(),
+                    sell: big_decimal_to_u256(&order_with_quote.order_sell_amount)
+                        .unwrap()
+                        .into_alloy(),
+                    buy: big_decimal_to_u256(&order_with_quote.order_buy_amount)
+                        .unwrap()
+                        .into_alloy(),
+                    fee: alloy::primitives::U256::from(0),
                 },
                 &Amounts {
-                    sell: big_decimal_to_u256(&order_with_quote.quote_sell_amount).unwrap(),
-                    buy: big_decimal_to_u256(&order_with_quote.quote_buy_amount).unwrap(),
+                    sell: big_decimal_to_u256(&order_with_quote.quote_sell_amount)
+                        .unwrap()
+                        .into_alloy(),
+                    buy: big_decimal_to_u256(&order_with_quote.quote_buy_amount)
+                        .unwrap()
+                        .into_alloy(),
                     fee: FeeParameters {
                         gas_amount: order_with_quote.quote_gas_amount,
                         gas_price: order_with_quote.quote_gas_price,
@@ -538,12 +544,14 @@ fn full_order_with_quote_into_model_order(
     let ethflow_data = if let Some((refund_tx, user_valid_to)) = order.ethflow_data {
         Some(EthflowData {
             user_valid_to,
-            refund_tx_hash: refund_tx.map(|hash| H256(hash.0)),
+            refund_tx_hash: refund_tx.map(|hash| B256::new(hash.0)),
         })
     } else {
         None
     };
-    let onchain_user = order.onchain_user.map(|onchain_user| H160(onchain_user.0));
+    let onchain_user = order
+        .onchain_user
+        .map(|onchain_user| Address::new(onchain_user.0));
     let class = order_class_from(&order);
     let onchain_placement_error = onchain_order_placement_error_from(&order);
     let onchain_order_data = onchain_user.map(|onchain_user| OnchainOrderData {
@@ -553,7 +561,7 @@ fn full_order_with_quote_into_model_order(
 
     let metadata = OrderMetadata {
         creation_date: order.creation_timestamp,
-        owner: H160(order.owner.0),
+        owner: Address::new(order.owner.0),
         uid: OrderUid(order.uid.0),
         available_balance: Default::default(),
         executed_buy_amount: big_decimal_to_big_uint(&order.sum_buy)
@@ -571,12 +579,12 @@ fn full_order_with_quote_into_model_order(
             .context("executed fee amount is not a valid u256")?,
         executed_fee: big_decimal_to_u256(&order.executed_fee)
             .context("executed fee is not a valid u256")?,
-        executed_fee_token: H160(order.executed_fee_token.0),
+        executed_fee_token: Address::new(order.executed_fee_token.0),
         invalidated: order.invalidated,
         status,
         is_liquidity_order: class == OrderClass::Liquidity,
         class,
-        settlement_contract: H160(order.settlement_contract.0),
+        settlement_contract: Address::new(order.settlement_contract.0),
         ethflow_data,
         onchain_user,
         onchain_order_data,
@@ -652,13 +660,11 @@ mod tests {
                 SigningScheme as DbSigningScheme,
             },
         },
-        ethrpc::alloy::conversions::IntoAlloy,
         model::{
             interaction::InteractionData,
             order::{Order, OrderData, OrderMetadata, OrderStatus, OrderUid},
             signature::{Signature, SigningScheme},
         },
-        primitive_types::U256,
         shared::order_quoting::{Quote, QuoteData, QuoteMetadataV1},
         std::sync::atomic::{AtomicI64, Ordering},
     };
@@ -879,7 +885,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn postgres_replace_order() {
-        let owner = H160([0x77; 20]);
+        let owner = Address::repeat_byte(0x77);
 
         let db = Postgres::try_new("postgresql://").unwrap();
         database::clear_DANGER(&db.pool).await.unwrap();
@@ -916,7 +922,7 @@ mod tests {
             .unwrap();
 
         let order_statuses = db
-            .user_orders(&owner.into_alloy(), 0, None)
+            .user_orders(&owner, 0, None)
             .await
             .unwrap()
             .iter()
@@ -945,7 +951,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn postgres_replace_order_no_cancellation_on_error() {
-        let owner = H160([0x77; 20]);
+        let owner = Address::repeat_byte(0x77);
 
         let db = Postgres::try_new("postgresql://").unwrap();
         database::clear_DANGER(&db.pool).await.unwrap();
@@ -1020,7 +1026,7 @@ mod tests {
         let insert_presignature = |signed: bool| {
             let db = db.clone();
             let block_number = &block_number;
-            let owner = order.metadata.owner.as_bytes();
+            let owner = order.metadata.owner.as_slice();
             async move {
                 sqlx::query(
                     "INSERT INTO presignature_events (block_number, log_index, owner, order_uid, \
@@ -1124,8 +1130,8 @@ mod tests {
 
         let quote = Quote {
             id: Some(5),
-            sell_amount: U256::from(1),
-            buy_amount: U256::from(2),
+            sell_amount: alloy::primitives::U256::from(1),
+            buy_amount: alloy::primitives::U256::from(2),
             data: QuoteData {
                 fee_parameters: FeeParameters {
                     sell_token_price: 2.5,
@@ -1174,8 +1180,8 @@ mod tests {
 
         let quote = Quote {
             id: Some(5),
-            sell_amount: U256::from(1),
-            buy_amount: U256::from(2),
+            sell_amount: alloy::primitives::U256::from(1),
+            buy_amount: alloy::primitives::U256::from(2),
             data: QuoteData {
                 verified: true,
                 metadata: QuoteMetadataV1 {

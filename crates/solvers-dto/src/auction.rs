@@ -320,6 +320,7 @@ pub struct ForeignLimitOrder {
 #[serde(rename_all = "camelCase")]
 pub struct Erc4626Edge {
     pub id: String,
+    pub address: H160,
     #[serde_as(as = "HexOrDecimalU256")]
     pub gas_estimate: U256,
     pub vault: H160,
@@ -458,6 +459,7 @@ pub struct ReClammPool {
     pub end_fourth_root_price_ratio: BigDecimal,
     pub price_ratio_update_start_time: u64,
     pub price_ratio_update_end_time: u64,
+    pub current_timestamp: u64,
 }
 
 #[serde_as]

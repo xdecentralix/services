@@ -8,8 +8,9 @@ use {
         ethrpc::Web3,
         sources::erc4626::registry::{Erc4626Registry, VaultMeta},
     },
+    contracts::alloy::IERC4626,
     ethcontract::{H160, U256},
-    ethrpc::alloy::conversions::IntoAlloy,
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     model::TokenPair,
     std::collections::HashMap,
 };
@@ -24,12 +25,12 @@ pub struct Erc4626Edge {
     pub vault: H160,
     pub asset: H160,
     pub epsilon_bps: u16,
-    contract: contracts::IERC4626,
+    contract: IERC4626::Instance,
 }
 
 impl Erc4626Edge {
     pub fn new(web3: &Web3, meta: &VaultMeta) -> Self {
-        let contract = contracts::IERC4626::at(web3, meta.vault);
+        let contract = IERC4626::Instance::new(meta.vault.into_alloy(), web3.alloy.clone());
         Self {
             vault: meta.vault,
             asset: meta.asset,
@@ -62,7 +63,13 @@ impl BaselineSolvable for Erc4626Edge {
 
             // Wrap (asset -> vault): use previewDeposit
             if in_token == this.asset && out_token == this.vault {
-                let res = this.contract.preview_deposit(in_amount).call().await.ok();
+                let res = this
+                    .contract
+                    .previewDeposit(in_amount.into_alloy())
+                    .call()
+                    .await
+                    .ok()
+                    .map(|r| r.into_legacy());
                 if let Some(ref shares_out) = res {
                     tracing::debug!(
                         asset = ?this.asset,
@@ -77,7 +84,13 @@ impl BaselineSolvable for Erc4626Edge {
 
             // Unwrap (vault -> asset): use previewRedeem
             if in_token == this.vault && out_token == this.asset {
-                let res = this.contract.preview_redeem(in_amount).call().await.ok();
+                let res = this
+                    .contract
+                    .previewRedeem(in_amount.into_alloy())
+                    .call()
+                    .await
+                    .ok()
+                    .map(|r| r.into_legacy());
                 if let Some(ref assets_out) = res {
                     tracing::debug!(
                         vault = ?this.vault,
@@ -108,7 +121,13 @@ impl BaselineSolvable for Erc4626Edge {
             // Wrap exact-out (asset -> vault): assets_in_max = ceil(previewMint(shares_out)
             // * (1+ε))
             if in_token == this.asset && out_token == this.vault {
-                let preview = this.contract.preview_mint(out_amount).call().await.ok()?;
+                let preview: U256 = this
+                    .contract
+                    .previewMint(out_amount.into_alloy())
+                    .call()
+                    .await
+                    .ok()?
+                    .into_legacy();
                 let needed = apply_epsilon_ceiled(preview, this.epsilon_bps);
                 tracing::debug!(
                     asset = ?this.asset,
@@ -125,12 +144,13 @@ impl BaselineSolvable for Erc4626Edge {
             // Unwrap exact-out (vault -> asset): shares_in_max =
             // ceil(previewWithdraw(assets_out) * (1+ε))
             if in_token == this.vault && out_token == this.asset {
-                let preview = this
+                let preview: U256 = this
                     .contract
-                    .preview_withdraw(out_amount)
+                    .previewWithdraw(out_amount.into_alloy())
                     .call()
                     .await
-                    .ok()?;
+                    .ok()?
+                    .into_legacy();
                 let needed = apply_epsilon_ceiled(preview, this.epsilon_bps);
                 tracing::debug!(
                     vault = ?this.vault,

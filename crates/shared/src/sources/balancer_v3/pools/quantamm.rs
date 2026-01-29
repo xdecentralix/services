@@ -8,8 +8,9 @@ use {
         swap::fixed_point::Bfp,
     },
     anyhow::{Result, anyhow},
-    contracts::{BalancerV3QuantAMMWeightedPool, BalancerV3QuantAMMWeightedPoolFactory},
+    contracts::alloy::{BalancerV3QuantAMMWeightedPool, BalancerV3QuantAMMWeightedPoolFactory},
     ethcontract::{BlockId, H160, I256},
+    ethrpc::alloy::conversions::{IntoAlloy, IntoLegacy},
     futures::{FutureExt as _, future::BoxFuture},
     std::collections::BTreeMap,
 };
@@ -74,25 +75,24 @@ impl PoolIndexing for PoolInfo {
 }
 
 #[async_trait::async_trait]
-impl FactoryIndexing for BalancerV3QuantAMMWeightedPoolFactory {
+impl FactoryIndexing for BalancerV3QuantAMMWeightedPoolFactory::Instance {
     type PoolInfo = PoolInfo;
     type PoolState = PoolState;
 
     async fn specialize_pool_info(&self, pool: common::PoolInfo) -> Result<Self::PoolInfo> {
-        let pool_contract =
-            BalancerV3QuantAMMWeightedPool::at(&self.raw_instance().web3(), pool.address);
+        let pool_contract = BalancerV3QuantAMMWeightedPool::Instance::new(
+            pool.address.into_alloy(),
+            self.provider().clone(),
+        );
 
         let immutable_data = pool_contract
-            .get_quant_amm_weighted_pool_immutable_data()
+            .getQuantAMMWeightedPoolImmutableData()
             .call()
             .await
             .map_err(|err| anyhow!("Failed to fetch QuantAMM immutable data: {err}"))?;
 
-        // Extract maxTradeSizeRatio from the immutable data tuple (9th field, index 8)
-        // struct: tokens, oracleStalenessThreshold, poolRegistry, ruleParameters,
-        // lambda, epsilonMax, absoluteWeightGuardRail, updateInterval,
-        // maxTradeSizeRatio
-        let max_trade_size_ratio = Bfp::from_wei(immutable_data.8);
+        // Extract maxTradeSizeRatio from the immutable data struct
+        let max_trade_size_ratio = Bfp::from_wei(immutable_data.maxTradeSizeRatio.into_legacy());
 
         Ok(PoolInfo {
             common: pool,
@@ -106,17 +106,21 @@ impl FactoryIndexing for BalancerV3QuantAMMWeightedPoolFactory {
         common_pool_state: BoxFuture<'static, common::PoolState>,
         block: BlockId,
     ) -> BoxFuture<'static, Result<Option<Self::PoolState>>> {
-        let pool_contract = BalancerV3QuantAMMWeightedPool::at(
-            &self.raw_instance().web3(),
-            pool_info.common.address,
+        let block = block.into_alloy();
+        let pool_contract = BalancerV3QuantAMMWeightedPool::Instance::new(
+            pool_info.common.address.into_alloy(),
+            self.provider().clone(),
         );
         let max_trade_size_ratio = pool_info.max_trade_size_ratio;
 
         let fetch_common = common_pool_state.map(Result::Ok);
-        let fetch_dynamic = pool_contract
-            .get_quant_amm_weighted_pool_dynamic_data()
-            .block(block)
-            .call();
+        let fetch_dynamic = async move {
+            pool_contract
+                .getQuantAMMWeightedPoolDynamicData()
+                .block(block)
+                .call()
+                .await
+        };
 
         async move {
             let (common, dynamic_data) = futures::try_join!(fetch_common, fetch_dynamic)?;
@@ -128,19 +132,19 @@ impl FactoryIndexing for BalancerV3QuantAMMWeightedPoolFactory {
                 .unwrap_or_default()
                 .as_secs();
 
-            // Extract dynamic data following the ABI structure
-            let (
-                _balances_live_scaled18,   // Already in common
-                _token_rates,              // Already in common
-                _total_supply,             // Already in common
-                _is_pool_initialized,      // Not used
-                _is_pool_paused,           // Already in common
-                _is_pool_in_recovery_mode, // Not used
-                first_four_weights_and_multipliers,
-                second_four_weights_and_multipliers,
-                last_update_time,
-                last_interop_time,
-            ) = dynamic_data;
+            // Extract dynamic data from the struct fields
+            let first_four_weights_and_multipliers: Vec<I256> = dynamic_data
+                .firstFourWeightsAndMultipliers
+                .into_iter()
+                .map(|v| v.into_legacy())
+                .collect();
+            let second_four_weights_and_multipliers: Vec<I256> = dynamic_data
+                .secondFourWeightsAndMultipliers
+                .into_iter()
+                .map(|v| v.into_legacy())
+                .collect();
+            let last_update_time: u64 = dynamic_data.lastUpdateTime.to();
+            let last_interop_time: u64 = dynamic_data.lastInteropTime.to();
 
             // Store raw data without calculations (like ReClamm pattern)
             Ok(Some(PoolState {

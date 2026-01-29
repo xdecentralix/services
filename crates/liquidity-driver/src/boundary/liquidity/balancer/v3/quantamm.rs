@@ -43,9 +43,9 @@ pub fn to_domain(id: liquidity::Id, pool: BalancerV3QuantAmmOrder) -> Result<liq
             version: match pool.version {
                 QuantAmmPoolVersion::V1 => balancer::v3::quantamm::Version::V1,
             },
-            max_trade_size_ratio: balancer::v3::ScalingFactor::from_raw(
+            max_trade_size_ratio: balancer::v3::Fee::from_raw(
                 pool.max_trade_size_ratio.as_uint256(),
-            )?,
+            ),
             first_four_weights_and_multipliers: pool.first_four_weights_and_multipliers,
             second_four_weights_and_multipliers: pool.second_four_weights_and_multipliers,
             last_update_time: pool.last_update_time,

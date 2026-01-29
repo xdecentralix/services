@@ -10,6 +10,7 @@ pub mod limit_order;
 pub mod quantamm;
 pub mod reclamm;
 pub mod stable;
+pub mod stable_surge;
 pub mod weighted_product;
 
 use {crate::domain::eth, ethereum_types::H160, std::cmp::Ordering};
@@ -33,6 +34,7 @@ pub enum State {
     ConstantProduct(constant_product::Pool),
     WeightedProduct(weighted_product::Pool),
     Stable(stable::Pool),
+    StableSurge(stable_surge::Pool),
     Concentrated(concentrated::Pool),
     GyroE(Box<gyro_e::Pool>),
     Gyro2CLP(gyro_2clp::Pool),

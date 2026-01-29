@@ -348,7 +348,7 @@ mod erc4626 {
     pub fn to_domain(edge: &Erc4626Edge) -> Result<liquidity::Liquidity, Error> {
         Ok(liquidity::Liquidity {
             id: liquidity::Id(edge.id.clone()),
-            address: edge.vault,
+            address: edge.address,
             gas: eth::Gas(edge.gas_estimate),
             state: liquidity::State::Erc4626(liquidity::erc4626::Edge {
                 asset: eth::TokenAddress(edge.asset),
@@ -730,6 +730,7 @@ mod reclamm_pool {
                 .ok_or("invalid end_fourth_root_price_ratio")?,
                 price_ratio_update_start_time: pool.price_ratio_update_start_time,
                 price_ratio_update_end_time: pool.price_ratio_update_end_time,
+                current_timestamp: pool.current_timestamp,
             }),
         })
     }
@@ -738,10 +739,8 @@ mod reclamm_pool {
 mod stable_surge_pool {
     use super::*;
     pub fn to_domain(pool: &StableSurgePool) -> Result<liquidity::Liquidity, Error> {
-        // External solvers receive StableSurge pool data but convert them to regular
-        // stable pools for their own pathfinding. They use the current
-        // effective fee from the DTO, not the dynamic surge calculations (which
-        // happen in the internal solver/driver).
+        // StableSurge pools are stable pools with dynamic surge pricing.
+        // We preserve the surge parameters so the solver can calculate dynamic fees.
         let reserves = {
             let mut entries = pool
                 .tokens
@@ -771,11 +770,17 @@ mod stable_surge_pool {
             id: liquidity::Id(pool.id.clone()),
             address: pool.address,
             gas: eth::Gas(pool.gas_estimate),
-            state: liquidity::State::Stable(liquidity::stable::Pool {
+            state: liquidity::State::StableSurge(liquidity::stable_surge::Pool {
                 reserves,
                 amplification_parameter: conv::decimal_to_rational(&pool.amplification_parameter)
                     .ok_or("invalid amplification parameter")?,
                 fee: conv::decimal_to_rational(&pool.fee).ok_or("invalid stable surge pool fee")?,
+                surge_threshold_percentage: conv::decimal_to_rational(
+                    &pool.surge_threshold_percentage,
+                )
+                .ok_or("invalid surge threshold percentage")?,
+                max_surge_fee_percentage: conv::decimal_to_rational(&pool.max_surge_fee_percentage)
+                    .ok_or("invalid max surge fee percentage")?,
             }),
         })
     }

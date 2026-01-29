@@ -54,14 +54,6 @@ fn add_swap_fee_amount(amount: U256, swap_fee: Bfp) -> Result<U256, Error> {
     Ok(amount_with_fees.as_uint256())
 }
 
-fn subtract_swap_fee_amount(amount: U256, swap_fee: Bfp) -> Result<U256, Error> {
-    // https://github.com/balancer-labs/balancer-v2-monorepo/blob/6c9e24e22d0c46cca6dd15861d3d33da61a60b98/pkg/core/contracts/pools/BasePool.sol#L462-L466
-    let amount = Bfp::from_wei(amount);
-    let fee_amount = amount.mul_up(swap_fee)?;
-    let amount_without_fees = amount.sub(fee_amount)?;
-    Ok(amount_without_fees.as_uint256())
-}
-
 // Apply scaling factor and rate with rounding down
 fn to_scaled_18_apply_rate_round_down_bfp(
     amount: Bfp,
@@ -69,8 +61,29 @@ fn to_scaled_18_apply_rate_round_down_bfp(
     rate: Bfp,
 ) -> Result<Bfp, Error> {
     // Apply scaling factor first, then rate, both with rounding down
-    let scaled = amount.mul_down(scaling_factor)?;
-    scaled.mul_down(rate)
+    // Matches V3 Vault `toScaled18ApplyRateRoundDown` logic:
+    // return MathSol.mulDownFixed(amount * scalingFactor, tokenRate);
+    // = (amount * scalingFactor * tokenRate) / WAD
+    // Rust Bfp `mul_down` does (a * b) / WAD.
+    // We want (amount * scaling_factor * rate) / WAD^2 (since scaling_factor is
+    // already WAD-scaled in Rust). But wait, if we use `Bfp` operations,
+    // `amount.mul_down(sf).mul_down(rate)` is `(A*S/W)*R/W = A*S*R/W^2`.
+    // This matches the unit analysis.
+    // The issue is DOUBLE rounding.
+    // We should multiply all numerators first, then divide.
+    let numerator = amount
+        .as_uint256()
+        .checked_mul(scaling_factor.as_uint256())
+        .ok_or(Error::MulOverflow)?
+        .checked_mul(rate.as_uint256())
+        .ok_or(Error::MulOverflow)?;
+
+    let denominator = U256::exp10(36); // WAD * WAD
+    let result = numerator
+        .checked_div(denominator)
+        .ok_or(Error::ZeroDivision)?;
+
+    Ok(Bfp::from_wei(result))
 }
 
 // Apply scaling factor and rate with rounding up
@@ -81,8 +94,27 @@ fn to_scaled_18_apply_rate_round_up_bfp(
     rate: Bfp,
 ) -> Result<Bfp, Error> {
     // Apply scaling factor first, then rate, both with rounding up
-    let scaled = amount.mul_up(scaling_factor)?;
-    scaled.mul_up(rate)
+    // Matches V3 Vault logic but with single rounding step.
+    let numerator = amount
+        .as_uint256()
+        .checked_mul(scaling_factor.as_uint256())
+        .ok_or(Error::MulOverflow)?
+        .checked_mul(rate.as_uint256())
+        .ok_or(Error::MulOverflow)?;
+
+    let denominator = U256::exp10(36); // WAD * WAD
+
+    // Div Up
+    if denominator == U256::zero() {
+        return Err(Error::ZeroDivision);
+    }
+    let result = (numerator
+        .checked_add(denominator)
+        .ok_or(Error::AddOverflow)?
+        - U256::one())
+        / denominator;
+
+    Ok(Bfp::from_wei(result))
 }
 
 // Undo scaling factor and rate with rounding down
@@ -92,8 +124,32 @@ fn to_raw_undo_rate_round_down_bfp(
     rate: Bfp,
 ) -> Result<Bfp, Error> {
     // Multiply scaling factor and rate first, then divide amount by the product
-    let denominator = scaling_factor.mul_up(rate)?;
-    amount.div_down(denominator)
+    // Matches V3 Vault `toRawUndoRateRoundDown` logic:
+    // return MathSol.divDownFixed(amount, scalingFactor * tokenRate);
+    // = (amount * WAD) / (scalingFactor * tokenRate)
+    // Rust scaling_factor is WAD-based (10^18 for 1.0), while TS might be 1.0
+    // based. Assuming Rust scaling_factor matches V2 style (10^30 for USDC), we
+    // need to divide by WAD effectively. If we simply do (amount * WAD * WAD) /
+    // (scaling_factor * rate), we match the units.
+
+    let numerator = amount
+        .as_uint256()
+        .checked_mul(U256::exp10(36)) // WAD * WAD
+        .ok_or(Error::MulOverflow)?;
+
+    let denominator = scaling_factor
+        .as_uint256()
+        .checked_mul(rate.as_uint256())
+        .ok_or(Error::MulOverflow)?;
+
+    if denominator == U256::zero() {
+        return Err(Error::ZeroDivision);
+    }
+
+    let result = numerator
+        .checked_div(denominator)
+        .ok_or(Error::ZeroDivision)?;
+    Ok(Bfp::from_wei(result))
 }
 
 // Undo scaling factor and rate with rounding up
@@ -102,13 +158,38 @@ fn to_raw_undo_rate_round_up_bfp(
     scaling_factor: Bfp,
     rate: Bfp,
 ) -> Result<Bfp, Error> {
-    // Multiply scaling factor and rate first, then divide amount by the product
-    let denominator = scaling_factor.mul_up(rate)?;
-    amount.div_up(denominator)
+    // Matches V3 Vault `toRawUndoRateRoundUp` logic:
+    // return MathSol.divUpFixed(amount, scalingFactor * tokenRate);
+
+    let numerator = amount
+        .as_uint256()
+        .checked_mul(U256::exp10(36)) // WAD * WAD
+        .ok_or(Error::MulOverflow)?;
+
+    let denominator = scaling_factor
+        .as_uint256()
+        .checked_mul(rate.as_uint256())
+        .ok_or(Error::MulOverflow)?;
+
+    if denominator == U256::zero() {
+        return Err(Error::ZeroDivision);
+    }
+
+    // Div Up
+    let result = (numerator
+        .checked_add(denominator)
+        .ok_or(Error::AddOverflow)?
+        - U256::one())
+        / denominator;
+    Ok(Bfp::from_wei(result))
 }
 
 // Rate rounding function from Balancer math library
-#[allow(dead_code)]
+// Rates calculated by an external rate provider have rounding errors.
+// Intuitively, a rate provider rounds the rate down so the pool math is
+// executed with conservative amounts. However, when upscaling or downscaling
+// the amount out, the rate should be rounded up to make sure the amounts scaled
+// are conservative.
 fn compute_rate_round_up(rate: U256) -> U256 {
     let rounded_rate = (rate / U256::exp10(18)) * U256::exp10(18);
     if rounded_rate == rate { rate } else { rate + 1 }
@@ -154,7 +235,9 @@ impl TokenState {
     /// div. https://github.com/balancer-labs/balancer-v2-monorepo/blob/c18ff2686c61a8cbad72cdcfc65e9b11476fdbc3/pkg/pool-utils/contracts/BasePool.sol#L542-L544
     fn downscale_down(&self, amount: Bfp) -> Result<U256, Error> {
         if self.rate != U256::exp10(18) {
-            let rate_bfp = Bfp::from_wei(self.rate);
+            // Round rate up when downscaling output amounts to be conservative
+            let rounded_rate = compute_rate_round_up(self.rate);
+            let rate_bfp = Bfp::from_wei(rounded_rate);
             let result = to_raw_undo_rate_round_down_bfp(amount, self.scaling_factor, rate_bfp)?;
             Ok(result.as_uint256())
         } else {
@@ -186,14 +269,18 @@ impl WeightedPoolRef<'_> {
         let in_reserves = self.reserves.get(&in_token)?;
         let out_reserves = self.reserves.get(&out_token)?;
 
-        let in_amount_minus_fees = subtract_swap_fee_amount(in_amount, self.swap_fee).ok()?;
+        // Upscale FIRST, then subtract fees (matches official balancer-maths
+        // vault/swap.rs)
+        let in_amount_scaled = in_reserves.common.upscale(in_amount).ok()?;
+        let fee_amount = in_amount_scaled.mul_up(self.swap_fee).ok()?;
+        let in_amount_after_fees = in_amount_scaled.sub(fee_amount).ok()?;
 
         let out_amount = weighted_math::calc_out_given_in(
             in_reserves.common.upscaled_balance().ok()?,
             in_reserves.weight,
             out_reserves.common.upscaled_balance().ok()?,
             out_reserves.weight,
-            in_reserves.common.upscale(in_amount_minus_fees).ok()?,
+            in_amount_after_fees,
         )
         .ok()?;
         out_reserves.common.downscale_down(out_amount).ok()
@@ -320,13 +407,18 @@ impl<'a> StablePoolRef<'a> {
         } = self
             .upscale_balances_with_token_indices(&in_token, &out_token)
             .ok()?;
-        let in_amount_minus_fees = subtract_swap_fee_amount(in_amount, self.swap_fee).ok()?;
+
+        // Upscale FIRST, then subtract fees
+        let in_amount_scaled = in_reserves.upscale(in_amount).ok()?;
+        let fee_amount = in_amount_scaled.mul_up(self.swap_fee).ok()?;
+        let in_amount_after_fees = in_amount_scaled.sub(fee_amount).ok()?;
+
         let out_amount = stable_math::calc_out_given_in(
             self.amplification_parameter_u256()?,
             balances.as_mut_slice(),
             token_index_in,
             token_index_out,
-            in_reserves.upscale(in_amount_minus_fees).ok()?,
+            in_amount_after_fees,
         )
         .ok()?;
         out_reserves.downscale_down(out_amount).ok()
@@ -745,8 +837,10 @@ impl GyroEPoolRef<'_> {
         let in_reserves = self.reserves.get(&in_token)?;
         let out_reserves = self.reserves.get(&out_token)?;
 
-        // Apply swap fee to input amount
-        let in_amount_minus_fees = subtract_swap_fee_amount(in_amount, self.swap_fee).ok()?;
+        // Upscale FIRST, then subtract fees
+        let in_amount_scaled = in_reserves.upscale(in_amount).ok()?;
+        let fee_amount = in_amount_scaled.mul_up(self.swap_fee).ok()?;
+        let in_amount_after_fees = in_amount_scaled.sub(fee_amount).ok()?;
 
         // Determine token order (token0 vs token1)
         let token_in_is_token0 = in_token < out_token;
@@ -779,10 +873,7 @@ impl GyroEPoolRef<'_> {
                     .to_big_int(),
             ]
         };
-
-        // Convert input amount to BigInt
-        let in_amount_scaled = in_reserves.upscale(in_amount_minus_fees).ok()?;
-        let _amount_in_big_int = in_amount_scaled.as_uint256().to_big_int();
+        let _amount_in_big_int = in_amount_after_fees.as_uint256().to_big_int();
 
         // Convert SBfp parameters to gyro_e_math format and perform swap calculation
         let params = gyro_e_math::EclpParams {
@@ -1027,13 +1118,15 @@ impl Gyro2CLPPoolRef<'_> {
         let in_reserves = self.reserves.get(&in_token)?;
         let out_reserves = self.reserves.get(&out_token)?;
 
-        // Apply swap fees to input amount
-        let in_amount_minus_fees = subtract_swap_fee_amount(in_amount, self.swap_fee).ok()?;
+        // Upscale FIRST, then subtract fees
+        let in_amount_scaled = in_reserves.upscale(in_amount).ok()?;
+        let fee_amount = in_amount_scaled.mul_up(self.swap_fee).ok()?;
+        let in_amount_after_fees = in_amount_scaled.sub(fee_amount).ok()?;
 
         // Convert to upscaled amounts
         let in_balance_upscaled = in_reserves.upscaled_balance().ok()?.as_uint256();
         let out_balance_upscaled = out_reserves.upscaled_balance().ok()?.as_uint256();
-        let in_amount_upscaled = in_reserves.upscale(in_amount_minus_fees).ok()?.as_uint256();
+        let in_amount_upscaled = in_amount_after_fees.as_uint256();
 
         // Convert to BigInt for 2-CLP math
         let in_balance_bigint = in_balance_upscaled.to_big_int();
@@ -1212,6 +1305,7 @@ pub struct ReClammPoolRef<'a> {
     pub end_fourth_root_price_ratio: Bfp,
     pub price_ratio_update_start_time: u64,
     pub price_ratio_update_end_time: u64,
+    pub current_timestamp: u64,
 }
 
 impl ReClammPoolRef<'_> {
@@ -1231,7 +1325,7 @@ impl ReClammPoolRef<'_> {
             end_fourth_root_price_ratio: self.end_fourth_root_price_ratio,
         };
         let (va, vb, changed) = reclamm_math::compute_current_virtual_balances(
-            self.last_timestamp,
+            self.current_timestamp,
             &balances_scaled18,
             self.last_virtual_balances[0],
             self.last_virtual_balances[1],
@@ -1258,8 +1352,10 @@ impl ReClammPoolRef<'_> {
         let in_reserves = self.reserves.get(&in_token)?;
         let out_reserves = self.reserves.get(&out_token)?;
 
-        // Apply swap fee
-        let in_amount_minus_fees = subtract_swap_fee_amount(in_amount, self.swap_fee).ok()?;
+        // Upscale FIRST, then subtract fees
+        let in_amount_scaled = in_reserves.upscale(in_amount).ok()?;
+        let fee_amount = in_amount_scaled.mul_up(self.swap_fee).ok()?;
+        let amount_in_scaled18 = in_amount_scaled.sub(fee_amount).ok()?;
 
         let (balances_scaled18, va, vb, _changed) =
             self.compute_virtuals_and_balances(token0, token1, self.reserves)?;
@@ -1270,8 +1366,6 @@ impl ReClammPoolRef<'_> {
         } else {
             (1usize, 0usize)
         };
-
-        let amount_in_scaled18 = in_reserves.upscale(in_amount_minus_fees).ok()?;
         let out_scaled = reclamm_math::compute_out_given_in(
             &balances_scaled18,
             va,
@@ -1338,6 +1432,7 @@ impl ReClammPool {
             end_fourth_root_price_ratio: self.end_fourth_root_price_ratio,
             price_ratio_update_start_time: self.price_ratio_update_start_time,
             price_ratio_update_end_time: self.price_ratio_update_end_time,
+            current_timestamp: self.current_timestamp,
         }
     }
 }
@@ -1387,8 +1482,10 @@ impl QuantAmmPoolRef<'_> {
         let in_index = self.reserves.keys().position(|&token| token == in_token)?;
         let out_index = self.reserves.keys().position(|&token| token == out_token)?;
 
-        // Apply swap fee first (subtract from input, like weighted pools)
-        let amount_in_minus_fees = subtract_swap_fee_amount(amount_in, self.swap_fee).ok()?;
+        // Upscale FIRST, then subtract fees
+        let amount_in_scaled = in_reserve.upscale(amount_in).ok()?;
+        let fee_amount = amount_in_scaled.mul_up(self.swap_fee).ok()?;
+        let upscaled_amount_in = amount_in_scaled.sub(fee_amount).ok()?;
 
         // Extract weights and multipliers from packed arrays (matches balancer-maths
         // pattern)
@@ -1397,8 +1494,6 @@ impl QuantAmmPoolRef<'_> {
             self.second_four_weights_and_multipliers,
             self.reserves.len(),
         )?;
-
-        let upscaled_amount_in = in_reserve.upscale(amount_in_minus_fees).ok()?;
 
         // Check max trade size ratio for input (matches balancer-maths)
         let max_in_amount = in_reserve
@@ -1526,9 +1621,6 @@ impl BaselineSolvable for QuantAmmPoolRef<'_> {
         out_token: H160,
         (amount_in, in_token): (U256, H160),
     ) -> Option<U256> {
-        if amount_in.is_zero() {
-            return Some(U256::zero());
-        }
         self.get_amount_out_inner(out_token, amount_in, in_token)
     }
 
@@ -1537,10 +1629,17 @@ impl BaselineSolvable for QuantAmmPoolRef<'_> {
         in_token: H160,
         (amount_out, out_token): (U256, H160),
     ) -> Option<U256> {
-        if amount_out.is_zero() {
-            return Some(U256::zero());
+        let result = self.get_amount_in_inner(in_token, amount_out, out_token);
+        if result.is_none() {
+            tracing::debug!(
+                in_token = ?in_token,
+                out_token = ?out_token,
+                amount_out = %amount_out,
+                reserves_count = self.reserves.len(),
+                "QuantAmm get_amount_in_inner returned None"
+            );
         }
-        self.get_amount_in_inner(in_token, amount_out, out_token)
+        result
     }
 
     async fn gas_cost(&self) -> usize {

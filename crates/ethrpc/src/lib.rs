@@ -10,7 +10,7 @@ pub mod mock;
 use {
     self::{buffered::BufferedTransport, http::HttpTransport},
     crate::alloy::MutWallet,
-    ::alloy::providers::DynProvider,
+    ::alloy::providers::{DynProvider, Provider, ProviderBuilder},
     ethcontract::{batch::CallBatch, transport::DynTransport},
     reqwest::{Client, Url},
     std::{num::NonZeroUsize, time::Duration},
@@ -150,4 +150,13 @@ pub fn create_test_transport(url: &str) -> Web3Transport {
     let dyn_transport = Web3Transport::new(http_transport);
     let instrumented = instrumented::InstrumentedTransport::new("test".into(), dyn_transport);
     Web3Transport::new(instrumented)
+}
+
+/// Creates a noop alloy provider for encoding-only use cases.
+/// This provider should only be used when creating contract instances
+/// for the purpose of encoding calldata, not for actual RPC calls.
+pub fn noop_provider() -> AlloyProvider {
+    ProviderBuilder::new()
+        .connect_mocked_client(::alloy::providers::mock::Asserter::new())
+        .erased()
 }

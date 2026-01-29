@@ -9,7 +9,7 @@ use {
         quote::QuoteId,
         signature::{self, EcdsaSignature, EcdsaSigningScheme, Signature},
     },
-    alloy::primitives::{Address, U512},
+    alloy::primitives::{Address, B256, U512},
     anyhow::{Result, anyhow},
     app_data::{AppDataHash, hash_full_app_data},
     bigdecimal::BigDecimal,
@@ -161,7 +161,7 @@ impl OrderBuilder {
         domain: &DomainSeparator,
         key: SecretKeyRef,
     ) -> Self {
-        self.0.metadata.owner = key.address();
+        self.0.metadata.owner = Address::new(key.address().0);
         self.0.metadata.uid = self.0.data.uid(domain, &key.address());
         self.0.signature =
             EcdsaSignature::sign(signing_scheme, domain, &self.0.data.hash_struct(), key)
@@ -170,13 +170,13 @@ impl OrderBuilder {
     }
 
     pub fn with_eip1271(mut self, owner: H160, signature: Vec<u8>) -> Self {
-        self.0.metadata.owner = owner;
+        self.0.metadata.owner = Address::new(owner.0);
         self.0.signature = Signature::Eip1271(signature);
         self
     }
 
     pub fn with_presign(mut self, owner: H160) -> Self {
-        self.0.metadata.owner = owner;
+        self.0.metadata.owner = Address::new(owner.0);
         self.0.signature = Signature::PreSign;
         self
     }
@@ -273,22 +273,9 @@ impl OrderData {
 
     /// Checks if the order is a market order.
     pub fn within_market(&self, quote: QuoteAmounts) -> bool {
-        // Manual transformation because this crate doesn't have the conversiont trait
-        let mut buy_buffer = [0; 32];
-        quote.buy.to_big_endian(&mut buy_buffer);
-        let quote_buy = alloy::primitives::U256::from_be_bytes(buy_buffer);
-
-        let mut sell_buffer = [0; 32];
-        quote.sell.to_big_endian(&mut sell_buffer);
-        let quote_sell = alloy::primitives::U256::from_be_bytes(sell_buffer);
-
-        let mut fee_buffer = [0; 32];
-        quote.fee.to_big_endian(&mut fee_buffer);
-        let quote_fee = alloy::primitives::U256::from_be_bytes(fee_buffer);
-
         // Using let here because widening_mul isn't able to infer the result size
-        let lhs: U512 = (self.sell_amount + self.fee_amount).widening_mul(quote_buy);
-        let rhs: U512 = (quote_sell + quote_fee).widening_mul(self.buy_amount);
+        let lhs: U512 = (self.sell_amount + self.fee_amount).widening_mul(quote.buy);
+        let rhs: U512 = (quote.sell + quote.fee).widening_mul(self.buy_amount);
         lhs >= rhs
     }
 }
@@ -297,9 +284,9 @@ impl OrderData {
 /// sell token and buy `buy` amount of buy token. Additionally, `fee``
 /// denominated in the sell token needs to be payed.
 pub struct QuoteAmounts {
-    pub sell: U256,
-    pub buy: U256,
-    pub fee: U256,
+    pub sell: alloy::primitives::U256,
+    pub buy: alloy::primitives::U256,
+    pub fee: alloy::primitives::U256,
 }
 
 /// An order as provided to the POST order endpoint.
@@ -647,7 +634,7 @@ pub struct CancellationPayload {
 #[serde(rename_all = "camelCase")]
 pub struct EthflowData {
     pub user_valid_to: i64,
-    pub refund_tx_hash: Option<H256>,
+    pub refund_tx_hash: Option<B256>,
 }
 
 // We still want to have the `is_refunded` field in the JSON response to stay
@@ -663,7 +650,7 @@ impl ::serde::Serialize for EthflowData {
         #[serde(rename_all = "camelCase")]
         struct Extended {
             user_valid_to: i64,
-            refund_tx_hash: Option<H256>,
+            refund_tx_hash: Option<B256>,
             is_refunded: bool,
         }
 
@@ -707,7 +694,7 @@ pub enum OnchainOrderPlacementError {
 #[derive(Eq, PartialEq, Clone, Default, Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct OnchainOrderData {
-    pub sender: H160,
+    pub sender: Address,
     pub placement_error: Option<OnchainOrderPlacementError>,
 }
 
@@ -717,7 +704,7 @@ pub struct OnchainOrderData {
 #[serde(rename_all = "camelCase")]
 pub struct OrderMetadata {
     pub creation_date: DateTime<Utc>,
-    pub owner: H160,
+    pub owner: Address,
     pub uid: OrderUid,
     /// deprecated, always set to null
     #[serde_as(as = "Option<HexOrDecimalU256>")]
@@ -734,18 +721,18 @@ pub struct OrderMetadata {
     pub executed_fee_amount: U256,
     #[serde_as(as = "HexOrDecimalU256")]
     pub executed_fee: U256,
-    pub executed_fee_token: H160,
+    pub executed_fee_token: Address,
     pub invalidated: bool,
     pub status: OrderStatus,
     #[serde(flatten)]
     pub class: OrderClass,
-    pub settlement_contract: H160,
+    pub settlement_contract: Address,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ethflow_data: Option<EthflowData>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub onchain_order_data: Option<OnchainOrderData>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub onchain_user: Option<H160>,
+    pub onchain_user: Option<Address>,
     pub is_liquidity_order: bool,
     /// Full app data that `OrderData::app_data` is a hash of. Can be None if
     /// the backend doesn't know about the full app data.
@@ -1139,7 +1126,7 @@ mod tests {
             metadata: OrderMetadata {
                 creation_date: Utc.timestamp_millis_opt(3_000).unwrap(),
                 class: OrderClass::Limit,
-                owner: H160::from_low_u64_be(1),
+                owner: Address::with_last_byte(1),
                 uid: OrderUid([17u8; 56]),
                 available_balance: None,
                 executed_buy_amount: BigUint::from_bytes_be(&[3]),
@@ -1147,10 +1134,10 @@ mod tests {
                 executed_sell_amount_before_fees: 4.into(),
                 executed_fee_amount: 1.into(),
                 executed_fee: 1.into(),
-                executed_fee_token: H160::from_low_u64_be(10),
+                executed_fee_token: Address::with_last_byte(10),
                 invalidated: true,
                 status: OrderStatus::Open,
-                settlement_contract: H160::from_low_u64_be(2),
+                settlement_contract: Address::with_last_byte(2),
                 full_app_data: Some("123".to_string()),
                 ..Default::default()
             },
